@@ -1,0 +1,2489 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Çam Segmentasyon Pipeline — Kod Dokümantasyonu</title>
+</head>
+<body>
+<style>
+:root{
+  --bg:#f6f7f3; --surface:#ffffff; --surface2:#eef1ea; --line:#dde3d8;
+  --ink:#20261f; --ink2:#5a6656; --ink3:#8a947f;
+  --accent:#2e6b3f; --accent-ink:#ffffff; --accent-soft:#e2ecdd;
+  --code-bg:#f0f2ec; --tk-kw:#1d5c8f; --tk-str:#356b32; --tk-com:#8a947f;
+  --tk-num:#9a5a1a; --tk-bi:#6b3fa0; --tk-dec:#9a5a1a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#141813; --surface:#1b201a; --surface2:#232a21; --line:#313a2e;
+    --ink:#e4e8df; --ink2:#a7b19d; --ink3:#77816d;
+    --accent:#7fbe8f; --accent-ink:#0f130e; --accent-soft:#24331f;
+    --code-bg:#191e18; --tk-kw:#7db3e0; --tk-str:#9ecf8f; --tk-com:#77816d;
+    --tk-num:#e0aa72; --tk-bi:#c19ae6; --tk-dec:#e0aa72;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141813; --surface:#1b201a; --surface2:#232a21; --line:#313a2e;
+  --ink:#e4e8df; --ink2:#a7b19d; --ink3:#77816d;
+  --accent:#7fbe8f; --accent-ink:#0f130e; --accent-soft:#24331f;
+  --code-bg:#191e18; --tk-kw:#7db3e0; --tk-str:#9ecf8f; --tk-com:#77816d;
+  --tk-num:#e0aa72; --tk-bi:#c19ae6; --tk-dec:#e0aa72;
+}
+:root[data-theme="light"]{
+  --bg:#f6f7f3; --surface:#ffffff; --surface2:#eef1ea; --line:#dde3d8;
+  --ink:#20261f; --ink2:#5a6656; --ink3:#8a947f;
+  --accent:#2e6b3f; --accent-ink:#ffffff; --accent-soft:#e2ecdd;
+  --code-bg:#f0f2ec; --tk-kw:#1d5c8f; --tk-str:#356b32; --tk-com:#8a947f;
+  --tk-num:#9a5a1a; --tk-bi:#6b3fa0; --tk-dec:#9a5a1a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+a{color:var(--accent); text-decoration:none}
+a:hover,a:focus-visible{text-decoration:underline}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+.wrap{display:grid; grid-template-columns:250px minmax(0,1fr); gap:0; max-width:1200px; margin:0 auto}
+nav{
+  position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  padding:28px 20px 40px 24px; border-right:1px solid var(--line); font-size:13.5px;
+}
+nav .brand{font-weight:700; font-size:14px; letter-spacing:.02em; margin-bottom:2px}
+nav .brand-sub{color:var(--ink2); font-size:12px; margin-bottom:20px}
+nav h3{
+  font-size:10.5px; text-transform:uppercase; letter-spacing:.14em;
+  color:var(--ink3); margin:20px 0 6px; font-weight:600;
+}
+nav ol,nav ul{list-style:none; margin:0; padding:0}
+nav li{margin:0}
+nav li a{display:block; padding:4px 8px; border-radius:6px; color:var(--ink2)}
+nav li a:hover{background:var(--surface2); color:var(--ink); text-decoration:none}
+nav .stepno{
+  display:inline-block; width:1.35em; color:var(--accent);
+  font-variant-numeric:tabular-nums; font-weight:600;
+}
+main{padding:36px 40px 80px; min-width:0}
+header.page h1{
+  font-size:30px; line-height:1.2; margin:0 0 6px; font-weight:750;
+  letter-spacing:-.015em; text-wrap:balance;
+}
+header.page .sub{color:var(--ink2); font-size:16px; max-width:62ch; margin:0 0 14px}
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px}
+.chip{
+  font-size:12px; letter-spacing:.04em; padding:3px 10px; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent); font-weight:600;
+  border:1px solid transparent;
+}
+section{margin-top:44px}
+section > h2{
+  font-size:21px; font-weight:700; letter-spacing:-.01em; margin:0 0 4px;
+  padding-top:8px; text-wrap:balance;
+}
+.eyebrow{
+  font-size:11px; text-transform:uppercase; letter-spacing:.14em;
+  color:var(--accent); font-weight:700; margin:0;
+}
+section > p.desc{color:var(--ink2); max-width:70ch; margin:8px 0 16px}
+table{
+  border-collapse:collapse; width:100%; font-size:14px;
+  background:var(--surface); border:1px solid var(--line); border-radius:10px;
+  overflow:hidden;
+}
+table.io{table-layout:fixed}
+th,td{padding:9px 14px; text-align:left; vertical-align:top; border-top:1px solid var(--line)}
+thead th{
+  border-top:none; background:var(--surface2); font-size:11px;
+  text-transform:uppercase; letter-spacing:.1em; color:var(--ink2);
+}
+td.mono,code{
+  font-family:ui-monospace,"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+  font-size:13px;
+}
+code{background:var(--surface2); padding:1px 6px; border-radius:5px}
+pre > code{background:transparent; padding:0; border-radius:0}
+.tablewrap{overflow-x:auto; border-radius:10px}
+.pipeline td:first-child{
+  width:2.2em; color:var(--accent); font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+details.code{
+  margin-top:16px; border:1px solid var(--line); border-radius:10px;
+  background:var(--surface); overflow:hidden;
+}
+details.code summary{
+  cursor:pointer; list-style:none; padding:10px 16px; font-weight:600;
+  font-size:13.5px; display:flex; align-items:center; gap:10px;
+  background:var(--surface2); user-select:none;
+}
+details.code summary::before{content:"▸"; color:var(--accent); transition:transform .15s}
+details.code[open] summary::before{transform:rotate(90deg)}
+@media (prefers-reduced-motion: reduce){details.code summary::before{transition:none}}
+details.code summary .fname{
+  font-family:ui-monospace,"Cascadia Code",Consolas,Menlo,monospace; font-weight:600;
+}
+details.code summary .hint{margin-left:auto; color:var(--ink3); font-weight:400; font-size:12px}
+pre{
+  margin:0; padding:16px 18px; overflow-x:auto; background:var(--code-bg);
+  font:12.5px/1.55 ui-monospace,"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+  tab-size:4;
+}
+.tk-kw{color:var(--tk-kw); font-weight:600}
+.tk-str{color:var(--tk-str)}
+.tk-com{color:var(--tk-com); font-style:italic}
+.tk-num{color:var(--tk-num)}
+.tk-bi{color:var(--tk-bi)}
+.tk-dec{color:var(--tk-dec)}
+.note{
+  border-left:3px solid var(--accent); background:var(--surface);
+  padding:10px 16px; border-radius:0 10px 10px 0; font-size:14px;
+  color:var(--ink2); margin:14px 0; max-width:75ch;
+}
+.note strong{color:var(--ink)}
+footer{
+  margin-top:64px; padding-top:20px; border-top:1px solid var(--line);
+  color:var(--ink3); font-size:13px;
+}
+@media (max-width: 860px){
+  .wrap{grid-template-columns:1fr}
+  nav{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line)}
+  main{padding:28px 20px 60px}
+}
+</style>
+<div class="wrap">
+<nav aria-label="İçindekiler">
+<div class="brand">🌲 Çam Segmentasyon</div>
+<div class="brand-sub">YTÜ Harita Müh. — Tez Pipeline'ı</div>
+<h3>İşlem Hattı</h3>
+<ol><li><a href="#adim-1"><span class="stepno">1</span>Roboflow&#x27;da etiketleme</a></li><li><a href="#adim-2"><span class="stepno">2</span>Colab&#x27;da eğitim</a></li><li><a href="#adim-3"><span class="stepno">3</span>best.pt&#x27;yi indir</a></li><li><a href="#adim-4"><span class="stepno">4</span>inference_orthomosaic.py</a></li><li><a href="#adim-5"><span class="stepno">5</span>export_results.py</a></li><li><a href="#adim-6"><span class="stepno">6</span>make_reference_grid.py</a></li><li><a href="#adim-7"><span class="stepno">7</span>QGIS&#x27;te referans çizimi</a></li><li><a href="#adim-8"><span class="stepno">8</span>accuracy_assessment.py</a></li><li><a href="#adim-9"><span class="stepno">9</span>threshold_analysis.py</a></li></ol>
+<h3>Kod Dosyaları</h3>
+<ul>
+<li><a href="#notebook">train_yolov8seg.ipynb</a></li>
+<li><a href="#inference">inference_orthomosaic.py</a></li><li><a href="#export">export_results.py</a></li><li><a href="#grid">make_reference_grid.py</a></li><li><a href="#accuracy">accuracy_assessment.py</a></li><li><a href="#threshold">threshold_analysis.py</a></li>
+<li><a href="#requirements">requirements.txt</a></li>
+</ul>
+</nav>
+<main>
+<header class="page">
+<p class="eyebrow">Yüksek Lisans Tezi — Kod Dokümantasyonu</p>
+<h1>İHA Görüntülerinden Çam Ağacı Tespiti ve Segmentasyonu</h1>
+<p class="sub">YOLOv8-seg ile ortomozaik üzerinde ağaç bazlı instance segmentation:
+tahmin, CBS çıktıları, ağaç boyu (CHM), doğruluk değerlendirmesi ve eşik analizi.
+Bu sayfa, projenin tüm Python kodunu tek yerde toplar.</p>
+<div class="chips">
+<span class="chip">Python 3.11</span><span class="chip">Windows 11</span>
+<span class="chip">YOLOv8m-seg</span><span class="chip">seed = 42</span>
+<span class="chip">EPSG:32635</span>
+</div>
+</header>
+<section id="pipeline">
+<p class="eyebrow">Genel Bakış</p>
+<h2>9 Adımlı İşlem Hattı</h2>
+<p class="desc">Adımlar sırayla uygulanır; her scriptin başındaki CONFIG bloğunda
+dosya yolları <code>C:\Users\meryemnur.cevik\Desktop\cam_tezi\</code> klasör
+yapısına göre tanımlıdır.</p>
+<div class="tablewrap"><table class="pipeline">
+<thead><tr><th>#</th><th>Adım</th><th>Girdi → Çıktı</th></tr></thead>
+<tbody><tr id="adim-1"><td>1</td><td><strong>Roboflow&#x27;da etiketleme</strong></td><td>Karo görüntüleri → polygon etiketli veri seti (sınıf: cam)</td></tr><tr id="adim-2"><td>2</td><td><strong>Colab&#x27;da eğitim — train_yolov8seg.ipynb</strong></td><td>seed=42, deterministic=True → best.pt + egitim_metrikleri.csv</td></tr><tr id="adim-3"><td>3</td><td><strong>best.pt&#x27;yi indir</strong></td><td>Google Drive → 04_training\best.pt</td></tr><tr id="adim-4"><td>4</td><td><strong>inference_orthomosaic.py</strong></td><td>Ortomozaik → cam_tespitleri.geojson + tespitler.pkl</td></tr><tr id="adim-5"><td>5</td><td><strong>export_results.py</strong></td><td>CHM&#x27;den ağaç boyu → cam_agaclari.shp + rapor + grafikler</td></tr><tr id="adim-6"><td>6</td><td><strong>make_reference_grid.py</strong></td><td>3 adet 30×30 m örneklem karesi → grid_kareleri.shp</td></tr><tr id="adim-7"><td>7</td><td><strong>QGIS&#x27;te referans çizimi</strong></td><td>Kareler içindeki çamlar elle → referans_agaclar.shp</td></tr><tr id="adim-8"><td>8</td><td><strong>accuracy_assessment.py</strong></td><td>Macar eşleştirme, IoU ≥ 0.5 → Precision / Recall / F1 + R², RMSE</td></tr><tr id="adim-9"><td>9</td><td><strong>threshold_analysis.py</strong></td><td>5 güven eşiği → esik_analizi.csv + esik_analizi.png</td></tr></tbody>
+</table></div>
+</section>
+<section id="notebook">
+<p class="eyebrow">Adım 2 — Google Colab</p>
+<h2>train_yolov8seg.ipynb — Model Eğitimi</h2>
+<p class="desc">Roboflow veri setiyle YOLOv8m-seg eğitimi. Eğitim
+<strong>seed=42</strong> ve <strong>deterministic=True</strong> ile tekrarlanabilirdir;
+son hücre doğrulama metriklerini tez tablosuna hazır biçimde
+<code>egitim_metrikleri.csv</code> dosyasına yazar.</p>
+<div class="tablewrap"><table class="io">
+<thead><tr><th>Girdi</th><th>Çıktı</th></tr></thead>
+<tbody><tr><td class="mono">Roboflow veri seti (YOLOv8-seg formatı)</td><td class="mono">best.pt, egitim_metrikleri.csv, eğitim grafikleri</td></tr></tbody>
+</table></div>
+<div class="note"><strong>Notebook bölümleri:</strong><ol style="margin:6px 0 0; padding-left:1.2em"><li>🌲 YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation Eğitimi</li><li>1. GPU Kontrolü ve Kurulum</li><li>2. Roboflow&#x27;dan Veri Seti İndirme</li><li>3. Örnek Görüntüleri Görselleştirme</li><li>4. YOLOv8m-seg Modelini Yükle</li><li>5. Model Eğitimi</li><li>6. Eğitim Sonuçlarını Değerlendirme</li><li>7. Modeli Google Drive&#x27;a Kaydet</li><li>8. Test: Tek Görüntü Üzerinde Tahmin</li><li>9. Sonraki Adımlar</li><li>10. Eğitim Metrikleri Tablosu (Tez İçin)</li></ol></div>
+<details class="code">
+<summary><span class="fname">Eğitim hücresi (seed=42, deterministic=True)</span><span class="hint">61 satır — göster / gizle</span></summary>
+<pre><code>%%time
+
+<span class="tk-com"># MODEL EĞİTİMİ BAŞLIYOR</span>
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;🚀 YOLOv8m-seg EĞİTİMİ BAŞLIYOR&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Epochs: {EPOCHS}&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Patience: {PATIENCE}&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Image Size: {IMAGE_SIZE}&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Batch Size: {&#x27;Otomatik&#x27; if BATCH_SIZE == -1 else BATCH_SIZE}&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Seed: {SEED} (deterministic=True)&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+
+<span class="tk-com"># Eğitimi başlat</span>
+results = model.train(
+    data=data_yaml,
+    epochs=EPOCHS,
+    patience=PATIENCE,
+    imgsz=IMAGE_SIZE,
+    batch=BATCH_SIZE,
+    
+    <span class="tk-com"># Optimizasyon</span>
+    optimizer=<span class="tk-str">&quot;auto&quot;</span>,
+    lr0=<span class="tk-num">0.01</span>,
+    lrf=<span class="tk-num">0.01</span>,
+    momentum=<span class="tk-num">0.937</span>,
+    weight_decay=<span class="tk-num">0.0005</span>,
+    warmup_epochs=<span class="tk-num">3.0</span>,
+    
+    <span class="tk-com"># Data Augmentation (varsayılanlar iyi çalışır)</span>
+    hsv_h=<span class="tk-num">0.015</span>,      <span class="tk-com"># Hue değişimi</span>
+    hsv_s=<span class="tk-num">0.7</span>,        <span class="tk-com"># Saturation değişimi</span>
+    hsv_v=<span class="tk-num">0.4</span>,        <span class="tk-com"># Value (parlaklık) değişimi</span>
+    degrees=<span class="tk-num">0.0</span>,      <span class="tk-com"># Rotasyon (ağaçlar için kapalı)</span>
+    translate=<span class="tk-num">0.1</span>,    <span class="tk-com"># Öteleme</span>
+    scale=<span class="tk-num">0.5</span>,        <span class="tk-com"># Ölçekleme (±50%)</span>
+    flipud=<span class="tk-num">0.0</span>,       <span class="tk-com"># Dikey çevirme (kapalı - ağaçlar ters durmaz)</span>
+    fliplr=<span class="tk-num">0.5</span>,       <span class="tk-com"># Yatay çevirme</span>
+    mosaic=<span class="tk-num">1.0</span>,       <span class="tk-com"># Mosaic augmentation</span>
+    mixup=<span class="tk-num">0.0</span>,        <span class="tk-com"># Mixup (kapalı)</span>
+    
+    <span class="tk-com"># Tekrarlanabilirlik (tezde belirtilecek: seed=42, deterministic=True)</span>
+    seed=SEED,
+    deterministic=<span class="tk-kw">True</span>,
+    
+    <span class="tk-com"># Diğer ayarlar</span>
+    device=<span class="tk-num">0</span>,         <span class="tk-com"># GPU 0</span>
+    workers=<span class="tk-num">2</span>,        <span class="tk-com"># Colab için 2 worker yeterli</span>
+    project=<span class="tk-str">&quot;cam_segmentation&quot;</span>,
+    name=<span class="tk-str">&quot;yolov8m_seg_egitim&quot;</span>,
+    exist_ok=<span class="tk-kw">True</span>,
+    pretrained=<span class="tk-kw">True</span>,
+    verbose=<span class="tk-kw">True</span>,
+    save=<span class="tk-kw">True</span>,
+    save_period=<span class="tk-num">25</span>,   <span class="tk-com"># Her 25 epoch&#x27;ta checkpoint kaydet</span>
+    plots=<span class="tk-kw">True</span>,       <span class="tk-com"># Eğitim grafiklerini oluştur</span>
+)
+
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;✅ EĞİTİM TAMAMLANDI!&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)</code></pre>
+</details>
+<details class="code">
+<summary><span class="fname">Metrik tablosu hücresi (egitim_metrikleri.csv)</span><span class="hint">44 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com"># Eğitim metriklerini tez tablosuna hazır DataFrame olarak yazdır ve CSV&#x27;ye kaydet</span>
+<span class="tk-com"># NOT: Bu hücre, 6. bölümdeki değerlendirme hücresinin (metrics = best_model.val(...))</span>
+<span class="tk-com"># çalıştırılmış olmasını gerektirir.</span>
+
+<span class="tk-kw">import</span> pandas <span class="tk-kw">as</span> pd
+
+metrik_tablosu = pd.DataFrame({
+    <span class="tk-str">&quot;Metrik&quot;</span>: [<span class="tk-str">&quot;mAP50&quot;</span>, <span class="tk-str">&quot;mAP50-95&quot;</span>, <span class="tk-str">&quot;Precision&quot;</span>, <span class="tk-str">&quot;Recall&quot;</span>],
+    <span class="tk-str">&quot;Box (Sınırlayıcı Kutu)&quot;</span>: [
+        <span class="tk-bi">round</span>(metrics.box.map50, <span class="tk-num">4</span>),
+        <span class="tk-bi">round</span>(metrics.box.map, <span class="tk-num">4</span>),
+        <span class="tk-bi">round</span>(metrics.box.mp, <span class="tk-num">4</span>),
+        <span class="tk-bi">round</span>(metrics.box.mr, <span class="tk-num">4</span>),
+    ],
+    <span class="tk-str">&quot;Mask (Segmentasyon)&quot;</span>: [
+        <span class="tk-bi">round</span>(metrics.seg.map50, <span class="tk-num">4</span>),
+        <span class="tk-bi">round</span>(metrics.seg.map, <span class="tk-num">4</span>),
+        <span class="tk-bi">round</span>(metrics.seg.mp, <span class="tk-num">4</span>),
+        <span class="tk-bi">round</span>(metrics.seg.mr, <span class="tk-num">4</span>),
+    ],
+})
+
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;📊 EĞİTİM METRİKLERİ TABLOSU (TEZ İÇİN)&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">50</span>)
+<span class="tk-bi">print</span>(metrik_tablosu.to_string(index=<span class="tk-kw">False</span>))
+<span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">50</span>)
+
+<span class="tk-com"># CSV olarak kaydet (utf-8-sig: Excel&#x27;de Türkçe karakterler düzgün görünür)</span>
+csv_yolu = <span class="tk-str">&quot;egitim_metrikleri.csv&quot;</span>
+metrik_tablosu.to_csv(csv_yolu, index=<span class="tk-kw">False</span>, encoding=<span class="tk-str">&quot;utf-8-sig&quot;</span>)
+<span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n✅ CSV kaydedildi: {csv_yolu}&quot;</span>)
+
+<span class="tk-com"># Google Drive bağlıysa model klasörüne de kopyala</span>
+<span class="tk-kw">import</span> os, shutil
+<span class="tk-kw">if</span> os.path.isdir(<span class="tk-str">&quot;/content/drive/MyDrive&quot;</span>):
+    drive_klasor = <span class="tk-str">&quot;/content/drive/MyDrive/YTU_Tez_Cam_Segmentation&quot;</span>
+    os.makedirs(drive_klasor, exist_ok=<span class="tk-kw">True</span>)
+    shutil.copy2(csv_yolu, os.path.join(drive_klasor, <span class="tk-str">&quot;egitim_metrikleri.csv&quot;</span>))
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;✅ Drive&#x27;a kopyalandı: {drive_klasor}/egitim_metrikleri.csv&quot;</span>)
+<span class="tk-kw">else</span>:
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;💡 Google Drive bağlı değil; CSV sadece Colab çalışma alanına kaydedildi.&quot;</span>)
+
+<span class="tk-com"># Tablonun şık görünümü (notebook çıktısı)</span>
+metrik_tablosu
+</code></pre>
+</details>
+</section>
+<section id="inference">
+<p class="eyebrow">Adım 4</p>
+<h2>inference_orthomosaic.py — Ortomozaik Üzerinde Tahmin</h2>
+<p class="desc">Büyük GeoTIFF ortomozaiği %20 örtüşmeli 1280 px karolara böler, her karoda YOLOv8-seg ile tahmin yapar, tespitleri Global NMS ile birleştirir ve UTM koordinatlı poligonlara dönüştürür. Cihaz otomatik seçilir: CUDA varsa GPU, yoksa CPU. Fonksiyonlara ayrılmıştır; threshold_analysis.py bu fonksiyonları import eder.</p>
+<div class="tablewrap"><table class="io">
+<thead><tr><th>Girdi</th><th>Çıktı</th></tr></thead>
+<tbody><tr><td class="mono">best.pt, Proses_transparent_mosaic_group1.tif</td><td class="mono">cam_tespitleri.geojson, tespitler.pkl</td></tr></tbody>
+</table></div>
+<details class="code">
+<summary><span class="fname">inference_orthomosaic.py</span><span class="hint">621 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com">#!/usr/bin/env python3</span>
+<span class="tk-com"># -*- coding: utf-8 -*-</span>
+<span class="tk-str">&quot;&quot;&quot;
+YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation
+Ortomozaik Üzerinde Inference (Tahmin) Scripti
+
+Bu script büyük GeoTIFF ortomozaiği karolara bölerek YOLOv8-seg modeli ile
+tahmin yapar ve sonuçları georeferanslı poligon olarak çıkarır.
+
+Buradaki fonksiyonlar threshold_analysis.py tarafından da import edilir;
+bu yüzden ana akış (inference_calistir) parametreli fonksiyonlara ayrılmıştır.
+
+Kullanım:
+    python inference_orthomosaic.py
+
+Gereksinimler:
+    - Python 3.11+
+    - ultralytics, rasterio, shapely, geopandas, tqdm
+    - Eğitilmiş best.pt model dosyası
+    - Ortomozaik GeoTIFF dosyası
+
+Yazar: YTÜ Harita Mühendisliği Yüksek Lisans Tezi
+Tarih: 2024
+&quot;&quot;&quot;</span>
+
+<span class="tk-kw">import</span> os
+<span class="tk-kw">import</span> sys
+<span class="tk-kw">import</span> warnings
+<span class="tk-kw">from</span> typing <span class="tk-kw">import</span> List, Tuple, Dict, Any
+
+<span class="tk-kw">import</span> numpy <span class="tk-kw">as</span> np
+<span class="tk-kw">from</span> tqdm <span class="tk-kw">import</span> tqdm
+
+<span class="tk-com"># Uyarıları sustur</span>
+warnings.filterwarnings(<span class="tk-str">&#x27;ignore&#x27;</span>)
+
+<span class="tk-com">#==============================================================================</span>
+<span class="tk-com"># KONFİGÜRASYON - Bu değerleri kendi dosya yollarınıza göre düzenleyin</span>
+<span class="tk-com">#==============================================================================</span>
+
+CONFIG = {
+    <span class="tk-com"># Model dosyası (Colab&#x27;dan indirdiğiniz best.pt)</span>
+    <span class="tk-str">&quot;model_path&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\04_training\best.pt&quot;</span>,
+
+    <span class="tk-com"># Ortomozaik GeoTIFF dosyası (Pix4D çıktısı)</span>
+    <span class="tk-str">&quot;orthomosaic_path&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\02_pix4d_outputs\Proses_transparent_mosaic_group1.tif&quot;</span>,
+
+    <span class="tk-com"># Çıktı klasörü (oluşturulacak)</span>
+    <span class="tk-str">&quot;output_dir&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference&quot;</span>,
+
+    <span class="tk-com"># Karo boyutu (piksel) - GPU belleğine göre ayarlayın</span>
+    <span class="tk-str">&quot;tile_size&quot;</span>: <span class="tk-num">1280</span>,
+
+    <span class="tk-com"># Örtüşme oranı (%20 = 0.2)</span>
+    <span class="tk-str">&quot;overlap_ratio&quot;</span>: <span class="tk-num">0.2</span>,
+
+    <span class="tk-com"># Tahmin güven eşiği (0.0-1.0)</span>
+    <span class="tk-str">&quot;confidence_threshold&quot;</span>: <span class="tk-num">0.4</span>,
+
+    <span class="tk-com"># NMS IoU eşiği (0.0-1.0)</span>
+    <span class="tk-str">&quot;iou_threshold&quot;</span>: <span class="tk-num">0.5</span>,
+
+    <span class="tk-com"># Global NMS IoU eşiği (karo birleştirme için)</span>
+    <span class="tk-str">&quot;global_nms_iou&quot;</span>: <span class="tk-num">0.5</span>,
+
+    <span class="tk-com"># Minimum alan filtresi (m²) - çok küçük tespitleri ele</span>
+    <span class="tk-str">&quot;min_area_m2&quot;</span>: <span class="tk-num">1.0</span>,
+
+    <span class="tk-com"># Cihaz: &quot;cpu&quot; varsayılan; script başında CUDA varsa otomatik &quot;cuda&quot; seçilir</span>
+    <span class="tk-str">&quot;device&quot;</span>: <span class="tk-str">&quot;cpu&quot;</span>,
+}
+
+<span class="tk-com">#==============================================================================</span>
+
+
+<span class="tk-kw">def</span> cihaz_sec() -&gt; <span class="tk-bi">str</span>:
+    <span class="tk-str">&quot;&quot;&quot;
+    Kullanılacak cihazı belirler: CUDA destekli GPU varsa otomatik olarak
+    &quot;cuda&quot;ya geçer, yoksa CONFIG&#x27;deki varsayılan &quot;cpu&quot; kullanılır.
+    Hangi cihazın kullanıldığını konsola yazar.
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> torch
+
+    <span class="tk-kw">if</span> torch.cuda.is_available():
+        device = <span class="tk-str">&quot;cuda&quot;</span>
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;🖥️ Cihaz: CUDA GPU bulundu → {torch.cuda.get_device_name(0)}&quot;</span>)
+    <span class="tk-kw">else</span>:
+        device = <span class="tk-str">&quot;cpu&quot;</span>
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;🖥️ Cihaz: GPU bulunamadı, CPU kullanılacak (işlem daha yavaş olabilir)&quot;</span>)
+
+    CONFIG[<span class="tk-str">&quot;device&quot;</span>] = device
+    <span class="tk-kw">return</span> device
+
+
+<span class="tk-kw">def</span> dosya_kontrol():
+    <span class="tk-str">&quot;&quot;&quot;Gerekli dosyaların varlığını kontrol eder.&quot;&quot;&quot;</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📁 Dosya kontrolü yapılıyor...&quot;</span>)
+
+    hatalar = []
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> os.path.exists(CONFIG[<span class="tk-str">&quot;model_path&quot;</span>]):
+        hatalar.append(<span class="tk-str">f&quot;❌ Model dosyası bulunamadı: {CONFIG[&#x27;model_path&#x27;]}&quot;</span>)
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Model: {CONFIG[&#x27;model_path&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> os.path.exists(CONFIG[<span class="tk-str">&quot;orthomosaic_path&quot;</span>]):
+        hatalar.append(<span class="tk-str">f&quot;❌ Ortomozaik dosyası bulunamadı: {CONFIG[&#x27;orthomosaic_path&#x27;]}&quot;</span>)
+    <span class="tk-kw">else</span>:
+        size_gb = os.path.getsize(CONFIG[<span class="tk-str">&quot;orthomosaic_path&quot;</span>]) / (<span class="tk-num">1024</span>**<span class="tk-num">3</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Ortomozaik: {CONFIG[&#x27;orthomosaic_path&#x27;]} ({size_gb:.2f} GB)&quot;</span>)
+
+    <span class="tk-kw">if</span> hatalar:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;\n&quot;</span>.join(hatalar))
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💡 Lütfen CONFIG bölümündeki dosya yollarını kontrol edin.&quot;</span>)
+        sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-com"># Çıktı klasörünü oluştur</span>
+    os.makedirs(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], exist_ok=<span class="tk-kw">True</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+
+
+<span class="tk-kw">def</span> model_yukle(model_path: <span class="tk-bi">str</span>):
+    <span class="tk-str">&quot;&quot;&quot;YOLOv8-seg modelini yükler ve döndürür.&quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> ultralytics <span class="tk-kw">import</span> YOLO
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n📦 Model yükleniyor: {model_path}&quot;</span>)
+    model = YOLO(model_path)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   ✅ Model yüklendi&quot;</span>)
+    <span class="tk-kw">return</span> model
+
+
+<span class="tk-kw">def</span> ortomozaik_bilgisi(src) -&gt; Dict[<span class="tk-bi">str</span>, Any]:
+    <span class="tk-str">&quot;&quot;&quot;Ortomozaik hakkında bilgi döndürür.&quot;&quot;&quot;</span>
+    info = {
+        <span class="tk-str">&quot;width&quot;</span>: src.width,
+        <span class="tk-str">&quot;height&quot;</span>: src.height,
+        <span class="tk-str">&quot;bands&quot;</span>: src.count,
+        <span class="tk-str">&quot;crs&quot;</span>: <span class="tk-bi">str</span>(src.crs),
+        <span class="tk-str">&quot;transform&quot;</span>: src.transform,
+        <span class="tk-str">&quot;bounds&quot;</span>: src.bounds,
+        <span class="tk-str">&quot;pixel_size_x&quot;</span>: <span class="tk-bi">abs</span>(src.transform.a),
+        <span class="tk-str">&quot;pixel_size_y&quot;</span>: <span class="tk-bi">abs</span>(src.transform.e),
+    }
+    <span class="tk-kw">return</span> info
+
+
+<span class="tk-kw">def</span> karo_pencerelerini_olustur(
+    width: <span class="tk-bi">int</span>,
+    height: <span class="tk-bi">int</span>,
+    tile_size: <span class="tk-bi">int</span>,
+    overlap: <span class="tk-bi">float</span>
+) -&gt; List[Tuple[<span class="tk-bi">int</span>, <span class="tk-bi">int</span>, <span class="tk-bi">int</span>, <span class="tk-bi">int</span>]]:
+    <span class="tk-str">&quot;&quot;&quot;
+    Örtüşmeli karo pencereleri oluşturur.
+
+    Returns:
+        List of (x_offset, y_offset, tile_width, tile_height)
+    &quot;&quot;&quot;</span>
+    stride = <span class="tk-bi">int</span>(tile_size * (<span class="tk-num">1</span> - overlap))
+    pencereler = []
+
+    y = <span class="tk-num">0</span>
+    <span class="tk-kw">while</span> y &lt; height:
+        x = <span class="tk-num">0</span>
+        <span class="tk-kw">while</span> x &lt; width:
+            <span class="tk-com"># Karo boyutunu sınırla (kenarlar için)</span>
+            w = <span class="tk-bi">min</span>(tile_size, width - x)
+            h = <span class="tk-bi">min</span>(tile_size, height - y)
+
+            <span class="tk-com"># Çok küçük karoları atla</span>
+            <span class="tk-kw">if</span> w &gt;= tile_size // <span class="tk-num">4</span> <span class="tk-kw">and</span> h &gt;= tile_size // <span class="tk-num">4</span>:
+                pencereler.append((x, y, w, h))
+
+            x += stride
+        y += stride
+
+    <span class="tk-kw">return</span> pencereler
+
+
+<span class="tk-kw">def</span> piksel_to_utm(
+    piksel_coords: np.ndarray,
+    transform
+) -&gt; np.ndarray:
+    <span class="tk-str">&quot;&quot;&quot;
+    Piksel koordinatlarını UTM koordinatlarına dönüştürür.
+
+    Args:
+        piksel_coords: (N, 2) array of (col, row) pixel coordinates
+        transform: rasterio affine transform
+
+    Returns:
+        (N, 2) array of (x, y) UTM coordinates
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> rasterio
+
+    cols = piksel_coords[:, <span class="tk-num">0</span>]
+    rows = piksel_coords[:, <span class="tk-num">1</span>]
+
+    xs, ys = rasterio.transform.xy(transform, rows, cols)
+
+    <span class="tk-kw">return</span> np.column_stack([xs, ys])
+
+
+<span class="tk-kw">def</span> mask_to_polygon(mask: np.ndarray, offset_x: <span class="tk-bi">int</span>, offset_y: <span class="tk-bi">int</span>):
+    <span class="tk-str">&quot;&quot;&quot;
+    Binary mask&#x27;ı Shapely poligonuna dönüştürür.
+
+    Args:
+        mask: 2D binary numpy array
+        offset_x, offset_y: Karonun piksel offsetleri
+
+    Returns:
+        Shapely Polygon veya None
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> shapely.geometry <span class="tk-kw">import</span> Polygon
+    <span class="tk-kw">import</span> cv2
+
+    <span class="tk-com"># Kontur bul</span>
+    mask_uint8 = (mask &gt; <span class="tk-num">0.5</span>).astype(np.uint8) * <span class="tk-num">255</span>
+    contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> contours:
+        <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+    <span class="tk-com"># En büyük konturu al</span>
+    contour = <span class="tk-bi">max</span>(contours, key=cv2.contourArea)
+
+    <span class="tk-kw">if</span> <span class="tk-bi">len</span>(contour) &lt; <span class="tk-num">3</span>:
+        <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+    <span class="tk-com"># Kontur noktalarını düzleştir ve offset ekle</span>
+    points = contour.squeeze()
+    <span class="tk-kw">if</span> <span class="tk-bi">len</span>(points.shape) == <span class="tk-num">1</span>:
+        <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+    <span class="tk-com"># Offset ekle (global piksel koordinatları)</span>
+    points = points.astype(<span class="tk-bi">float</span>)
+    points[:, <span class="tk-num">0</span>] += offset_x
+    points[:, <span class="tk-num">1</span>] += offset_y
+
+    <span class="tk-kw">try</span>:
+        polygon = Polygon(points)
+        <span class="tk-kw">if</span> polygon.is_valid <span class="tk-kw">and</span> polygon.area &gt; <span class="tk-num">0</span>:
+            <span class="tk-kw">return</span> polygon
+        <span class="tk-kw">else</span>:
+            <span class="tk-com"># Geçersiz poligonu düzeltmeyi dene</span>
+            polygon = polygon.buffer(<span class="tk-num">0</span>)
+            <span class="tk-kw">if</span> polygon.is_valid <span class="tk-kw">and</span> polygon.area &gt; <span class="tk-num">0</span>:
+                <span class="tk-kw">return</span> polygon
+    <span class="tk-kw">except</span>:
+        <span class="tk-kw">pass</span>
+
+    <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+
+<span class="tk-kw">def</span> ham_tespitleri_topla(
+    model,
+    src,
+    info: Dict[<span class="tk-bi">str</span>, Any],
+    conf_esigi: <span class="tk-bi">float</span>,
+    device: <span class="tk-bi">str</span>,
+    tile_size: <span class="tk-bi">int</span> = <span class="tk-kw">None</span>,
+    overlap_ratio: <span class="tk-bi">float</span> = <span class="tk-kw">None</span>,
+    iou_threshold: <span class="tk-bi">float</span> = <span class="tk-kw">None</span>,
+) -&gt; List[Dict]:
+    <span class="tk-str">&quot;&quot;&quot;
+    Ortomozaiği karolara bölerek modelle tarar ve ham tespitleri
+    (piksel koordinatlı poligon + güven skoru) toplar.
+
+    threshold_analysis.py bu fonksiyonu düşük bir eşikle (örn. 0.25) bir kez
+    çağırıp, daha yüksek eşikleri güven skoruna göre filtreleyerek analiz eder.
+
+    Args:
+        model: Yüklenmiş YOLO modeli
+        src: Açık rasterio dataset (ortomozaik)
+        info: ortomozaik_bilgisi() çıktısı
+        conf_esigi: Tahmin güven eşiği
+        device: &quot;cuda&quot; veya &quot;cpu&quot;
+        tile_size, overlap_ratio, iou_threshold: None ise CONFIG&#x27;den alınır
+
+    Returns:
+        List of {&quot;polygon&quot;: Polygon (piksel), &quot;confidence&quot;: float, ...}
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> rasterio.windows <span class="tk-kw">import</span> Window
+    <span class="tk-kw">import</span> cv2
+
+    tile_size = tile_size <span class="tk-kw">if</span> tile_size <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span> <span class="tk-kw">else</span> CONFIG[<span class="tk-str">&quot;tile_size&quot;</span>]
+    overlap_ratio = overlap_ratio <span class="tk-kw">if</span> overlap_ratio <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span> <span class="tk-kw">else</span> CONFIG[<span class="tk-str">&quot;overlap_ratio&quot;</span>]
+    iou_threshold = iou_threshold <span class="tk-kw">if</span> iou_threshold <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span> <span class="tk-kw">else</span> CONFIG[<span class="tk-str">&quot;iou_threshold&quot;</span>]
+
+    <span class="tk-com"># Karo pencerelerini oluştur</span>
+    pencereler = karo_pencerelerini_olustur(
+        info[<span class="tk-str">&quot;width&quot;</span>],
+        info[<span class="tk-str">&quot;height&quot;</span>],
+        tile_size,
+        overlap_ratio
+    )
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n📦 Toplam karo sayısı: {len(pencereler)}&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Karo boyutu: {tile_size}px&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Örtüşme: %{int(overlap_ratio*100)}&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Güven eşiği: {conf_esigi}&quot;</span>)
+
+    tum_tespitler = []
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n🔍 Inference başlıyor...&quot;</span>)
+
+    <span class="tk-kw">for</span> x_off, y_off, w, h <span class="tk-kw">in</span> tqdm(pencereler, desc=<span class="tk-str">&quot;   Karolar işleniyor&quot;</span>):
+        <span class="tk-kw">try</span>:
+            <span class="tk-com"># Karoyu oku (sadece RGB bantları)</span>
+            window = Window(x_off, y_off, w, h)
+
+            <span class="tk-kw">if</span> info[<span class="tk-str">&quot;bands&quot;</span>] &gt;= <span class="tk-num">3</span>:
+                tile_data = src.read([<span class="tk-num">1</span>, <span class="tk-num">2</span>, <span class="tk-num">3</span>], window=window)
+            <span class="tk-kw">else</span>:
+                tile_data = src.read(<span class="tk-num">1</span>, window=window)
+                tile_data = np.stack([tile_data, tile_data, tile_data])
+
+            <span class="tk-com"># (C, H, W) -&gt; (H, W, C)</span>
+            tile_rgb = np.transpose(tile_data, (<span class="tk-num">1</span>, <span class="tk-num">2</span>, <span class="tk-num">0</span>))
+
+            <span class="tk-com"># NoData kontrolü (tamamen boş karoları atla)</span>
+            <span class="tk-kw">if</span> np.<span class="tk-bi">all</span>(tile_rgb == <span class="tk-num">0</span>) <span class="tk-kw">or</span> np.<span class="tk-bi">all</span>(tile_rgb == <span class="tk-num">255</span>):
+                <span class="tk-kw">continue</span>
+
+            <span class="tk-com"># uint8&#x27;e dönüştür</span>
+            <span class="tk-kw">if</span> tile_rgb.dtype != np.uint8:
+                tile_rgb = np.clip(tile_rgb, <span class="tk-num">0</span>, <span class="tk-num">255</span>).astype(np.uint8)
+
+            <span class="tk-com"># YOLO tahmin</span>
+            results = model.predict(
+                source=tile_rgb,
+                conf=conf_esigi,
+                iou=iou_threshold,
+                imgsz=tile_size,
+                device=device,
+                verbose=<span class="tk-kw">False</span>,
+                retina_masks=<span class="tk-kw">True</span>,  <span class="tk-com"># Yüksek çözünürlüklü mask</span>
+            )
+
+            result = results[<span class="tk-num">0</span>]
+
+            <span class="tk-com"># Tespit yoksa atla</span>
+            <span class="tk-kw">if</span> result.masks <span class="tk-kw">is</span> <span class="tk-kw">None</span> <span class="tk-kw">or</span> <span class="tk-bi">len</span>(result.masks) == <span class="tk-num">0</span>:
+                <span class="tk-kw">continue</span>
+
+            <span class="tk-com"># Her tespit için poligon oluştur</span>
+            masks = result.masks.data.cpu().numpy()
+            boxes = result.boxes
+
+            <span class="tk-kw">for</span> idx <span class="tk-kw">in</span> <span class="tk-bi">range</span>(<span class="tk-bi">len</span>(masks)):
+                mask = masks[idx]
+                conf = <span class="tk-bi">float</span>(boxes.conf[idx])
+
+                <span class="tk-com"># Mask&#x27;ı orijinal karo boyutuna yeniden boyutlandır</span>
+                mask_resized = cv2.resize(
+                    mask.astype(np.float32),
+                    (w, h),
+                    interpolation=cv2.INTER_LINEAR
+                )
+
+                <span class="tk-com"># Poligona dönüştür</span>
+                polygon = mask_to_polygon(mask_resized, x_off, y_off)
+
+                <span class="tk-kw">if</span> polygon <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span>:
+                    tum_tespitler.append({
+                        <span class="tk-str">&quot;polygon&quot;</span>: polygon,
+                        <span class="tk-str">&quot;confidence&quot;</span>: conf,
+                        <span class="tk-str">&quot;karo_x&quot;</span>: x_off,
+                        <span class="tk-str">&quot;karo_y&quot;</span>: y_off,
+                    })
+
+        <span class="tk-kw">except</span> Exception:
+            <span class="tk-com"># Hatalı karoları sessizce atla</span>
+            <span class="tk-kw">continue</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n📊 Ham tespit sayısı: {len(tum_tespitler)}&quot;</span>)
+
+    <span class="tk-kw">return</span> tum_tespitler
+
+
+<span class="tk-kw">def</span> global_nms_poligonlar(
+    poligonlar: List[Dict],
+    iou_threshold: <span class="tk-bi">float</span>
+) -&gt; List[Dict]:
+    <span class="tk-str">&quot;&quot;&quot;
+    Tüm karolardaki poligonları birleştirir ve mükerrer tespitleri eler.
+    IoU tabanlı Non-Maximum Suppression uygular.
+
+    Args:
+        poligonlar: List of {&quot;polygon&quot;: Polygon, &quot;confidence&quot;: float, ...}
+        iou_threshold: IoU eşiği (bu değerin üstündeki örtüşmeler birleştirilir)
+
+    Returns:
+        Filtrelenmiş poligon listesi
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> poligonlar:
+        <span class="tk-kw">return</span> []
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🔄 Global NMS uygulanıyor ({len(poligonlar)} poligon)...&quot;</span>)
+
+    <span class="tk-com"># Güven skoruna göre sırala (yüksekten düşüğe)</span>
+    poligonlar = <span class="tk-bi">sorted</span>(poligonlar, key=<span class="tk-kw">lambda</span> x: x[<span class="tk-str">&quot;confidence&quot;</span>], reverse=<span class="tk-kw">True</span>)
+
+    secilen = []
+    elenen_indexler = <span class="tk-bi">set</span>()
+
+    <span class="tk-kw">for</span> i, p1 <span class="tk-kw">in</span> <span class="tk-bi">enumerate</span>(tqdm(poligonlar, desc=<span class="tk-str">&quot;   NMS işlemi&quot;</span>)):
+        <span class="tk-kw">if</span> i <span class="tk-kw">in</span> elenen_indexler:
+            <span class="tk-kw">continue</span>
+
+        secilen.append(p1)
+        poly1 = p1[<span class="tk-str">&quot;polygon&quot;</span>]
+
+        <span class="tk-com"># Bu poligonla örtüşenleri ele</span>
+        <span class="tk-kw">for</span> j <span class="tk-kw">in</span> <span class="tk-bi">range</span>(i + <span class="tk-num">1</span>, <span class="tk-bi">len</span>(poligonlar)):
+            <span class="tk-kw">if</span> j <span class="tk-kw">in</span> elenen_indexler:
+                <span class="tk-kw">continue</span>
+
+            poly2 = poligonlar[j][<span class="tk-str">&quot;polygon&quot;</span>]
+
+            <span class="tk-kw">try</span>:
+                <span class="tk-com"># IoU hesapla</span>
+                intersection = poly1.intersection(poly2).area
+                union = poly1.union(poly2).area
+
+                <span class="tk-kw">if</span> union &gt; <span class="tk-num">0</span>:
+                    iou = intersection / union
+                    <span class="tk-kw">if</span> iou &gt; iou_threshold:
+                        elenen_indexler.add(j)
+            <span class="tk-kw">except</span>:
+                <span class="tk-kw">continue</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ NMS sonrası: {len(secilen)} poligon (elenen: {len(elenen_indexler)})&quot;</span>)
+
+    <span class="tk-kw">return</span> secilen
+
+
+<span class="tk-kw">def</span> utm_poligonlara_donustur(
+    tespitler: List[Dict],
+    info: Dict[<span class="tk-bi">str</span>, Any],
+    min_area_m2: <span class="tk-bi">float</span> = <span class="tk-kw">None</span>,
+) -&gt; List[Dict]:
+    <span class="tk-str">&quot;&quot;&quot;
+    Piksel koordinatlı tespit poligonlarını UTM koordinatlarına dönüştürür
+    ve minimum alan filtresini uygular.
+
+    Args:
+        tespitler: List of {&quot;polygon&quot;: Polygon (piksel), &quot;confidence&quot;: float}
+        info: ortomozaik_bilgisi() çıktısı
+        min_area_m2: Minimum taç alanı (None ise CONFIG&#x27;den alınır)
+
+    Returns:
+        List of {&quot;geometry&quot;: Polygon (UTM), &quot;confidence&quot;: float, &quot;alan_m2&quot;: float}
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> shapely.geometry <span class="tk-kw">import</span> Polygon
+
+    min_area_m2 = min_area_m2 <span class="tk-kw">if</span> min_area_m2 <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span> <span class="tk-kw">else</span> CONFIG[<span class="tk-str">&quot;min_area_m2&quot;</span>]
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n🌍 Koordinat dönüşümü yapılıyor (Piksel → UTM)...&quot;</span>)
+
+    utm_poligonlar = []
+
+    <span class="tk-kw">for</span> tespit <span class="tk-kw">in</span> tqdm(tespitler, desc=<span class="tk-str">&quot;   Dönüştürülüyor&quot;</span>):
+        poly = tespit[<span class="tk-str">&quot;polygon&quot;</span>]
+
+        <span class="tk-com"># Poligon köşelerini al</span>
+        coords = np.array(poly.exterior.coords)
+
+        <span class="tk-com"># UTM&#x27;e dönüştür</span>
+        utm_coords = piksel_to_utm(coords, info[<span class="tk-str">&quot;transform&quot;</span>])
+
+        <span class="tk-kw">try</span>:
+            utm_poly = Polygon(utm_coords)
+
+            <span class="tk-kw">if</span> utm_poly.is_valid <span class="tk-kw">and</span> utm_poly.area &gt; <span class="tk-num">0</span>:
+                <span class="tk-com"># Alan filtresini uygula</span>
+                alan_m2 = utm_poly.area
+
+                <span class="tk-kw">if</span> alan_m2 &gt;= min_area_m2:
+                    utm_poligonlar.append({
+                        <span class="tk-str">&quot;geometry&quot;</span>: utm_poly,
+                        <span class="tk-str">&quot;confidence&quot;</span>: tespit[<span class="tk-str">&quot;confidence&quot;</span>],
+                        <span class="tk-str">&quot;alan_m2&quot;</span>: alan_m2,
+                    })
+        <span class="tk-kw">except</span>:
+            <span class="tk-kw">continue</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Geçerli UTM poligon sayısı: {len(utm_poligonlar)}&quot;</span>)
+
+    <span class="tk-kw">return</span> utm_poligonlar
+
+
+<span class="tk-kw">def</span> inference_calistir():
+    <span class="tk-str">&quot;&quot;&quot;Ana inference fonksiyonu.&quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> rasterio
+    <span class="tk-kw">import</span> geopandas <span class="tk-kw">as</span> gpd
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;🌲 ÇAM AĞACI INSTANCE SEGMENTATION - ORTOMOZAIK INFERENCE&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+
+    <span class="tk-com"># Cihaz seçimi (CPU varsayılan, CUDA varsa otomatik GPU)</span>
+    device = cihaz_sec()
+
+    <span class="tk-com"># Dosya kontrolü</span>
+    dosya_kontrol()
+
+    <span class="tk-com"># Model yükle</span>
+    model = model_yukle(CONFIG[<span class="tk-str">&quot;model_path&quot;</span>])
+
+    <span class="tk-com"># Ortomozaiği aç</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🗺️ Ortomozaik açılıyor: {CONFIG[&#x27;orthomosaic_path&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">with</span> rasterio.<span class="tk-bi">open</span>(CONFIG[<span class="tk-str">&quot;orthomosaic_path&quot;</span>]) <span class="tk-kw">as</span> src:
+        info = ortomozaik_bilgisi(src)
+
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   📐 Boyut: {info[&#x27;width&#x27;]} x {info[&#x27;height&#x27;]} piksel&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   🌍 CRS: {info[&#x27;crs&#x27;]}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   📏 Piksel boyutu: {info[&#x27;pixel_size_x&#x27;]*100:.2f} cm/px&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   🔲 Bant sayısı: {info[&#x27;bands&#x27;]}&quot;</span>)
+
+        <span class="tk-com"># Karoları tara ve ham tespitleri topla</span>
+        tum_tespitler = ham_tespitleri_topla(
+            model=model,
+            src=src,
+            info=info,
+            conf_esigi=CONFIG[<span class="tk-str">&quot;confidence_threshold&quot;</span>],
+            device=device,
+        )
+
+        <span class="tk-kw">if</span> <span class="tk-kw">not</span> tum_tespitler:
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n⚠️ UYARI: Hiç tespit yapılamadı!&quot;</span>)
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;   Olası nedenler:&quot;</span>)
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;   - Güven eşiği çok yüksek (confidence_threshold&#x27;u düşürün)&quot;</span>)
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;   - Model bu veriye uygun değil&quot;</span>)
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;   - Ortomozaikte çam ağacı yok&quot;</span>)
+            <span class="tk-kw">return</span>
+
+        <span class="tk-com"># Global NMS uygula</span>
+        filtrelenmis = global_nms_poligonlar(
+            tum_tespitler,
+            CONFIG[<span class="tk-str">&quot;global_nms_iou&quot;</span>]
+        )
+
+        <span class="tk-com"># Piksel koordinatlarını UTM&#x27;e dönüştür</span>
+        utm_poligonlar = utm_poligonlara_donustur(filtrelenmis, info)
+
+        <span class="tk-kw">if</span> <span class="tk-kw">not</span> utm_poligonlar:
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n⚠️ UYARI: UTM dönüşümü sonrası geçerli poligon kalmadı!&quot;</span>)
+            <span class="tk-kw">return</span>
+
+        <span class="tk-com"># GeoDataFrame oluştur</span>
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💾 Sonuçlar kaydediliyor...&quot;</span>)
+
+        gdf = gpd.GeoDataFrame(
+            utm_poligonlar,
+            crs=info[<span class="tk-str">&quot;crs&quot;</span>],
+            geometry=<span class="tk-str">&quot;geometry&quot;</span>
+        )
+
+        <span class="tk-com"># Ek öznitelikler hesapla</span>
+        gdf[<span class="tk-str">&quot;id&quot;</span>] = <span class="tk-bi">range</span>(<span class="tk-num">1</span>, <span class="tk-bi">len</span>(gdf) + <span class="tk-num">1</span>)
+
+        <span class="tk-com"># Merkez koordinatları</span>
+        gdf[<span class="tk-str">&quot;merkez_x&quot;</span>] = gdf.geometry.centroid.x
+        gdf[<span class="tk-str">&quot;merkez_y&quot;</span>] = gdf.geometry.centroid.y
+
+        <span class="tk-com"># Eşdeğer daire çapı</span>
+        gdf[<span class="tk-str">&quot;cap_m&quot;</span>] = <span class="tk-num">2</span> * np.sqrt(gdf[<span class="tk-str">&quot;alan_m2&quot;</span>] / np.pi)
+
+        <span class="tk-com"># Sütun sırasını düzenle</span>
+        gdf = gdf[[<span class="tk-str">&quot;id&quot;</span>, <span class="tk-str">&quot;confidence&quot;</span>, <span class="tk-str">&quot;alan_m2&quot;</span>, <span class="tk-str">&quot;cap_m&quot;</span>, <span class="tk-str">&quot;merkez_x&quot;</span>, <span class="tk-str">&quot;merkez_y&quot;</span>, <span class="tk-str">&quot;geometry&quot;</span>]]
+
+        <span class="tk-com"># GeoJSON olarak kaydet</span>
+        geojson_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;cam_tespitleri.geojson&quot;</span>)
+        gdf.to_file(geojson_path, driver=<span class="tk-str">&quot;GeoJSON&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ GeoJSON: {geojson_path}&quot;</span>)
+
+        <span class="tk-com"># Pickle olarak da kaydet (export_results.py için)</span>
+        <span class="tk-kw">import</span> pickle
+        pickle_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;tespitler.pkl&quot;</span>)
+        <span class="tk-kw">with</span> <span class="tk-bi">open</span>(pickle_path, <span class="tk-str">&quot;wb&quot;</span>) <span class="tk-kw">as</span> f:
+            pickle.dump({
+                <span class="tk-str">&quot;gdf&quot;</span>: gdf,
+                <span class="tk-str">&quot;crs&quot;</span>: <span class="tk-bi">str</span>(info[<span class="tk-str">&quot;crs&quot;</span>]),
+                <span class="tk-str">&quot;transform&quot;</span>: info[<span class="tk-str">&quot;transform&quot;</span>],
+                <span class="tk-str">&quot;bounds&quot;</span>: info[<span class="tk-str">&quot;bounds&quot;</span>],
+                <span class="tk-str">&quot;pixel_size&quot;</span>: info[<span class="tk-str">&quot;pixel_size_x&quot;</span>],
+            }, f)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Pickle: {pickle_path}&quot;</span>)
+
+        <span class="tk-com"># Özet rapor</span>
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;📊 INFERENCE SONUÇ ÖZETİ&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Toplam tespit: {len(gdf)}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Toplam taç alanı: {gdf[&#x27;alan_m2&#x27;].sum():.2f} m²&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Ortalama taç alanı: {gdf[&#x27;alan_m2&#x27;].mean():.2f} m²&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Ortalama taç çapı: {gdf[&#x27;cap_m&#x27;].mean():.2f} m&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Min güven: {gdf[&#x27;confidence&#x27;].min():.3f}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Max güven: {gdf[&#x27;confidence&#x27;].max():.3f}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Ortalama güven: {gdf[&#x27;confidence&#x27;].mean():.3f}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n✅ Inference tamamlandı!&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;📂 Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💡 Sonraki adım: export_results.py çalıştırın&quot;</span>)
+
+
+<span class="tk-kw">if</span> __name__ == <span class="tk-str">&quot;__main__&quot;</span>:
+    <span class="tk-kw">try</span>:
+        inference_calistir()
+    <span class="tk-kw">except</span> KeyboardInterrupt:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n\n⚠️ İşlem kullanıcı tarafından iptal edildi.&quot;</span>)
+        sys.exit(<span class="tk-num">0</span>)
+    <span class="tk-kw">except</span> Exception <span class="tk-kw">as</span> e:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n❌ HATA: {str(e)}&quot;</span>)
+        <span class="tk-kw">import</span> traceback
+        traceback.print_exc()
+        sys.exit(<span class="tk-num">1</span>)
+</code></pre>
+</details>
+</section>
+<section id="export">
+<p class="eyebrow">Adım 5</p>
+<h2>export_results.py — CBS Çıktıları ve Ağaç Boyu</h2>
+<p class="desc">Tespitleri Shapefile / GeoJSON / CSV olarak dışa aktarır. DTM (3.08 cm/px), DSM (0.615 cm/px) grid&#x27;ine rasterio.warp.reproject ile bilinear yeniden örneklenir ve CHM = DSM − DTM&#x27;den her ağacın boyu hesaplanır. Shapefile öznitelik adları ESRI&#x27;nin 10 karakter sınırına uygundur: id, conf, alan_m2, cap_m, boy_m, merkez_x, merkez_y.</p>
+<div class="tablewrap"><table class="io">
+<thead><tr><th>Girdi</th><th>Çıktı</th></tr></thead>
+<tbody><tr><td class="mono">tespitler.pkl, Proses_dsm.tif, Proses_dtm.tif</td><td class="mono">cam_agaclari.shp, cam_agaclari.geojson, cam_agaclari_ozellikler.csv, ozet_rapor.txt, istatistik_grafikleri.png</td></tr></tbody>
+</table></div>
+<details class="code">
+<summary><span class="fname">export_results.py</span><span class="hint">492 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com">#!/usr/bin/env python3</span>
+<span class="tk-com"># -*- coding: utf-8 -*-</span>
+<span class="tk-str">&quot;&quot;&quot;
+YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation
+CBS Çıktıları ve İstatistik Raporu Oluşturma Scripti
+
+Bu script inference sonuçlarını CBS formatlarına (Shapefile, GeoJSON) dönüştürür,
+DSM-DTM farkından ağaç boylarını hesaplar ve özet rapor oluşturur.
+
+ÖNEMLİ: DSM (0.615 cm/px) ve DTM (3.08 cm/px) çözünürlükleri FARKLIDIR.
+CHM hesaplanmadan önce DTM, rasterio.warp.reproject ile DSM grid&#x27;ine
+bilinear yöntemle yeniden örneklenir; doğrudan array çıkarma yapılmaz.
+
+Kullanım:
+    python export_results.py
+
+Gereksinimler:
+    - inference_orthomosaic.py çıktıları (tespitler.pkl)
+    - DSM ve DTM GeoTIFF dosyaları (ağaç boyu hesaplama için)
+
+Yazar: YTÜ Harita Mühendisliği Yüksek Lisans Tezi
+Tarih: 2024
+&quot;&quot;&quot;</span>
+
+<span class="tk-kw">import</span> os
+<span class="tk-kw">import</span> sys
+<span class="tk-kw">import</span> pickle
+<span class="tk-kw">import</span> warnings
+<span class="tk-kw">from</span> typing <span class="tk-kw">import</span> Dict, Any, Optional
+
+<span class="tk-kw">import</span> numpy <span class="tk-kw">as</span> np
+<span class="tk-kw">import</span> pandas <span class="tk-kw">as</span> pd
+<span class="tk-kw">import</span> geopandas <span class="tk-kw">as</span> gpd
+<span class="tk-kw">import</span> matplotlib.pyplot <span class="tk-kw">as</span> plt
+<span class="tk-kw">from</span> matplotlib <span class="tk-kw">import</span> rcParams
+<span class="tk-kw">from</span> tqdm <span class="tk-kw">import</span> tqdm
+
+<span class="tk-com"># Türkçe karakter desteği</span>
+rcParams[<span class="tk-str">&#x27;font.family&#x27;</span>] = <span class="tk-str">&#x27;DejaVu Sans&#x27;</span>
+
+<span class="tk-com"># Uyarıları sustur</span>
+warnings.filterwarnings(<span class="tk-str">&#x27;ignore&#x27;</span>)
+
+<span class="tk-com">#==============================================================================</span>
+<span class="tk-com"># KONFİGÜRASYON - Bu değerleri kendi dosya yollarınıza göre düzenleyin</span>
+<span class="tk-com">#==============================================================================</span>
+
+CONFIG = {
+    <span class="tk-com"># inference_orthomosaic.py çıktı klasörü (tespitler.pkl burada)</span>
+    <span class="tk-str">&quot;input_dir&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference&quot;</span>,
+
+    <span class="tk-com"># DSM dosyası (Pix4D çıktısı, 0.615 cm/px) - Ağaç boyu hesaplama için</span>
+    <span class="tk-str">&quot;dsm_path&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\02_pix4d_outputs\Proses_dsm.tif&quot;</span>,
+
+    <span class="tk-com"># DTM dosyası (Pix4D çıktısı, 3.08 cm/px) - Ağaç boyu hesaplama için</span>
+    <span class="tk-str">&quot;dtm_path&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\02_pix4d_outputs\Proses_dtm.tif&quot;</span>,
+
+    <span class="tk-com"># Çıktı klasörü (Shapefile ve raporlar için)</span>
+    <span class="tk-str">&quot;output_dir&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference&quot;</span>,
+
+    <span class="tk-com"># Koordinat sistemi (WGS84 / UTM Zone 35N)</span>
+    <span class="tk-str">&quot;target_crs&quot;</span>: <span class="tk-str">&quot;EPSG:32635&quot;</span>,
+
+    <span class="tk-com"># Boy hesaplama yöntemi: &quot;max&quot; (maksimum), &quot;mean&quot; (ortalama), &quot;percentile_95&quot;</span>
+    <span class="tk-str">&quot;boy_hesaplama&quot;</span>: <span class="tk-str">&quot;max&quot;</span>,
+}
+
+<span class="tk-com">#==============================================================================</span>
+
+
+<span class="tk-kw">def</span> dosya_kontrol() -&gt; Dict[<span class="tk-bi">str</span>, Any]:
+    <span class="tk-str">&quot;&quot;&quot;Gerekli dosyaların varlığını kontrol eder.&quot;&quot;&quot;</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📁 Dosya kontrolü yapılıyor...&quot;</span>)
+
+    hatalar = []
+    bulunanlar = {}
+
+    <span class="tk-com"># Pickle dosyası (zorunlu)</span>
+    pickle_path = os.path.join(CONFIG[<span class="tk-str">&quot;input_dir&quot;</span>], <span class="tk-str">&quot;tespitler.pkl&quot;</span>)
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> os.path.exists(pickle_path):
+        hatalar.append(<span class="tk-str">f&quot;❌ Tespit dosyası bulunamadı: {pickle_path}&quot;</span>)
+        hatalar.append(<span class="tk-str">&quot;   Önce inference_orthomosaic.py çalıştırın!&quot;</span>)
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Tespitler: {pickle_path}&quot;</span>)
+        bulunanlar[<span class="tk-str">&quot;pickle&quot;</span>] = pickle_path
+
+    <span class="tk-com"># DSM dosyası (opsiyonel ama önerilen)</span>
+    <span class="tk-kw">if</span> os.path.exists(CONFIG[<span class="tk-str">&quot;dsm_path&quot;</span>]):
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ DSM: {CONFIG[&#x27;dsm_path&#x27;]}&quot;</span>)
+        bulunanlar[<span class="tk-str">&quot;dsm&quot;</span>] = CONFIG[<span class="tk-str">&quot;dsm_path&quot;</span>]
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ⚠️ DSM bulunamadı (ağaç boyu hesaplanmayacak): {CONFIG[&#x27;dsm_path&#x27;]}&quot;</span>)
+
+    <span class="tk-com"># DTM dosyası (opsiyonel ama önerilen)</span>
+    <span class="tk-kw">if</span> os.path.exists(CONFIG[<span class="tk-str">&quot;dtm_path&quot;</span>]):
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ DTM: {CONFIG[&#x27;dtm_path&#x27;]}&quot;</span>)
+        bulunanlar[<span class="tk-str">&quot;dtm&quot;</span>] = CONFIG[<span class="tk-str">&quot;dtm_path&quot;</span>]
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ⚠️ DTM bulunamadı (ağaç boyu hesaplanmayacak): {CONFIG[&#x27;dtm_path&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">if</span> hatalar:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;\n&quot;</span>.join(hatalar))
+        sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-com"># Çıktı klasörünü oluştur</span>
+    os.makedirs(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], exist_ok=<span class="tk-kw">True</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">return</span> bulunanlar
+
+
+<span class="tk-kw">def</span> chm_hesapla(dsm_path: <span class="tk-bi">str</span>, dtm_path: <span class="tk-bi">str</span>) -&gt; Optional[Any]:
+    <span class="tk-str">&quot;&quot;&quot;
+    Canopy Height Model (CHM) = DSM - DTM hesaplar.
+    Ağaç boylarını belirlemek için kullanılır.
+
+    KRİTİK: DSM ve DTM çözünürlükleri farklıdır (DSM ≈ 0.615 cm/px,
+    DTM ≈ 3.08 cm/px). Bu yüzden DTM, rasterio.warp.reproject ile DSM&#x27;in
+    grid&#x27;ine (aynı transform, aynı boyut) bilinear olarak yeniden örneklenir.
+    Doğrudan array çıkarma yapılırsa şekil uyuşmazlığı hatası oluşur.
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> rasterio
+    <span class="tk-kw">from</span> rasterio.warp <span class="tk-kw">import</span> reproject, Resampling
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n🌳 CHM (Canopy Height Model) hesaplanıyor...&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   CHM = DSM - DTM (ağaç tepesi - zemin = ağaç boyu)&quot;</span>)
+
+    <span class="tk-kw">try</span>:
+        <span class="tk-kw">with</span> rasterio.<span class="tk-bi">open</span>(dsm_path) <span class="tk-kw">as</span> dsm_src:
+            dsm_data = dsm_src.read(<span class="tk-num">1</span>).astype(np.float32)
+            dsm_transform = dsm_src.transform
+            dsm_crs = dsm_src.crs
+            dsm_nodata = dsm_src.nodata
+
+            <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   DSM boyut: {dsm_src.width} x {dsm_src.height}&quot;</span>)
+            <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   DSM çözünürlük: {abs(dsm_transform.a)*100:.3f} cm/px&quot;</span>)
+
+            <span class="tk-kw">with</span> rasterio.<span class="tk-bi">open</span>(dtm_path) <span class="tk-kw">as</span> dtm_src:
+                <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   DTM orijinal boyut: {dtm_src.width} x {dtm_src.height}&quot;</span>)
+                <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   DTM çözünürlük: {abs(dtm_src.transform.a)*100:.3f} cm/px&quot;</span>)
+
+                <span class="tk-com"># DTM&#x27;yi DSM grid&#x27;ine yeniden örnekle (bilinear resampling).</span>
+                <span class="tk-com"># reproject, iki raster&#x27;ın transform&#x27;larını dikkate aldığı için</span>
+                <span class="tk-com"># hem çözünürlük hem de kapsama (extent) farkları doğru işlenir.</span>
+                <span class="tk-bi">print</span>(<span class="tk-str">&quot;   🔄 DTM, DSM grid&#x27;ine yeniden örnekleniyor (bilinear)...&quot;</span>)
+
+                dtm_resampled = np.full(dsm_data.shape, np.nan, dtype=np.float32)
+
+                reproject(
+                    source=rasterio.band(dtm_src, <span class="tk-num">1</span>),
+                    destination=dtm_resampled,
+                    src_transform=dtm_src.transform,
+                    src_crs=dtm_src.crs,
+                    src_nodata=dtm_src.nodata,
+                    dst_transform=dsm_transform,
+                    dst_crs=dsm_crs,
+                    dst_nodata=np.nan,
+                    resampling=Resampling.bilinear,
+                )
+
+        <span class="tk-com"># DSM NoData değerlerini NaN yap (DTM NoData&#x27;sı reproject&#x27;te NaN oldu)</span>
+        <span class="tk-kw">if</span> dsm_nodata <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span>:
+            dsm_data[dsm_data == dsm_nodata] = np.nan
+
+        <span class="tk-com"># CHM hesapla — artık iki array de aynı grid&#x27;de, güvenle çıkarılabilir</span>
+        chm_data = dsm_data - dtm_resampled
+
+        <span class="tk-com"># Negatif değerleri sıfırla (hatalı veriler)</span>
+        chm_data[chm_data &lt; <span class="tk-num">0</span>] = <span class="tk-num">0</span>
+
+        <span class="tk-com"># Çok yüksek değerleri filtrele (hatalı veriler, &gt;50m mantıksız)</span>
+        chm_data[chm_data &gt; <span class="tk-num">50</span>] = np.nan
+
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ CHM hesaplandı&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Min boy: {np.nanmin(chm_data):.2f} m&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Max boy: {np.nanmax(chm_data):.2f} m&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Ortalama boy: {np.nanmean(chm_data):.2f} m&quot;</span>)
+
+        <span class="tk-kw">return</span> {
+            <span class="tk-str">&quot;data&quot;</span>: chm_data,
+            <span class="tk-str">&quot;transform&quot;</span>: dsm_transform,
+            <span class="tk-str">&quot;crs&quot;</span>: dsm_crs,
+        }
+
+    <span class="tk-kw">except</span> Exception <span class="tk-kw">as</span> e:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ❌ CHM hesaplama hatası: {str(e)}&quot;</span>)
+        <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+
+<span class="tk-kw">def</span> poligon_icin_boy_hesapla(
+    polygon,
+    chm_data: np.ndarray,
+    transform,
+    method: <span class="tk-bi">str</span> = <span class="tk-str">&quot;max&quot;</span>
+) -&gt; Optional[<span class="tk-bi">float</span>]:
+    <span class="tk-str">&quot;&quot;&quot;
+    Bir poligon içindeki piksellerden ağaç boyunu hesaplar.
+
+    Args:
+        polygon: Shapely polygon
+        chm_data: CHM numpy array
+        transform: rasterio transform
+        method: &quot;max&quot;, &quot;mean&quot;, veya &quot;percentile_95&quot;
+
+    Returns:
+        Ağaç boyu (metre) veya None
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> rasterio.features <span class="tk-kw">import</span> geometry_mask
+
+    <span class="tk-kw">try</span>:
+        <span class="tk-com"># Poligon için mask oluştur</span>
+        mask = geometry_mask(
+            [polygon],
+            out_shape=chm_data.shape,
+            transform=transform,
+            invert=<span class="tk-kw">True</span>  <span class="tk-com"># Poligon içi True</span>
+        )
+
+        <span class="tk-com"># Poligon içindeki değerleri al</span>
+        values = chm_data[mask]
+        values = values[~np.isnan(values)]
+
+        <span class="tk-kw">if</span> <span class="tk-bi">len</span>(values) == <span class="tk-num">0</span>:
+            <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+        <span class="tk-kw">if</span> method == <span class="tk-str">&quot;max&quot;</span>:
+            <span class="tk-kw">return</span> <span class="tk-bi">float</span>(np.<span class="tk-bi">max</span>(values))
+        <span class="tk-kw">elif</span> method == <span class="tk-str">&quot;mean&quot;</span>:
+            <span class="tk-kw">return</span> <span class="tk-bi">float</span>(np.mean(values))
+        <span class="tk-kw">elif</span> method == <span class="tk-str">&quot;percentile_95&quot;</span>:
+            <span class="tk-kw">return</span> <span class="tk-bi">float</span>(np.percentile(values, <span class="tk-num">95</span>))
+        <span class="tk-kw">else</span>:
+            <span class="tk-kw">return</span> <span class="tk-bi">float</span>(np.<span class="tk-bi">max</span>(values))
+
+    <span class="tk-kw">except</span> Exception:
+        <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+
+<span class="tk-kw">def</span> istatistik_raporu_olustur(gdf: gpd.GeoDataFrame, output_dir: <span class="tk-bi">str</span>):
+    <span class="tk-str">&quot;&quot;&quot;Özet istatistik raporu ve grafikler oluşturur.&quot;&quot;&quot;</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📊 İstatistik raporu oluşturuluyor...&quot;</span>)
+
+    <span class="tk-com"># Rapor dosyası</span>
+    rapor_path = os.path.join(output_dir, <span class="tk-str">&quot;ozet_rapor.txt&quot;</span>)
+
+    <span class="tk-kw">with</span> <span class="tk-bi">open</span>(rapor_path, <span class="tk-str">&quot;w&quot;</span>, encoding=<span class="tk-str">&quot;utf-8&quot;</span>) <span class="tk-kw">as</span> f:
+        f.write(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span> + <span class="tk-str">&quot;\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;YTÜ HARİTA MÜHENDİSLİĞİ - ÇAM AĞACI TESPİT RAPORU\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span> + <span class="tk-str">&quot;\n\n&quot;</span>)
+
+        f.write(<span class="tk-str">&quot;GENEL İSTATİSTİKLER\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;-&quot;</span>*<span class="tk-num">40</span> + <span class="tk-str">&quot;\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Toplam tespit edilen ağaç sayısı: {len(gdf)}\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Koordinat sistemi: {gdf.crs}\n\n&quot;</span>)
+
+        f.write(<span class="tk-str">&quot;TAÇ ALANI İSTATİSTİKLERİ\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;-&quot;</span>*<span class="tk-num">40</span> + <span class="tk-str">&quot;\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Toplam taç alanı: {gdf[&#x27;alan_m2&#x27;].sum():.2f} m²\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Ortalama taç alanı: {gdf[&#x27;alan_m2&#x27;].mean():.2f} m²\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Minimum taç alanı: {gdf[&#x27;alan_m2&#x27;].min():.2f} m²\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Maksimum taç alanı: {gdf[&#x27;alan_m2&#x27;].max():.2f} m²\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Std sapma: {gdf[&#x27;alan_m2&#x27;].std():.2f} m²\n\n&quot;</span>)
+
+        f.write(<span class="tk-str">&quot;TAÇ ÇAPI İSTATİSTİKLERİ\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;-&quot;</span>*<span class="tk-num">40</span> + <span class="tk-str">&quot;\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Ortalama taç çapı: {gdf[&#x27;cap_m&#x27;].mean():.2f} m\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Minimum taç çapı: {gdf[&#x27;cap_m&#x27;].min():.2f} m\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Maksimum taç çapı: {gdf[&#x27;cap_m&#x27;].max():.2f} m\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Std sapma: {gdf[&#x27;cap_m&#x27;].std():.2f} m\n\n&quot;</span>)
+
+        <span class="tk-kw">if</span> <span class="tk-str">&quot;boy_m&quot;</span> <span class="tk-kw">in</span> gdf.columns <span class="tk-kw">and</span> gdf[<span class="tk-str">&quot;boy_m&quot;</span>].notna().<span class="tk-bi">any</span>():
+            f.write(<span class="tk-str">&quot;AĞAÇ BOYU İSTATİSTİKLERİ\n&quot;</span>)
+            f.write(<span class="tk-str">&quot;-&quot;</span>*<span class="tk-num">40</span> + <span class="tk-str">&quot;\n&quot;</span>)
+            boy_gecerli = gdf[gdf[<span class="tk-str">&quot;boy_m&quot;</span>].notna()][<span class="tk-str">&quot;boy_m&quot;</span>]
+            f.write(<span class="tk-str">f&quot;Boy hesaplanan ağaç sayısı: {len(boy_gecerli)}\n&quot;</span>)
+            f.write(<span class="tk-str">f&quot;Ortalama ağaç boyu: {boy_gecerli.mean():.2f} m\n&quot;</span>)
+            f.write(<span class="tk-str">f&quot;Minimum ağaç boyu: {boy_gecerli.min():.2f} m\n&quot;</span>)
+            f.write(<span class="tk-str">f&quot;Maksimum ağaç boyu: {boy_gecerli.max():.2f} m\n&quot;</span>)
+            f.write(<span class="tk-str">f&quot;Std sapma: {boy_gecerli.std():.2f} m\n\n&quot;</span>)
+
+        f.write(<span class="tk-str">&quot;GÜVEN SKORU İSTATİSTİKLERİ\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;-&quot;</span>*<span class="tk-num">40</span> + <span class="tk-str">&quot;\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Ortalama güven: {gdf[&#x27;conf&#x27;].mean():.3f}\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Minimum güven: {gdf[&#x27;conf&#x27;].min():.3f}\n&quot;</span>)
+        f.write(<span class="tk-str">f&quot;Maksimum güven: {gdf[&#x27;conf&#x27;].max():.3f}\n\n&quot;</span>)
+
+        f.write(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span> + <span class="tk-str">&quot;\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;Rapor otomatik olarak oluşturulmuştur.\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;YTÜ Harita Mühendisliği Yüksek Lisans Tezi\n&quot;</span>)
+        f.write(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span> + <span class="tk-str">&quot;\n&quot;</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Rapor: {rapor_path}&quot;</span>)
+
+    <span class="tk-com"># Grafikler</span>
+    fig, axes = plt.subplots(<span class="tk-num">2</span>, <span class="tk-num">2</span>, figsize=(<span class="tk-num">12</span>, <span class="tk-num">10</span>))
+    fig.suptitle(<span class="tk-str">&quot;Çam Ağacı Tespit Analizi - YTÜ Harita Mühendisliği&quot;</span>,
+                 fontsize=<span class="tk-num">14</span>, fontweight=<span class="tk-str">&#x27;bold&#x27;</span>)
+
+    <span class="tk-com"># 1. Taç alanı histogramı</span>
+    ax1 = axes[<span class="tk-num">0</span>, <span class="tk-num">0</span>]
+    ax1.hist(gdf[<span class="tk-str">&quot;alan_m2&quot;</span>], bins=<span class="tk-num">30</span>, color=<span class="tk-str">&#x27;forestgreen&#x27;</span>, edgecolor=<span class="tk-str">&#x27;darkgreen&#x27;</span>, alpha=<span class="tk-num">0.7</span>)
+    ax1.set_xlabel(<span class="tk-str">&quot;Taç Alanı (m²)&quot;</span>)
+    ax1.set_ylabel(<span class="tk-str">&quot;Ağaç Sayısı&quot;</span>)
+    ax1.set_title(<span class="tk-str">&quot;Taç Alanı Dağılımı&quot;</span>)
+    ax1.axvline(gdf[<span class="tk-str">&quot;alan_m2&quot;</span>].mean(), color=<span class="tk-str">&#x27;red&#x27;</span>, linestyle=<span class="tk-str">&#x27;--&#x27;</span>,
+                label=<span class="tk-str">f&#x27;Ortalama: {gdf[&quot;alan_m2&quot;].mean():.1f} m²&#x27;</span>)
+    ax1.legend()
+
+    <span class="tk-com"># 2. Taç çapı histogramı</span>
+    ax2 = axes[<span class="tk-num">0</span>, <span class="tk-num">1</span>]
+    ax2.hist(gdf[<span class="tk-str">&quot;cap_m&quot;</span>], bins=<span class="tk-num">30</span>, color=<span class="tk-str">&#x27;darkgreen&#x27;</span>, edgecolor=<span class="tk-str">&#x27;black&#x27;</span>, alpha=<span class="tk-num">0.7</span>)
+    ax2.set_xlabel(<span class="tk-str">&quot;Taç Çapı (m)&quot;</span>)
+    ax2.set_ylabel(<span class="tk-str">&quot;Ağaç Sayısı&quot;</span>)
+    ax2.set_title(<span class="tk-str">&quot;Taç Çapı Dağılımı&quot;</span>)
+    ax2.axvline(gdf[<span class="tk-str">&quot;cap_m&quot;</span>].mean(), color=<span class="tk-str">&#x27;red&#x27;</span>, linestyle=<span class="tk-str">&#x27;--&#x27;</span>,
+                label=<span class="tk-str">f&#x27;Ortalama: {gdf[&quot;cap_m&quot;].mean():.1f} m&#x27;</span>)
+    ax2.legend()
+
+    <span class="tk-com"># 3. Ağaç boyu histogramı (varsa)</span>
+    ax3 = axes[<span class="tk-num">1</span>, <span class="tk-num">0</span>]
+    <span class="tk-kw">if</span> <span class="tk-str">&quot;boy_m&quot;</span> <span class="tk-kw">in</span> gdf.columns <span class="tk-kw">and</span> gdf[<span class="tk-str">&quot;boy_m&quot;</span>].notna().<span class="tk-bi">any</span>():
+        boy_data = gdf[gdf[<span class="tk-str">&quot;boy_m&quot;</span>].notna()][<span class="tk-str">&quot;boy_m&quot;</span>]
+        ax3.hist(boy_data, bins=<span class="tk-num">30</span>, color=<span class="tk-str">&#x27;saddlebrown&#x27;</span>, edgecolor=<span class="tk-str">&#x27;black&#x27;</span>, alpha=<span class="tk-num">0.7</span>)
+        ax3.set_xlabel(<span class="tk-str">&quot;Ağaç Boyu (m)&quot;</span>)
+        ax3.set_ylabel(<span class="tk-str">&quot;Ağaç Sayısı&quot;</span>)
+        ax3.set_title(<span class="tk-str">&quot;Ağaç Boyu Dağılımı&quot;</span>)
+        ax3.axvline(boy_data.mean(), color=<span class="tk-str">&#x27;red&#x27;</span>, linestyle=<span class="tk-str">&#x27;--&#x27;</span>,
+                    label=<span class="tk-str">f&#x27;Ortalama: {boy_data.mean():.1f} m&#x27;</span>)
+        ax3.legend()
+    <span class="tk-kw">else</span>:
+        ax3.text(<span class="tk-num">0.5</span>, <span class="tk-num">0.5</span>, <span class="tk-str">&quot;Ağaç boyu verisi\nmevcut değil\n(DSM/DTM gerekli)&quot;</span>,
+                 ha=<span class="tk-str">&#x27;center&#x27;</span>, va=<span class="tk-str">&#x27;center&#x27;</span>, fontsize=<span class="tk-num">12</span>, color=<span class="tk-str">&#x27;gray&#x27;</span>)
+        ax3.set_title(<span class="tk-str">&quot;Ağaç Boyu Dağılımı&quot;</span>)
+        ax3.axis(<span class="tk-str">&#x27;off&#x27;</span>)
+
+    <span class="tk-com"># 4. Güven skoru dağılımı</span>
+    ax4 = axes[<span class="tk-num">1</span>, <span class="tk-num">1</span>]
+    ax4.hist(gdf[<span class="tk-str">&quot;conf&quot;</span>], bins=<span class="tk-num">20</span>, color=<span class="tk-str">&#x27;steelblue&#x27;</span>, edgecolor=<span class="tk-str">&#x27;navy&#x27;</span>, alpha=<span class="tk-num">0.7</span>)
+    ax4.set_xlabel(<span class="tk-str">&quot;Güven Skoru&quot;</span>)
+    ax4.set_ylabel(<span class="tk-str">&quot;Ağaç Sayısı&quot;</span>)
+    ax4.set_title(<span class="tk-str">&quot;Model Güven Skoru Dağılımı&quot;</span>)
+    ax4.axvline(gdf[<span class="tk-str">&quot;conf&quot;</span>].mean(), color=<span class="tk-str">&#x27;red&#x27;</span>, linestyle=<span class="tk-str">&#x27;--&#x27;</span>,
+                label=<span class="tk-str">f&#x27;Ortalama: {gdf[&quot;conf&quot;].mean():.2f}&#x27;</span>)
+    ax4.legend()
+
+    plt.tight_layout()
+
+    histogram_path = os.path.join(output_dir, <span class="tk-str">&quot;istatistik_grafikleri.png&quot;</span>)
+    plt.savefig(histogram_path, dpi=<span class="tk-num">150</span>, bbox_inches=<span class="tk-str">&#x27;tight&#x27;</span>)
+    plt.close()
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Grafikler: {histogram_path}&quot;</span>)
+
+
+<span class="tk-kw">def</span> export_calistir():
+    <span class="tk-str">&quot;&quot;&quot;Ana export fonksiyonu.&quot;&quot;&quot;</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;🌲 ÇAM AĞACI CBS ÇIKTILARI VE RAPOR OLUŞTURMA&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+
+    <span class="tk-com"># Dosya kontrolü</span>
+    bulunanlar = dosya_kontrol()
+
+    <span class="tk-com"># Tespitleri yükle</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📂 Tespit verileri yükleniyor...&quot;</span>)
+
+    <span class="tk-kw">with</span> <span class="tk-bi">open</span>(bulunanlar[<span class="tk-str">&quot;pickle&quot;</span>], <span class="tk-str">&quot;rb&quot;</span>) <span class="tk-kw">as</span> f:
+        data = pickle.load(f)
+
+    gdf = data[<span class="tk-str">&quot;gdf&quot;</span>]
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ {len(gdf)} adet tespit yüklendi&quot;</span>)
+
+    <span class="tk-com"># ESRI Shapefile alan adları en fazla 10 karakter olabilir.</span>
+    <span class="tk-com"># &quot;confidence&quot; (10+ karakter riski ve tutarlılık için) → &quot;conf&quot; olarak</span>
+    <span class="tk-com"># kısaltılır; tüm alan adları 10 karakter sınırına uygundur:</span>
+    <span class="tk-com"># id, conf, alan_m2, cap_m, boy_m, merkez_x, merkez_y</span>
+    <span class="tk-kw">if</span> <span class="tk-str">&quot;confidence&quot;</span> <span class="tk-kw">in</span> gdf.columns:
+        gdf = gdf.rename(columns={<span class="tk-str">&quot;confidence&quot;</span>: <span class="tk-str">&quot;conf&quot;</span>})
+
+    <span class="tk-com"># CRS kontrolü ve dönüşümü</span>
+    <span class="tk-kw">if</span> gdf.crs <span class="tk-kw">is</span> <span class="tk-kw">None</span>:
+        gdf = gdf.set_crs(CONFIG[<span class="tk-str">&quot;target_crs&quot;</span>])
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   CRS atandı: {CONFIG[&#x27;target_crs&#x27;]}&quot;</span>)
+    <span class="tk-kw">elif</span> <span class="tk-bi">str</span>(gdf.crs) != CONFIG[<span class="tk-str">&quot;target_crs&quot;</span>]:
+        gdf = gdf.to_crs(CONFIG[<span class="tk-str">&quot;target_crs&quot;</span>])
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   CRS dönüştürüldü: {CONFIG[&#x27;target_crs&#x27;]}&quot;</span>)
+
+    <span class="tk-com"># CHM&#x27;den ağaç boyu hesapla</span>
+    <span class="tk-kw">if</span> <span class="tk-str">&quot;dsm&quot;</span> <span class="tk-kw">in</span> bulunanlar <span class="tk-kw">and</span> <span class="tk-str">&quot;dtm&quot;</span> <span class="tk-kw">in</span> bulunanlar:
+        chm = chm_hesapla(bulunanlar[<span class="tk-str">&quot;dsm&quot;</span>], bulunanlar[<span class="tk-str">&quot;dtm&quot;</span>])
+
+        <span class="tk-kw">if</span> chm <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span>:
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n🌳 Her ağaç için boy hesaplanıyor...&quot;</span>)
+
+            boylar = []
+            <span class="tk-kw">for</span> idx, row <span class="tk-kw">in</span> tqdm(gdf.iterrows(), total=<span class="tk-bi">len</span>(gdf), desc=<span class="tk-str">&quot;   Boy hesaplama&quot;</span>):
+                boy = poligon_icin_boy_hesapla(
+                    row.geometry,
+                    chm[<span class="tk-str">&quot;data&quot;</span>],
+                    chm[<span class="tk-str">&quot;transform&quot;</span>],
+                    method=CONFIG[<span class="tk-str">&quot;boy_hesaplama&quot;</span>]
+                )
+                boylar.append(boy)
+
+            gdf[<span class="tk-str">&quot;boy_m&quot;</span>] = boylar
+
+            gecerli_boy = gdf[<span class="tk-str">&quot;boy_m&quot;</span>].notna().<span class="tk-bi">sum</span>()
+            <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ {gecerli_boy}/{len(gdf)} ağaç için boy hesaplandı&quot;</span>)
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n⚠️ DSM/DTM bulunamadı, ağaç boyu hesaplanamıyor&quot;</span>)
+        gdf[<span class="tk-str">&quot;boy_m&quot;</span>] = <span class="tk-kw">None</span>
+
+    <span class="tk-com"># Öznitelikleri düzenle (Shapefile 10 karakter sınırına uygun adlar)</span>
+    <span class="tk-kw">if</span> <span class="tk-str">&quot;boy_m&quot;</span> <span class="tk-kw">in</span> gdf.columns:
+        gdf = gdf[[<span class="tk-str">&quot;id&quot;</span>, <span class="tk-str">&quot;conf&quot;</span>, <span class="tk-str">&quot;alan_m2&quot;</span>, <span class="tk-str">&quot;cap_m&quot;</span>, <span class="tk-str">&quot;boy_m&quot;</span>, <span class="tk-str">&quot;merkez_x&quot;</span>, <span class="tk-str">&quot;merkez_y&quot;</span>, <span class="tk-str">&quot;geometry&quot;</span>]]
+    <span class="tk-kw">else</span>:
+        gdf = gdf[[<span class="tk-str">&quot;id&quot;</span>, <span class="tk-str">&quot;conf&quot;</span>, <span class="tk-str">&quot;alan_m2&quot;</span>, <span class="tk-str">&quot;cap_m&quot;</span>, <span class="tk-str">&quot;merkez_x&quot;</span>, <span class="tk-str">&quot;merkez_y&quot;</span>, <span class="tk-str">&quot;geometry&quot;</span>]]
+
+    <span class="tk-com"># Sayısal değerleri yuvarla</span>
+    gdf[<span class="tk-str">&quot;conf&quot;</span>] = gdf[<span class="tk-str">&quot;conf&quot;</span>].<span class="tk-bi">round</span>(<span class="tk-num">4</span>)
+    gdf[<span class="tk-str">&quot;alan_m2&quot;</span>] = gdf[<span class="tk-str">&quot;alan_m2&quot;</span>].<span class="tk-bi">round</span>(<span class="tk-num">3</span>)
+    gdf[<span class="tk-str">&quot;cap_m&quot;</span>] = gdf[<span class="tk-str">&quot;cap_m&quot;</span>].<span class="tk-bi">round</span>(<span class="tk-num">3</span>)
+    gdf[<span class="tk-str">&quot;merkez_x&quot;</span>] = gdf[<span class="tk-str">&quot;merkez_x&quot;</span>].<span class="tk-bi">round</span>(<span class="tk-num">3</span>)
+    gdf[<span class="tk-str">&quot;merkez_y&quot;</span>] = gdf[<span class="tk-str">&quot;merkez_y&quot;</span>].<span class="tk-bi">round</span>(<span class="tk-num">3</span>)
+    <span class="tk-kw">if</span> <span class="tk-str">&quot;boy_m&quot;</span> <span class="tk-kw">in</span> gdf.columns:
+        gdf[<span class="tk-str">&quot;boy_m&quot;</span>] = gdf[<span class="tk-str">&quot;boy_m&quot;</span>].<span class="tk-bi">round</span>(<span class="tk-num">2</span>)
+
+    <span class="tk-com"># Shapefile olarak kaydet</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💾 CBS dosyaları kaydediliyor...&quot;</span>)
+
+    shapefile_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;cam_agaclari.shp&quot;</span>)
+    gdf.to_file(shapefile_path, driver=<span class="tk-str">&quot;ESRI Shapefile&quot;</span>, encoding=<span class="tk-str">&quot;utf-8&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Shapefile: {shapefile_path}&quot;</span>)
+
+    <span class="tk-com"># GeoJSON olarak kaydet</span>
+    geojson_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;cam_agaclari.geojson&quot;</span>)
+    gdf.to_file(geojson_path, driver=<span class="tk-str">&quot;GeoJSON&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ GeoJSON: {geojson_path}&quot;</span>)
+
+    <span class="tk-com"># CSV olarak da kaydet (öznitelik tablosu)</span>
+    csv_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;cam_agaclari_ozellikler.csv&quot;</span>)
+    gdf_csv = gdf.drop(columns=[<span class="tk-str">&quot;geometry&quot;</span>])
+    gdf_csv.to_csv(csv_path, index=<span class="tk-kw">False</span>, encoding=<span class="tk-str">&quot;utf-8-sig&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ CSV: {csv_path}&quot;</span>)
+
+    <span class="tk-com"># İstatistik raporu oluştur</span>
+    istatistik_raporu_olustur(gdf, CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>])
+
+    <span class="tk-com"># Final özet</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;📊 SONUÇ ÖZETİ&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Toplam ağaç sayısı: {len(gdf)}&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Toplam taç alanı: {gdf[&#x27;alan_m2&#x27;].sum():.2f} m²&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Ortalama taç çapı: {gdf[&#x27;cap_m&#x27;].mean():.2f} m&quot;</span>)
+    <span class="tk-kw">if</span> <span class="tk-str">&quot;boy_m&quot;</span> <span class="tk-kw">in</span> gdf.columns <span class="tk-kw">and</span> gdf[<span class="tk-str">&quot;boy_m&quot;</span>].notna().<span class="tk-bi">any</span>():
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Ortalama ağaç boyu: {gdf[&#x27;boy_m&#x27;].mean():.2f} m&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n✅ Tüm çıktılar başarıyla oluşturuldu!&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;📂 Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📋 Oluşturulan dosyalar:&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   1. cam_agaclari.shp (+ .dbf, .shx, .prj) - QGIS&#x27;te açın&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   2. cam_agaclari.geojson - Web haritalar için&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   3. cam_agaclari_ozellikler.csv - Excel&#x27;de analiz için&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   4. ozet_rapor.txt - Metin rapor&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   5. istatistik_grafikleri.png - Görsel rapor&quot;</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💡 QGIS&#x27;te görselleştirme:&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   1. QGIS&#x27;i açın&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   2. Ortomozaik GeoTIFF&#x27;i ekleyin (Layer → Add Raster Layer)&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   3. cam_agaclari.shp&#x27;yi ekleyin (Layer → Add Vector Layer)&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   4. Shapefile&#x27;ı ortomozaiğin üstüne sürükleyin&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   5. Poligonları yeşil renk + şeffaf dolgu yapın&quot;</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💡 Sonraki adım: make_reference_grid.py ile referans kareleri oluşturun&quot;</span>)
+
+
+<span class="tk-kw">if</span> __name__ == <span class="tk-str">&quot;__main__&quot;</span>:
+    <span class="tk-kw">try</span>:
+        export_calistir()
+    <span class="tk-kw">except</span> KeyboardInterrupt:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n\n⚠️ İşlem kullanıcı tarafından iptal edildi.&quot;</span>)
+        sys.exit(<span class="tk-num">0</span>)
+    <span class="tk-kw">except</span> Exception <span class="tk-kw">as</span> e:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n❌ HATA: {str(e)}&quot;</span>)
+        <span class="tk-kw">import</span> traceback
+        traceback.print_exc()
+        sys.exit(<span class="tk-num">1</span>)
+</code></pre>
+</details>
+</section>
+<section id="grid">
+<p class="eyebrow">Adım 6</p>
+<h2>make_reference_grid.py — Referans Örneklem Kareleri</h2>
+<p class="desc">Ortomozaik sınırlarından rastgele 3 adet 30×30 m örneklem karesi seçer (seed=42, tekrarlanabilir), boş/kenar bölgeleri eler ve grid_kareleri.shp olarak kaydeder. Konsola QGIS&#x27;te referans çizimi için Türkçe talimat yazdırır.</p>
+<div class="tablewrap"><table class="io">
+<thead><tr><th>Girdi</th><th>Çıktı</th></tr></thead>
+<tbody><tr><td class="mono">Proses_transparent_mosaic_group1.tif</td><td class="mono">grid_kareleri.shp</td></tr></tbody>
+</table></div>
+<details class="code">
+<summary><span class="fname">make_reference_grid.py</span><span class="hint">254 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com">#!/usr/bin/env python3</span>
+<span class="tk-com"># -*- coding: utf-8 -*-</span>
+<span class="tk-str">&quot;&quot;&quot;
+YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation
+Referans Veri Hazırlama Yardımcısı (Örneklem Kareleri)
+
+Bu script, ortomozaik sınırları içinden RASTGELE 3 adet 30x30 m örneklem
+karesi seçer ve grid_kareleri.shp olarak kaydeder. Rastgelelik sabit
+seed (42) ile üretildiği için sonuçlar TEKRARLANABİLİRDİR (tezde belirtin).
+
+Kullanıcı bu karelerin içindeki TÜM çam ağaçlarını QGIS&#x27;te elle çizerek
+referans veri setini (referans_agaclar.shp) oluşturur. Bu referans,
+accuracy_assessment.py ile modelin doğruluğunu ölçmek için kullanılır.
+
+Kullanım:
+    python make_reference_grid.py
+
+Gereksinimler:
+    - rasterio, geopandas, shapely, numpy
+    - Ortomozaik GeoTIFF dosyası
+
+Yazar: YTÜ Harita Mühendisliği Yüksek Lisans Tezi
+Tarih: 2024
+&quot;&quot;&quot;</span>
+
+<span class="tk-kw">import</span> os
+<span class="tk-kw">import</span> sys
+<span class="tk-kw">import</span> warnings
+
+<span class="tk-kw">import</span> numpy <span class="tk-kw">as</span> np
+
+<span class="tk-com"># Uyarıları sustur</span>
+warnings.filterwarnings(<span class="tk-str">&#x27;ignore&#x27;</span>)
+
+<span class="tk-com">#==============================================================================</span>
+<span class="tk-com"># KONFİGÜRASYON - Bu değerleri kendi dosya yollarınıza göre düzenleyin</span>
+<span class="tk-com">#==============================================================================</span>
+
+CONFIG = {
+    <span class="tk-com"># Ortomozaik GeoTIFF dosyası (Pix4D çıktısı)</span>
+    <span class="tk-str">&quot;orthomosaic_path&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\02_pix4d_outputs\Proses_transparent_mosaic_group1.tif&quot;</span>,
+
+    <span class="tk-com"># Çıktı klasörü (grid_kareleri.shp buraya kaydedilecek)</span>
+    <span class="tk-str">&quot;output_dir&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference&quot;</span>,
+
+    <span class="tk-com"># Örneklem karesi kenar uzunluğu (metre)</span>
+    <span class="tk-str">&quot;kare_boyutu_m&quot;</span>: <span class="tk-num">30.0</span>,
+
+    <span class="tk-com"># Seçilecek kare sayısı</span>
+    <span class="tk-str">&quot;kare_sayisi&quot;</span>: <span class="tk-num">3</span>,
+
+    <span class="tk-com"># Rastgelelik tohumu (SABİT: tekrarlanabilirlik için değiştirmeyin)</span>
+    <span class="tk-str">&quot;seed&quot;</span>: <span class="tk-num">42</span>,
+
+    <span class="tk-com"># Bir karenin kabul edilmesi için izin verilen en fazla boş (NoData) oranı</span>
+    <span class="tk-com"># (şeffaf mozaiklerin kenarlarındaki veri içermeyen kareleri elemek için)</span>
+    <span class="tk-str">&quot;max_bos_oran&quot;</span>: <span class="tk-num">0.5</span>,
+
+    <span class="tk-com"># En fazla deneme sayısı (uygun kare bulunamazsa güvenlik sınırı)</span>
+    <span class="tk-str">&quot;max_deneme&quot;</span>: <span class="tk-num">2000</span>,
+}
+
+<span class="tk-com">#==============================================================================</span>
+
+
+<span class="tk-kw">def</span> dosya_kontrol():
+    <span class="tk-str">&quot;&quot;&quot;Gerekli dosyaların varlığını kontrol eder.&quot;&quot;&quot;</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📁 Dosya kontrolü yapılıyor...&quot;</span>)
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> os.path.exists(CONFIG[<span class="tk-str">&quot;orthomosaic_path&quot;</span>]):
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;❌ Ortomozaik dosyası bulunamadı: {CONFIG[&#x27;orthomosaic_path&#x27;]}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;💡 Lütfen CONFIG bölümündeki dosya yolunu kontrol edin.&quot;</span>)
+        sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Ortomozaik: {CONFIG[&#x27;orthomosaic_path&#x27;]}&quot;</span>)
+
+    os.makedirs(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], exist_ok=<span class="tk-kw">True</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+
+
+<span class="tk-kw">def</span> kare_bos_orani(src, kare_geom) -&gt; <span class="tk-bi">float</span>:
+    <span class="tk-str">&quot;&quot;&quot;
+    Bir örneklem karesi içindeki boş (NoData/siyah) piksel oranını hesaplar.
+    Hız için kare, düşük çözünürlükte (64x64) okunur.
+
+    Args:
+        src: Açık rasterio dataset (ortomozaik)
+        kare_geom: Shapely box (UTM koordinatlı kare)
+
+    Returns:
+        0.0 - 1.0 arasında boş piksel oranı
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> rasterio.windows <span class="tk-kw">import</span> from_bounds
+
+    minx, miny, maxx, maxy = kare_geom.bounds
+
+    <span class="tk-kw">try</span>:
+        window = from_bounds(minx, miny, maxx, maxy, transform=src.transform)
+
+        <span class="tk-com"># Düşük çözünürlükte oku (64x64 yeterli, çok hızlı)</span>
+        veri = src.read(<span class="tk-num">1</span>, window=window, out_shape=(<span class="tk-num">64</span>, <span class="tk-num">64</span>), boundless=<span class="tk-kw">True</span>, fill_value=<span class="tk-num">0</span>)
+
+        nodata = src.nodata
+        <span class="tk-kw">if</span> nodata <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span>:
+            bos = (veri == nodata) | (veri == <span class="tk-num">0</span>)
+        <span class="tk-kw">else</span>:
+            bos = (veri == <span class="tk-num">0</span>)
+
+        <span class="tk-kw">return</span> <span class="tk-bi">float</span>(np.mean(bos))
+
+    <span class="tk-kw">except</span> Exception:
+        <span class="tk-com"># Okunamayan kare tamamen boş kabul edilir</span>
+        <span class="tk-kw">return</span> <span class="tk-num">1.0</span>
+
+
+<span class="tk-kw">def</span> kareleri_sec(src) -&gt; <span class="tk-bi">list</span>:
+    <span class="tk-str">&quot;&quot;&quot;
+    Ortomozaik sınırları içinden rastgele, birbiriyle örtüşmeyen ve
+    yeterli veri içeren örneklem kareleri seçer (seed=42, tekrarlanabilir).
+
+    Returns:
+        List of Shapely box geometrileri
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> shapely.geometry <span class="tk-kw">import</span> box
+
+    bounds = src.bounds
+    kare = CONFIG[<span class="tk-str">&quot;kare_boyutu_m&quot;</span>]
+
+    genislik = bounds.right - bounds.left
+    yukseklik = bounds.top - bounds.bottom
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🗺️ Ortomozaik kapsamı: {genislik:.1f} m x {yukseklik:.1f} m&quot;</span>)
+
+    <span class="tk-kw">if</span> genislik &lt; kare <span class="tk-kw">or</span> yukseklik &lt; kare:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;❌ HATA: Ortomozaik {kare:.0f}x{kare:.0f} m kare için çok küçük!&quot;</span>)
+        sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-com"># Sabit seed ile rastgele sayı üreteci (tekrarlanabilirlik)</span>
+    rng = np.random.default_rng(CONFIG[<span class="tk-str">&quot;seed&quot;</span>])
+
+    secilen = []
+    deneme = <span class="tk-num">0</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🎲 Rastgele {CONFIG[&#x27;kare_sayisi&#x27;]} adet {kare:.0f}x{kare:.0f} m kare seçiliyor (seed={CONFIG[&#x27;seed&#x27;]})...&quot;</span>)
+
+    <span class="tk-kw">while</span> <span class="tk-bi">len</span>(secilen) &lt; CONFIG[<span class="tk-str">&quot;kare_sayisi&quot;</span>] <span class="tk-kw">and</span> deneme &lt; CONFIG[<span class="tk-str">&quot;max_deneme&quot;</span>]:
+        deneme += <span class="tk-num">1</span>
+
+        <span class="tk-com"># Kare tamamen sınırlar içinde kalacak şekilde sol-alt köşe seç</span>
+        x = bounds.left + rng.uniform(<span class="tk-num">0</span>, genislik - kare)
+        y = bounds.bottom + rng.uniform(<span class="tk-num">0</span>, yukseklik - kare)
+
+        aday = box(x, y, x + kare, y + kare)
+
+        <span class="tk-com"># Daha önce seçilen karelerle örtüşmesin</span>
+        <span class="tk-kw">if</span> <span class="tk-bi">any</span>(aday.intersects(k) <span class="tk-kw">for</span> k <span class="tk-kw">in</span> secilen):
+            <span class="tk-kw">continue</span>
+
+        <span class="tk-com"># Yeterli veri içersin (kenar boşluklarını ele)</span>
+        bos_oran = kare_bos_orani(src, aday)
+        <span class="tk-kw">if</span> bos_oran &gt; CONFIG[<span class="tk-str">&quot;max_bos_oran&quot;</span>]:
+            <span class="tk-kw">continue</span>
+
+        secilen.append(aday)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Kare {len(secilen)}: sol-alt köşe ({x:.1f}, {y:.1f}), dolu oran: %{(1-bos_oran)*100:.0f}&quot;</span>)
+
+    <span class="tk-kw">if</span> <span class="tk-bi">len</span>(secilen) &lt; CONFIG[<span class="tk-str">&quot;kare_sayisi&quot;</span>]:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n⚠️ UYARI: {CONFIG[&#x27;max_deneme&#x27;]} denemede sadece {len(secilen)} uygun kare bulundu.&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;   &#x27;max_bos_oran&#x27; değerini artırmayı deneyin (örn. 0.7).&quot;</span>)
+        <span class="tk-kw">if</span> <span class="tk-kw">not</span> secilen:
+            sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-kw">return</span> secilen
+
+
+<span class="tk-kw">def</span> grid_olustur():
+    <span class="tk-str">&quot;&quot;&quot;Ana fonksiyon: kareleri seçer ve shapefile olarak kaydeder.&quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> rasterio
+    <span class="tk-kw">import</span> geopandas <span class="tk-kw">as</span> gpd
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;🌲 REFERANS VERİ HAZIRLAMA - ÖRNEKLEM KARELERİ&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+
+    dosya_kontrol()
+
+    <span class="tk-kw">with</span> rasterio.<span class="tk-bi">open</span>(CONFIG[<span class="tk-str">&quot;orthomosaic_path&quot;</span>]) <span class="tk-kw">as</span> src:
+        <span class="tk-kw">if</span> src.crs <span class="tk-kw">is</span> <span class="tk-kw">None</span>:
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;❌ HATA: Ortomozaiğin koordinat sistemi (CRS) tanımlı değil!&quot;</span>)
+            sys.exit(<span class="tk-num">1</span>)
+
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   🌍 CRS: {src.crs}&quot;</span>)
+
+        kareler = kareleri_sec(src)
+        crs = src.crs
+
+    <span class="tk-com"># GeoDataFrame oluştur ve kaydet</span>
+    gdf = gpd.GeoDataFrame(
+        {
+            <span class="tk-str">&quot;kare_id&quot;</span>: <span class="tk-bi">range</span>(<span class="tk-num">1</span>, <span class="tk-bi">len</span>(kareler) + <span class="tk-num">1</span>),
+            <span class="tk-str">&quot;alan_m2&quot;</span>: [k.area <span class="tk-kw">for</span> k <span class="tk-kw">in</span> kareler],
+        },
+        geometry=kareler,
+        crs=crs,
+    )
+
+    shp_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;grid_kareleri.shp&quot;</span>)
+    gdf.to_file(shp_path, driver=<span class="tk-str">&quot;ESRI Shapefile&quot;</span>, encoding=<span class="tk-str">&quot;utf-8&quot;</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n💾 Kaydedildi: {shp_path}&quot;</span>)
+
+    <span class="tk-com"># Kullanıcıya QGIS talimatları</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;📋 ŞİMDİ NE YAPMALISINIZ? (QGIS&#x27;TE REFERANS ÇİZİMİ)&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;&quot;&quot;
+1. QGIS&#x27;i açın ve şu katmanları ekleyin:
+   - Ortomozaik GeoTIFF  (Layer → Add Layer → Add Raster Layer)
+   - grid_kareleri.shp   (Layer → Add Layer → Add Vector Layer)
+
+2. Yeni bir poligon shapefile oluşturun:
+   - Layer → Create Layer → New Shapefile Layer
+   - Dosya adı : referans_agaclar.shp
+   - Konum     : {output_dir}
+   - Geometri  : Polygon
+   - CRS       : Ortomozaikle AYNI olmalı ({crs})
+
+3. Her örneklem karesinin İÇİNDEKİ TÜM çam ağaçlarının taçlarını
+   tek tek poligon olarak çizin (Toggle Editing → Add Polygon Feature).
+   - Taç sınırını olabildiğince gerçeğe yakın çizin.
+   - Kare sınırında kalan ağaçlarda, taç merkezi kare İÇİNDEYSE çizin.
+   - Hiçbir çamı atlamayın; referans TAM olmalı.
+
+4. Düzenlemeyi kaydedin (Toggle Editing → Save).
+
+5. Ardından doğruluk değerlendirmesini çalıştırın:
+   python accuracy_assessment.py
+&quot;&quot;&quot;</span>.format(output_dir=CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], crs=crs))
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span>*<span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n✅ Tamamlandı! {len(kareler)} örneklem karesi oluşturuldu.&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   (seed={CONFIG[&#x27;seed&#x27;]} sabit olduğu için script yeniden çalıştırılırsa aynı kareler seçilir)&quot;</span>)
+
+
+<span class="tk-kw">if</span> __name__ == <span class="tk-str">&quot;__main__&quot;</span>:
+    <span class="tk-kw">try</span>:
+        grid_olustur()
+    <span class="tk-kw">except</span> KeyboardInterrupt:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n\n⚠️ İşlem kullanıcı tarafından iptal edildi.&quot;</span>)
+        sys.exit(<span class="tk-num">0</span>)
+    <span class="tk-kw">except</span> Exception <span class="tk-kw">as</span> e:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n❌ HATA: {str(e)}&quot;</span>)
+        <span class="tk-kw">import</span> traceback
+        traceback.print_exc()
+        sys.exit(<span class="tk-num">1</span>)
+</code></pre>
+</details>
+</section>
+<section id="accuracy">
+<p class="eyebrow">Adım 8</p>
+<h2>accuracy_assessment.py — Ağaç Bazlı Doğruluk Değerlendirmesi</h2>
+<p class="desc">Tahmin ve referans poligonlarını Macar algoritması (scipy.optimize.linear_sum_assignment) ile birebir eşleştirir. IoU ≥ 0.5 eşleşmeler TP; eşleşmeyen tahminler FP; eşleşmeyen referanslar FN sayılır. Ağaç bazında Precision / Recall / F1 ile eşleşen çiftler için taç alanı karşılaştırması (R², RMSE, saçılım grafiği) üretir.</p>
+<div class="tablewrap"><table class="io">
+<thead><tr><th>Girdi</th><th>Çıktı</th></tr></thead>
+<tbody><tr><td class="mono">cam_agaclari.shp, referans_agaclar.shp, grid_kareleri.shp (opsiyonel)</td><td class="mono">accuracy_report.txt, alan_karsilastirma_sacilim.png, eslesen_ciftler.csv</td></tr></tbody>
+</table></div>
+<details class="code">
+<summary><span class="fname">accuracy_assessment.py</span><span class="hint">430 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com">#!/usr/bin/env python3</span>
+<span class="tk-com"># -*- coding: utf-8 -*-</span>
+<span class="tk-str">&quot;&quot;&quot;
+YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation
+Ağaç Bazlı Doğruluk Değerlendirmesi (Accuracy Assessment)
+
+Bu script, modelin ürettiği tahmin poligonlarını (cam_agaclari.shp)
+kullanıcının QGIS&#x27;te elle çizdiği referans poligonlarla
+(referans_agaclar.shp) karşılaştırır ve &quot;model kaç ağacı doğru buldu?&quot;
+sorusuna cevap verir.
+
+Yöntem:
+    - Tahmin-referans çiftleri Macar algoritması
+      (scipy.optimize.linear_sum_assignment) ile BİREBİR eşleştirilir.
+    - IoU &gt;= 0.5 olan eşleşmeler True Positive (TP) sayılır.
+    - Eşleşmeyen tahminler False Positive (FP),
+      eşleşmeyen referanslar False Negative (FN) olur.
+    - Precision, Recall ve F1 ağaç bazında hesaplanır.
+    - Eşleşen çiftler için taç alanı karşılaştırması yapılır
+      (R², RMSE, saçılım grafiği).
+
+Kullanım:
+    python accuracy_assessment.py
+
+Gereksinimler:
+    - geopandas, shapely, scipy, matplotlib, tqdm
+    - cam_agaclari.shp (export_results.py çıktısı)
+    - referans_agaclar.shp (QGIS&#x27;te elle çizilen referans)
+
+Yazar: YTÜ Harita Mühendisliği Yüksek Lisans Tezi
+Tarih: 2024
+&quot;&quot;&quot;</span>
+
+<span class="tk-kw">import</span> os
+<span class="tk-kw">import</span> sys
+<span class="tk-kw">import</span> warnings
+
+<span class="tk-kw">import</span> numpy <span class="tk-kw">as</span> np
+<span class="tk-kw">from</span> tqdm <span class="tk-kw">import</span> tqdm
+
+<span class="tk-com"># Uyarıları sustur</span>
+warnings.filterwarnings(<span class="tk-str">&#x27;ignore&#x27;</span>)
+
+<span class="tk-com">#==============================================================================</span>
+<span class="tk-com"># KONFİGÜRASYON - Bu değerleri kendi dosya yollarınıza göre düzenleyin</span>
+<span class="tk-com">#==============================================================================</span>
+
+CONFIG = {
+    <span class="tk-com"># Modelin ürettiği tahmin poligonları (export_results.py çıktısı)</span>
+    <span class="tk-str">&quot;tahmin_shp&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference\cam_agaclari.shp&quot;</span>,
+
+    <span class="tk-com"># Referans poligonlar (QGIS&#x27;te elle çizilen kontrol verisi)</span>
+    <span class="tk-str">&quot;referans_shp&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference\referans_agaclar.shp&quot;</span>,
+
+    <span class="tk-com"># Örneklem kareleri (make_reference_grid.py çıktısı, OPSİYONEL).</span>
+    <span class="tk-com"># Dosya varsa tahminler bu karelerle sınırlandırılır; çünkü referans</span>
+    <span class="tk-com"># sadece kareler içinde çizildiği için tüm sahadaki tahminlerle</span>
+    <span class="tk-com"># karşılaştırmak Precision&#x27;ı haksız yere düşürür.</span>
+    <span class="tk-str">&quot;grid_shp&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference\grid_kareleri.shp&quot;</span>,
+
+    <span class="tk-com"># Eşleşme için minimum IoU eşiği (tez literatüründe standart: 0.5)</span>
+    <span class="tk-str">&quot;iou_esigi&quot;</span>: <span class="tk-num">0.5</span>,
+
+    <span class="tk-com"># Çıktı klasörü (rapor ve grafik buraya kaydedilir)</span>
+    <span class="tk-str">&quot;output_dir&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference&quot;</span>,
+}
+
+<span class="tk-com">#==============================================================================</span>
+
+
+<span class="tk-kw">def</span> dosya_kontrol():
+    <span class="tk-str">&quot;&quot;&quot;Gerekli dosyaların varlığını kontrol eder.&quot;&quot;&quot;</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📁 Dosya kontrolü yapılıyor...&quot;</span>)
+
+    hatalar = []
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> os.path.exists(CONFIG[<span class="tk-str">&quot;tahmin_shp&quot;</span>]):
+        hatalar.append(<span class="tk-str">f&quot;❌ Tahmin shapefile bulunamadı: {CONFIG[&#x27;tahmin_shp&#x27;]}&quot;</span>)
+        hatalar.append(<span class="tk-str">&quot;   Önce inference_orthomosaic.py ve export_results.py çalıştırın!&quot;</span>)
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Tahminler: {CONFIG[&#x27;tahmin_shp&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> os.path.exists(CONFIG[<span class="tk-str">&quot;referans_shp&quot;</span>]):
+        hatalar.append(<span class="tk-str">f&quot;❌ Referans shapefile bulunamadı: {CONFIG[&#x27;referans_shp&#x27;]}&quot;</span>)
+        hatalar.append(<span class="tk-str">&quot;   QGIS&#x27;te referans poligonları çizip bu yola kaydedin.&quot;</span>)
+        hatalar.append(<span class="tk-str">&quot;   (Yardım için: python make_reference_grid.py)&quot;</span>)
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Referans: {CONFIG[&#x27;referans_shp&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">if</span> hatalar:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;\n&quot;</span>.join(hatalar))
+        sys.exit(<span class="tk-num">1</span>)
+
+    os.makedirs(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], exist_ok=<span class="tk-kw">True</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+
+
+<span class="tk-kw">def</span> geometri_duzelt(gdf):
+    <span class="tk-str">&quot;&quot;&quot;Geçersiz geometrileri buffer(0) ile düzeltir, boşları eler.&quot;&quot;&quot;</span>
+    gdf = gdf[gdf.geometry.notna()].copy()
+    gecersiz = ~gdf.geometry.is_valid
+    <span class="tk-kw">if</span> gecersiz.<span class="tk-bi">any</span>():
+        gdf.loc[gecersiz, <span class="tk-str">&quot;geometry&quot;</span>] = gdf.loc[gecersiz, <span class="tk-str">&quot;geometry&quot;</span>].buffer(<span class="tk-num">0</span>)
+    gdf = gdf[gdf.geometry.area &gt; <span class="tk-num">0</span>]
+    <span class="tk-kw">return</span> gdf
+
+
+<span class="tk-kw">def</span> iou_hesapla(poly1, poly2) -&gt; <span class="tk-bi">float</span>:
+    <span class="tk-str">&quot;&quot;&quot;İki poligon arasındaki IoU (Intersection over Union) değerini hesaplar.&quot;&quot;&quot;</span>
+    <span class="tk-kw">try</span>:
+        <span class="tk-kw">if</span> <span class="tk-kw">not</span> poly1.intersects(poly2):
+            <span class="tk-kw">return</span> <span class="tk-num">0.0</span>
+        kesisim = poly1.intersection(poly2).area
+        birlesim = poly1.union(poly2).area
+        <span class="tk-kw">if</span> birlesim &lt;= <span class="tk-num">0</span>:
+            <span class="tk-kw">return</span> <span class="tk-num">0.0</span>
+        <span class="tk-kw">return</span> kesisim / birlesim
+    <span class="tk-kw">except</span> Exception:
+        <span class="tk-kw">return</span> <span class="tk-num">0.0</span>
+
+
+<span class="tk-kw">def</span> eslestir(tahminler, referanslar, iou_esigi: <span class="tk-bi">float</span>):
+    <span class="tk-str">&quot;&quot;&quot;
+    Tahmin ve referans poligonlarını Macar algoritması ile BİREBİR eşleştirir.
+
+    Args:
+        tahminler: Tahmin geometrileri listesi
+        referanslar: Referans geometrileri listesi
+        iou_esigi: TP sayılmak için minimum IoU
+
+    Returns:
+        eslesmeler: List of (tahmin_index, referans_index, iou) — sadece IoU &gt;= eşik
+        iou_matrisi: (n_tahmin, n_referans) IoU matrisi
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> scipy.optimize <span class="tk-kw">import</span> linear_sum_assignment
+
+    n_t, n_r = <span class="tk-bi">len</span>(tahminler), <span class="tk-bi">len</span>(referanslar)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🔗 Eşleştirme yapılıyor ({n_t} tahmin x {n_r} referans)...&quot;</span>)
+
+    <span class="tk-com"># IoU matrisini hesapla</span>
+    iou_matrisi = np.zeros((n_t, n_r), dtype=np.float64)
+
+    <span class="tk-kw">for</span> i <span class="tk-kw">in</span> tqdm(<span class="tk-bi">range</span>(n_t), desc=<span class="tk-str">&quot;   IoU matrisi&quot;</span>):
+        <span class="tk-kw">for</span> j <span class="tk-kw">in</span> <span class="tk-bi">range</span>(n_r):
+            iou_matrisi[i, j] = iou_hesapla(tahminler[i], referanslar[j])
+
+    <span class="tk-com"># Macar algoritması: toplam IoU&#x27;yu MAKSİMİZE eden birebir atama</span>
+    <span class="tk-com"># (linear_sum_assignment maliyeti minimize eder, bu yüzden -IoU verilir)</span>
+    satirlar, sutunlar = linear_sum_assignment(-iou_matrisi)
+
+    <span class="tk-com"># Sadece IoU eşiğini geçen atamalar gerçek eşleşme sayılır</span>
+    eslesmeler = []
+    <span class="tk-kw">for</span> i, j <span class="tk-kw">in</span> <span class="tk-bi">zip</span>(satirlar, sutunlar):
+        iou = iou_matrisi[i, j]
+        <span class="tk-kw">if</span> iou &gt;= iou_esigi:
+            eslesmeler.append((<span class="tk-bi">int</span>(i), <span class="tk-bi">int</span>(j), <span class="tk-bi">float</span>(iou)))
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ IoU &gt;= {iou_esigi} olan eşleşme sayısı: {len(eslesmeler)}&quot;</span>)
+
+    <span class="tk-kw">return</span> eslesmeler, iou_matrisi
+
+
+<span class="tk-kw">def</span> alan_karsilastirma(eslesmeler, tahminler, referanslar, output_dir: <span class="tk-bi">str</span>):
+    <span class="tk-str">&quot;&quot;&quot;
+    Eşleşen çiftler için taç alanı karşılaştırması yapar:
+    R², RMSE ve saçılım grafiği (tahmin vs referans).
+
+    Returns:
+        dict: {&quot;r2&quot;: ..., &quot;rmse&quot;: ..., &quot;n&quot;: ...} veya None (eşleşme yoksa)
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">from</span> scipy <span class="tk-kw">import</span> stats
+    <span class="tk-kw">import</span> matplotlib.pyplot <span class="tk-kw">as</span> plt
+    <span class="tk-kw">from</span> matplotlib <span class="tk-kw">import</span> rcParams
+
+    rcParams[<span class="tk-str">&#x27;font.family&#x27;</span>] = <span class="tk-str">&#x27;DejaVu Sans&#x27;</span>
+
+    <span class="tk-kw">if</span> <span class="tk-bi">len</span>(eslesmeler) &lt; <span class="tk-num">2</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n⚠️ Alan karşılaştırması için en az 2 eşleşme gerekli, atlanıyor.&quot;</span>)
+        <span class="tk-kw">return</span> <span class="tk-kw">None</span>
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📐 Taç alanı karşılaştırması yapılıyor (tahmin vs referans)...&quot;</span>)
+
+    ref_alan = np.array([referanslar[j].area <span class="tk-kw">for</span> _, j, _ <span class="tk-kw">in</span> eslesmeler])
+    tah_alan = np.array([tahminler[i].area <span class="tk-kw">for</span> i, _, _ <span class="tk-kw">in</span> eslesmeler])
+
+    <span class="tk-com"># Doğrusal regresyon ile R² ve RMSE</span>
+    reg = stats.linregress(ref_alan, tah_alan)
+    r2 = <span class="tk-bi">float</span>(reg.rvalue ** <span class="tk-num">2</span>)
+    rmse = <span class="tk-bi">float</span>(np.sqrt(np.mean((tah_alan - ref_alan) ** <span class="tk-num">2</span>)))
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   R²   : {r2:.4f}&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   RMSE : {rmse:.3f} m²&quot;</span>)
+
+    <span class="tk-com"># Saçılım grafiği (tek seri; 1:1 doğrusu referans çizgisi olarak)</span>
+    fig, ax = plt.subplots(figsize=(<span class="tk-num">7</span>, <span class="tk-num">7</span>))
+
+    ax.set_axisbelow(<span class="tk-kw">True</span>)
+    ax.grid(<span class="tk-kw">True</span>, color=<span class="tk-str">&quot;#d9d9d9&quot;</span>, linewidth=<span class="tk-num">0.6</span>)
+    <span class="tk-kw">for</span> kenar <span class="tk-kw">in</span> [<span class="tk-str">&quot;top&quot;</span>, <span class="tk-str">&quot;right&quot;</span>]:
+        ax.spines[kenar].set_visible(<span class="tk-kw">False</span>)
+
+    ax.scatter(ref_alan, tah_alan, s=<span class="tk-num">45</span>, color=<span class="tk-str">&quot;forestgreen&quot;</span>,
+               edgecolor=<span class="tk-str">&quot;white&quot;</span>, linewidth=<span class="tk-num">0.8</span>, zorder=<span class="tk-num">3</span>)
+
+    <span class="tk-com"># 1:1 doğrusu (mükemmel uyum çizgisi)</span>
+    maksimum = <span class="tk-bi">max</span>(ref_alan.<span class="tk-bi">max</span>(), tah_alan.<span class="tk-bi">max</span>()) * <span class="tk-num">1.05</span>
+    ax.plot([<span class="tk-num">0</span>, maksimum], [<span class="tk-num">0</span>, maksimum], linestyle=<span class="tk-str">&quot;--&quot;</span>,
+            color=<span class="tk-str">&quot;#8c8c8c&quot;</span>, linewidth=<span class="tk-num">1.5</span>, zorder=<span class="tk-num">2</span>)
+    ax.annotate(<span class="tk-str">&quot;1:1 doğrusu&quot;</span>, xy=(maksimum * <span class="tk-num">0.82</span>, maksimum * <span class="tk-num">0.86</span>),
+                color=<span class="tk-str">&quot;#666666&quot;</span>, fontsize=<span class="tk-num">10</span>, rotation=<span class="tk-num">45</span>,
+                ha=<span class="tk-str">&quot;center&quot;</span>, va=<span class="tk-str">&quot;center&quot;</span>)
+
+    ax.set_xlim(<span class="tk-num">0</span>, maksimum)
+    ax.set_ylim(<span class="tk-num">0</span>, maksimum)
+    ax.set_aspect(<span class="tk-str">&quot;equal&quot;</span>)
+
+    ax.set_xlabel(<span class="tk-str">&quot;Referans taç alanı (m²)&quot;</span>)
+    ax.set_ylabel(<span class="tk-str">&quot;Tahmin edilen taç alanı (m²)&quot;</span>)
+    ax.set_title(<span class="tk-str">&quot;Taç Alanı: Model Tahmini vs Referans&quot;</span>, fontweight=<span class="tk-str">&quot;bold&quot;</span>)
+
+    <span class="tk-com"># İstatistikleri grafik üzerine yaz</span>
+    ax.text(<span class="tk-num">0.03</span>, <span class="tk-num">0.97</span>,
+            <span class="tk-str">f&quot;n = {len(eslesmeler)}\nR² = {r2:.3f}\nRMSE = {rmse:.2f} m²&quot;</span>,
+            transform=ax.transAxes, va=<span class="tk-str">&quot;top&quot;</span>, ha=<span class="tk-str">&quot;left&quot;</span>, fontsize=<span class="tk-num">10</span>,
+            bbox=<span class="tk-bi">dict</span>(boxstyle=<span class="tk-str">&quot;round,pad=0.4&quot;</span>, facecolor=<span class="tk-str">&quot;white&quot;</span>,
+                      edgecolor=<span class="tk-str">&quot;#cccccc&quot;</span>))
+
+    plt.tight_layout()
+
+    grafik_path = os.path.join(output_dir, <span class="tk-str">&quot;alan_karsilastirma_sacilim.png&quot;</span>)
+    plt.savefig(grafik_path, dpi=<span class="tk-num">150</span>, bbox_inches=<span class="tk-str">&quot;tight&quot;</span>)
+    plt.close()
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Saçılım grafiği: {grafik_path}&quot;</span>)
+
+    <span class="tk-kw">return</span> {<span class="tk-str">&quot;r2&quot;</span>: r2, <span class="tk-str">&quot;rmse&quot;</span>: rmse, <span class="tk-str">&quot;n&quot;</span>: <span class="tk-bi">len</span>(eslesmeler),
+            <span class="tk-str">&quot;ref_toplam&quot;</span>: <span class="tk-bi">float</span>(ref_alan.<span class="tk-bi">sum</span>()), <span class="tk-str">&quot;tah_toplam&quot;</span>: <span class="tk-bi">float</span>(tah_alan.<span class="tk-bi">sum</span>())}
+
+
+<span class="tk-kw">def</span> rapor_yaz(sonuclar: <span class="tk-bi">dict</span>, output_dir: <span class="tk-bi">str</span>):
+    <span class="tk-str">&quot;&quot;&quot;Sonuçları hem konsola hem accuracy_report.txt dosyasına Türkçe yazar.&quot;&quot;&quot;</span>
+
+    satirlar = []
+    satirlar.append(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    satirlar.append(<span class="tk-str">&quot;YTÜ HARİTA MÜHENDİSLİĞİ - AĞAÇ BAZLI DOĞRULUK RAPORU&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    satirlar.append(<span class="tk-str">&quot;&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;VERİ ÖZETİ&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;-&quot;</span> * <span class="tk-num">40</span>)
+    satirlar.append(<span class="tk-str">f&quot;Tahmin poligon sayısı  : {sonuclar[&#x27;n_tahmin&#x27;]}&quot;</span>)
+    satirlar.append(<span class="tk-str">f&quot;Referans poligon sayısı: {sonuclar[&#x27;n_referans&#x27;]}&quot;</span>)
+    <span class="tk-kw">if</span> sonuclar.get(<span class="tk-str">&quot;grid_kullanildi&quot;</span>):
+        satirlar.append(<span class="tk-str">&quot;Not: Tahminler örneklem kareleri (grid_kareleri.shp) ile&quot;</span>)
+        satirlar.append(<span class="tk-str">&quot;     sınırlandırılmıştır; referans yalnızca bu karelerde çizilidir.&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;&quot;</span>)
+    satirlar.append(<span class="tk-str">f&quot;EŞLEŞTİRME SONUÇLARI (IoU eşiği = {sonuclar[&#x27;iou_esigi&#x27;]})&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;-&quot;</span> * <span class="tk-num">40</span>)
+    satirlar.append(<span class="tk-str">f&quot;True Positive  (doğru tespit)        : {sonuclar[&#x27;tp&#x27;]}&quot;</span>)
+    satirlar.append(<span class="tk-str">f&quot;False Positive (yanlış alarm)        : {sonuclar[&#x27;fp&#x27;]}&quot;</span>)
+    satirlar.append(<span class="tk-str">f&quot;False Negative (kaçırılan ağaç)      : {sonuclar[&#x27;fn&#x27;]}&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;DOĞRULUK METRİKLERİ (AĞAÇ BAZINDA)&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;-&quot;</span> * <span class="tk-num">40</span>)
+    satirlar.append(<span class="tk-str">f&quot;Precision (kesinlik)  : {sonuclar[&#x27;precision&#x27;]:.4f}  (%{sonuclar[&#x27;precision&#x27;]*100:.1f})&quot;</span>)
+    satirlar.append(<span class="tk-str">f&quot;Recall    (duyarlılık): {sonuclar[&#x27;recall&#x27;]:.4f}  (%{sonuclar[&#x27;recall&#x27;]*100:.1f})&quot;</span>)
+    satirlar.append(<span class="tk-str">f&quot;F1 skoru              : {sonuclar[&#x27;f1&#x27;]:.4f}  (%{sonuclar[&#x27;f1&#x27;]*100:.1f})&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;&quot;</span>)
+    <span class="tk-kw">if</span> sonuclar[<span class="tk-str">&quot;eslesmeler&quot;</span>]:
+        ort_iou = np.mean([e[<span class="tk-num">2</span>] <span class="tk-kw">for</span> e <span class="tk-kw">in</span> sonuclar[<span class="tk-str">&quot;eslesmeler&quot;</span>]])
+        satirlar.append(<span class="tk-str">f&quot;Eşleşen çiftlerin ortalama IoU değeri : {ort_iou:.4f}&quot;</span>)
+        satirlar.append(<span class="tk-str">&quot;&quot;</span>)
+
+    <span class="tk-kw">if</span> sonuclar.get(<span class="tk-str">&quot;alan&quot;</span>) <span class="tk-kw">is</span> <span class="tk-kw">not</span> <span class="tk-kw">None</span>:
+        alan = sonuclar[<span class="tk-str">&quot;alan&quot;</span>]
+        satirlar.append(<span class="tk-str">&quot;TAÇ ALANI KARŞILAŞTIRMASI (EŞLEŞEN ÇİFTLER)&quot;</span>)
+        satirlar.append(<span class="tk-str">&quot;-&quot;</span> * <span class="tk-num">40</span>)
+        satirlar.append(<span class="tk-str">f&quot;Karşılaştırılan çift sayısı : {alan[&#x27;n&#x27;]}&quot;</span>)
+        satirlar.append(<span class="tk-str">f&quot;R² (belirleme katsayısı)    : {alan[&#x27;r2&#x27;]:.4f}&quot;</span>)
+        satirlar.append(<span class="tk-str">f&quot;RMSE                        : {alan[&#x27;rmse&#x27;]:.3f} m²&quot;</span>)
+        satirlar.append(<span class="tk-str">f&quot;Toplam referans alanı       : {alan[&#x27;ref_toplam&#x27;]:.2f} m²&quot;</span>)
+        satirlar.append(<span class="tk-str">f&quot;Toplam tahmin alanı         : {alan[&#x27;tah_toplam&#x27;]:.2f} m²&quot;</span>)
+        satirlar.append(<span class="tk-str">&quot;Saçılım grafiği             : alan_karsilastirma_sacilim.png&quot;</span>)
+        satirlar.append(<span class="tk-str">&quot;&quot;</span>)
+
+    satirlar.append(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    satirlar.append(<span class="tk-str">&quot;Rapor otomatik olarak oluşturulmuştur.&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;YTÜ Harita Mühendisliği Yüksek Lisans Tezi&quot;</span>)
+    satirlar.append(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+
+    rapor_metni = <span class="tk-str">&quot;\n&quot;</span>.join(satirlar)
+
+    <span class="tk-com"># Konsola yaz</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + rapor_metni)
+
+    <span class="tk-com"># Dosyaya yaz</span>
+    rapor_path = os.path.join(output_dir, <span class="tk-str">&quot;accuracy_report.txt&quot;</span>)
+    <span class="tk-kw">with</span> <span class="tk-bi">open</span>(rapor_path, <span class="tk-str">&quot;w&quot;</span>, encoding=<span class="tk-str">&quot;utf-8&quot;</span>) <span class="tk-kw">as</span> f:
+        f.write(rapor_metni + <span class="tk-str">&quot;\n&quot;</span>)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n✅ Rapor kaydedildi: {rapor_path}&quot;</span>)
+
+
+<span class="tk-kw">def</span> degerlendirme_calistir():
+    <span class="tk-str">&quot;&quot;&quot;Ana doğruluk değerlendirme fonksiyonu.&quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> geopandas <span class="tk-kw">as</span> gpd
+    <span class="tk-kw">import</span> pandas <span class="tk-kw">as</span> pd
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;🌲 AĞAÇ BAZLI DOĞRULUK DEĞERLENDİRMESİ&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+
+    dosya_kontrol()
+
+    <span class="tk-com"># Verileri yükle</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n📂 Shapefile&#x27;lar yükleniyor...&quot;</span>)
+    tahmin_gdf = gpd.read_file(CONFIG[<span class="tk-str">&quot;tahmin_shp&quot;</span>])
+    referans_gdf = gpd.read_file(CONFIG[<span class="tk-str">&quot;referans_shp&quot;</span>])
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Tahmin: {len(tahmin_gdf)} poligon&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Referans: {len(referans_gdf)} poligon&quot;</span>)
+
+    <span class="tk-kw">if</span> <span class="tk-bi">len</span>(referans_gdf) == <span class="tk-num">0</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n❌ HATA: Referans shapefile boş! QGIS&#x27;te poligon çizdiğinizden emin olun.&quot;</span>)
+        sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-com"># CRS uyumu: referansı tahmin CRS&#x27;ine dönüştür</span>
+    <span class="tk-kw">if</span> referans_gdf.crs != tahmin_gdf.crs:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   🔄 Referans CRS dönüştürülüyor: {referans_gdf.crs} → {tahmin_gdf.crs}&quot;</span>)
+        referans_gdf = referans_gdf.to_crs(tahmin_gdf.crs)
+
+    <span class="tk-com"># Geometrileri temizle</span>
+    tahmin_gdf = geometri_duzelt(tahmin_gdf)
+    referans_gdf = geometri_duzelt(referans_gdf)
+
+    <span class="tk-com"># Örneklem kareleri varsa tahminleri karelerle sınırla</span>
+    <span class="tk-com"># (referans sadece kareler içinde çizildiği için adil karşılaştırma)</span>
+    grid_kullanildi = <span class="tk-kw">False</span>
+    <span class="tk-kw">if</span> CONFIG[<span class="tk-str">&quot;grid_shp&quot;</span>] <span class="tk-kw">and</span> os.path.exists(CONFIG[<span class="tk-str">&quot;grid_shp&quot;</span>]):
+        grid_gdf = gpd.read_file(CONFIG[<span class="tk-str">&quot;grid_shp&quot;</span>])
+        <span class="tk-kw">if</span> grid_gdf.crs != tahmin_gdf.crs:
+            grid_gdf = grid_gdf.to_crs(tahmin_gdf.crs)
+
+        kareler_birlesik = grid_gdf.geometry.union_all() <span class="tk-kw">if</span> <span class="tk-bi">hasattr</span>(grid_gdf.geometry, <span class="tk-str">&quot;union_all&quot;</span>) \
+            <span class="tk-kw">else</span> grid_gdf.geometry.unary_union
+
+        onceki = <span class="tk-bi">len</span>(tahmin_gdf)
+        <span class="tk-com"># Taç merkezi kare içinde olan tahminler değerlendirilir</span>
+        tahmin_gdf = tahmin_gdf[tahmin_gdf.geometry.centroid.within(kareler_birlesik)]
+        grid_kullanildi = <span class="tk-kw">True</span>
+
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🔲 Örneklem kareleri bulundu: {CONFIG[&#x27;grid_shp&#x27;]}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Tahminler karelerle sınırlandırıldı: {onceki} → {len(tahmin_gdf)}&quot;</span>)
+    <span class="tk-kw">else</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n🔲 Örneklem karesi dosyası yok; TÜM tahminler değerlendirilecek.&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;   (Referans tüm sahayı kapsamıyorsa Precision olduğundan düşük çıkar!)&quot;</span>)
+
+    tahminler = <span class="tk-bi">list</span>(tahmin_gdf.geometry)
+    referanslar = <span class="tk-bi">list</span>(referans_gdf.geometry)
+
+    <span class="tk-kw">if</span> <span class="tk-bi">len</span>(tahminler) == <span class="tk-num">0</span>:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n❌ HATA: Değerlendirilecek tahmin poligonu kalmadı!&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;   Grid kareleri ile tahminlerin aynı bölgede olduğundan emin olun.&quot;</span>)
+        sys.exit(<span class="tk-num">1</span>)
+
+    <span class="tk-com"># Macar algoritması ile birebir eşleştir</span>
+    eslesmeler, _ = eslestir(tahminler, referanslar, CONFIG[<span class="tk-str">&quot;iou_esigi&quot;</span>])
+
+    <span class="tk-com"># TP / FP / FN</span>
+    tp = <span class="tk-bi">len</span>(eslesmeler)
+    fp = <span class="tk-bi">len</span>(tahminler) - tp
+    fn = <span class="tk-bi">len</span>(referanslar) - tp
+
+    <span class="tk-com"># Metrikler (sıfıra bölme koruması)</span>
+    precision = tp / (tp + fp) <span class="tk-kw">if</span> (tp + fp) &gt; <span class="tk-num">0</span> <span class="tk-kw">else</span> <span class="tk-num">0.0</span>
+    recall = tp / (tp + fn) <span class="tk-kw">if</span> (tp + fn) &gt; <span class="tk-num">0</span> <span class="tk-kw">else</span> <span class="tk-num">0.0</span>
+    f1 = <span class="tk-num">2</span> * precision * recall / (precision + recall) <span class="tk-kw">if</span> (precision + recall) &gt; <span class="tk-num">0</span> <span class="tk-kw">else</span> <span class="tk-num">0.0</span>
+
+    <span class="tk-com"># Eşleşen çiftleri CSV olarak kaydet (tez eki için)</span>
+    <span class="tk-kw">if</span> eslesmeler:
+        eslesme_df = pd.DataFrame([
+            {
+                <span class="tk-str">&quot;tahmin_no&quot;</span>: i + <span class="tk-num">1</span>,
+                <span class="tk-str">&quot;referans_no&quot;</span>: j + <span class="tk-num">1</span>,
+                <span class="tk-str">&quot;iou&quot;</span>: <span class="tk-bi">round</span>(iou, <span class="tk-num">4</span>),
+                <span class="tk-str">&quot;tahmin_alan_m2&quot;</span>: <span class="tk-bi">round</span>(tahminler[i].area, <span class="tk-num">3</span>),
+                <span class="tk-str">&quot;referans_alan_m2&quot;</span>: <span class="tk-bi">round</span>(referanslar[j].area, <span class="tk-num">3</span>),
+            }
+            <span class="tk-kw">for</span> i, j, iou <span class="tk-kw">in</span> eslesmeler
+        ])
+        eslesme_csv = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;eslesen_ciftler.csv&quot;</span>)
+        eslesme_df.to_csv(eslesme_csv, index=<span class="tk-kw">False</span>, encoding=<span class="tk-str">&quot;utf-8-sig&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Eşleşen çiftler: {eslesme_csv}&quot;</span>)
+
+    <span class="tk-com"># Taç alanı karşılaştırması (R², RMSE, saçılım grafiği)</span>
+    alan_sonuc = alan_karsilastirma(eslesmeler, tahminler, referanslar, CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>])
+
+    <span class="tk-com"># Raporu yaz (konsol + accuracy_report.txt)</span>
+    rapor_yaz(
+        {
+            <span class="tk-str">&quot;n_tahmin&quot;</span>: <span class="tk-bi">len</span>(tahminler),
+            <span class="tk-str">&quot;n_referans&quot;</span>: <span class="tk-bi">len</span>(referanslar),
+            <span class="tk-str">&quot;iou_esigi&quot;</span>: CONFIG[<span class="tk-str">&quot;iou_esigi&quot;</span>],
+            <span class="tk-str">&quot;tp&quot;</span>: tp,
+            <span class="tk-str">&quot;fp&quot;</span>: fp,
+            <span class="tk-str">&quot;fn&quot;</span>: fn,
+            <span class="tk-str">&quot;precision&quot;</span>: precision,
+            <span class="tk-str">&quot;recall&quot;</span>: recall,
+            <span class="tk-str">&quot;f1&quot;</span>: f1,
+            <span class="tk-str">&quot;eslesmeler&quot;</span>: eslesmeler,
+            <span class="tk-str">&quot;alan&quot;</span>: alan_sonuc,
+            <span class="tk-str">&quot;grid_kullanildi&quot;</span>: grid_kullanildi,
+        },
+        CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>],
+    )
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💡 Sonraki adım: threshold_analysis.py ile güven eşiği analizini yapın&quot;</span>)
+
+
+<span class="tk-kw">if</span> __name__ == <span class="tk-str">&quot;__main__&quot;</span>:
+    <span class="tk-kw">try</span>:
+        degerlendirme_calistir()
+    <span class="tk-kw">except</span> KeyboardInterrupt:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n\n⚠️ İşlem kullanıcı tarafından iptal edildi.&quot;</span>)
+        sys.exit(<span class="tk-num">0</span>)
+    <span class="tk-kw">except</span> Exception <span class="tk-kw">as</span> e:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n❌ HATA: {str(e)}&quot;</span>)
+        <span class="tk-kw">import</span> traceback
+        traceback.print_exc()
+        sys.exit(<span class="tk-num">1</span>)
+</code></pre>
+</details>
+</section>
+<section id="threshold">
+<p class="eyebrow">Adım 9</p>
+<h2>threshold_analysis.py — Güven Eşiği Duyarlılık Analizi</h2>
+<p class="desc">conf = 0.25 / 0.30 / 0.40 / 0.50 / 0.60 eşikleri için tespit sayısı ve toplam taç alanını hesaplar. Inference yalnızca bir kez, en düşük eşikle çalışır; yüksek eşikler güven skoruna göre filtrelenir ve her eşik için NMS + alan filtresi yeniden uygulanır. Tüm fonksiyonlar inference_orthomosaic.py&#x27;den import edilir (kod tekrarı yoktur).</p>
+<div class="tablewrap"><table class="io">
+<thead><tr><th>Girdi</th><th>Çıktı</th></tr></thead>
+<tbody><tr><td class="mono">best.pt, Proses_transparent_mosaic_group1.tif</td><td class="mono">esik_analizi.csv, esik_analizi.png</td></tr></tbody>
+</table></div>
+<details class="code">
+<summary><span class="fname">threshold_analysis.py</span><span class="hint">253 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com">#!/usr/bin/env python3</span>
+<span class="tk-com"># -*- coding: utf-8 -*-</span>
+<span class="tk-str">&quot;&quot;&quot;
+YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation
+Güven Eşiği Duyarlılık Analizi (Threshold Analysis)
+
+Bu script farklı güven eşiği (confidence threshold) değerleri için tespit
+sayısını ve toplam taç alanını hesaplar. Sonuçlar tezin &quot;parametre seçimi&quot;
+bölümünde kullanılır.
+
+Verimlilik notu: Ortomozaik üzerinde inference SADECE BİR KEZ, en düşük
+eşikle (örn. 0.25) çalıştırılır. YOLO conf=0.25 ile çalıştırıldığında
+0.25 ve üzeri güvenli TÜM tespitleri döndürdüğü için, daha yüksek eşikler
+bu tespitlerin güven skoruna göre filtrelenmesiyle elde edilir ve her eşik
+için Global NMS + alan filtresi yeniden uygulanır. Böylece 5 ayrı inference
+yerine 1 inference yeterli olur; kod tekrarını önlemek için tüm fonksiyonlar
+inference_orthomosaic.py&#x27;den import edilir.
+
+Kullanım:
+    python threshold_analysis.py
+
+Gereksinimler:
+    - inference_orthomosaic.py (aynı klasörde; fonksiyonlar oradan import edilir)
+    - ultralytics, rasterio, shapely, pandas, matplotlib, tqdm
+
+Yazar: YTÜ Harita Mühendisliği Yüksek Lisans Tezi
+Tarih: 2024
+&quot;&quot;&quot;</span>
+
+<span class="tk-kw">import</span> os
+<span class="tk-kw">import</span> sys
+<span class="tk-kw">import</span> warnings
+
+<span class="tk-kw">import</span> numpy <span class="tk-kw">as</span> np
+
+<span class="tk-com"># Uyarıları sustur</span>
+warnings.filterwarnings(<span class="tk-str">&#x27;ignore&#x27;</span>)
+
+<span class="tk-com"># inference_orthomosaic.py&#x27;deki fonksiyonları import et (kod tekrarı YOK)</span>
+<span class="tk-kw">try</span>:
+    <span class="tk-kw">from</span> inference_orthomosaic <span class="tk-kw">import</span> (
+        CONFIG <span class="tk-kw">as</span> INFERENCE_CONFIG,
+        cihaz_sec,
+        dosya_kontrol,
+        model_yukle,
+        ortomozaik_bilgisi,
+        ham_tespitleri_topla,
+        global_nms_poligonlar,
+        utm_poligonlara_donustur,
+    )
+<span class="tk-kw">except</span> ImportError <span class="tk-kw">as</span> e:
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;❌ HATA: inference_orthomosaic.py import edilemedi!&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   Bu script, inference_orthomosaic.py ile AYNI klasörde çalıştırılmalıdır.&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Detay: {e}&quot;</span>)
+    sys.exit(<span class="tk-num">1</span>)
+
+<span class="tk-com">#==============================================================================</span>
+<span class="tk-com"># KONFİGÜRASYON - Bu değerleri kendi projenize göre düzenleyin</span>
+<span class="tk-com"># (Model ve ortomozaik yolları inference_orthomosaic.py CONFIG&#x27;inden alınır)</span>
+<span class="tk-com">#==============================================================================</span>
+
+CONFIG = {
+    <span class="tk-com"># Analiz edilecek güven eşiği değerleri</span>
+    <span class="tk-str">&quot;esikler&quot;</span>: [<span class="tk-num">0.25</span>, <span class="tk-num">0.30</span>, <span class="tk-num">0.40</span>, <span class="tk-num">0.50</span>, <span class="tk-num">0.60</span>],
+
+    <span class="tk-com"># Çıktı klasörü (CSV ve grafik buraya kaydedilir)</span>
+    <span class="tk-str">&quot;output_dir&quot;</span>: <span class="tk-str">r&quot;C:\Users\meryemnur.cevik\Desktop\cam_tezi\05_inference&quot;</span>,
+}
+
+<span class="tk-com">#==============================================================================</span>
+
+
+<span class="tk-kw">def</span> grafik_ciz(df, output_dir: <span class="tk-bi">str</span>):
+    <span class="tk-str">&quot;&quot;&quot;
+    Eşik-duyarlılık grafiğini çizer: ortak x ekseni (güven eşiği) üzerinde
+    iki ayrı panel (tespit sayısı ve toplam taç alanı). İki büyüklüğün
+    ölçeği farklı olduğu için tek grafikte çift y ekseni KULLANILMAZ.
+    &quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> matplotlib.pyplot <span class="tk-kw">as</span> plt
+    <span class="tk-kw">from</span> matplotlib <span class="tk-kw">import</span> rcParams
+
+    rcParams[<span class="tk-str">&#x27;font.family&#x27;</span>] = <span class="tk-str">&#x27;DejaVu Sans&#x27;</span>
+
+    fig, (ax1, ax2) = plt.subplots(<span class="tk-num">2</span>, <span class="tk-num">1</span>, figsize=(<span class="tk-num">8</span>, <span class="tk-num">8</span>), sharex=<span class="tk-kw">True</span>)
+    fig.suptitle(<span class="tk-str">&quot;Güven Eşiği Duyarlılık Analizi&quot;</span>, fontsize=<span class="tk-num">13</span>, fontweight=<span class="tk-str">&quot;bold&quot;</span>)
+
+    <span class="tk-kw">for</span> ax <span class="tk-kw">in</span> (ax1, ax2):
+        ax.set_axisbelow(<span class="tk-kw">True</span>)
+        ax.grid(<span class="tk-kw">True</span>, color=<span class="tk-str">&quot;#d9d9d9&quot;</span>, linewidth=<span class="tk-num">0.6</span>)
+        <span class="tk-kw">for</span> kenar <span class="tk-kw">in</span> [<span class="tk-str">&quot;top&quot;</span>, <span class="tk-str">&quot;right&quot;</span>]:
+            ax.spines[kenar].set_visible(<span class="tk-kw">False</span>)
+
+    <span class="tk-com"># Panel 1: Tespit sayısı</span>
+    ax1.plot(df[<span class="tk-str">&quot;esik&quot;</span>], df[<span class="tk-str">&quot;tespit_sayisi&quot;</span>], color=<span class="tk-str">&quot;forestgreen&quot;</span>,
+             linewidth=<span class="tk-num">2</span>, marker=<span class="tk-str">&quot;o&quot;</span>, markersize=<span class="tk-num">8</span>,
+             markeredgecolor=<span class="tk-str">&quot;white&quot;</span>, markeredgewidth=<span class="tk-num">1</span>)
+    ax1.set_ylabel(<span class="tk-str">&quot;Tespit sayısı (adet)&quot;</span>)
+    ax1.set_title(<span class="tk-str">&quot;Tespit Edilen Ağaç Sayısı&quot;</span>, fontsize=<span class="tk-num">11</span>)
+
+    <span class="tk-com"># Her noktaya değer etiketi</span>
+    <span class="tk-kw">for</span> _, satir <span class="tk-kw">in</span> df.iterrows():
+        ax1.annotate(<span class="tk-str">f&quot;{int(satir[&#x27;tespit_sayisi&#x27;])}&quot;</span>,
+                     xy=(satir[<span class="tk-str">&quot;esik&quot;</span>], satir[<span class="tk-str">&quot;tespit_sayisi&quot;</span>]),
+                     xytext=(<span class="tk-num">0</span>, <span class="tk-num">9</span>), textcoords=<span class="tk-str">&quot;offset points&quot;</span>,
+                     ha=<span class="tk-str">&quot;center&quot;</span>, fontsize=<span class="tk-num">9</span>, color=<span class="tk-str">&quot;#333333&quot;</span>)
+
+    <span class="tk-com"># Panel 2: Toplam taç alanı</span>
+    ax2.plot(df[<span class="tk-str">&quot;esik&quot;</span>], df[<span class="tk-str">&quot;toplam_alan_m2&quot;</span>], color=<span class="tk-str">&quot;#3b6ea5&quot;</span>,
+             linewidth=<span class="tk-num">2</span>, marker=<span class="tk-str">&quot;o&quot;</span>, markersize=<span class="tk-num">8</span>,
+             markeredgecolor=<span class="tk-str">&quot;white&quot;</span>, markeredgewidth=<span class="tk-num">1</span>)
+    ax2.set_ylabel(<span class="tk-str">&quot;Toplam taç alanı (m²)&quot;</span>)
+    ax2.set_xlabel(<span class="tk-str">&quot;Güven eşiği (confidence threshold)&quot;</span>)
+    ax2.set_title(<span class="tk-str">&quot;Toplam Taç Alanı&quot;</span>, fontsize=<span class="tk-num">11</span>)
+
+    <span class="tk-kw">for</span> _, satir <span class="tk-kw">in</span> df.iterrows():
+        ax2.annotate(<span class="tk-str">f&quot;{satir[&#x27;toplam_alan_m2&#x27;]:.0f}&quot;</span>,
+                     xy=(satir[<span class="tk-str">&quot;esik&quot;</span>], satir[<span class="tk-str">&quot;toplam_alan_m2&quot;</span>]),
+                     xytext=(<span class="tk-num">0</span>, <span class="tk-num">9</span>), textcoords=<span class="tk-str">&quot;offset points&quot;</span>,
+                     ha=<span class="tk-str">&quot;center&quot;</span>, fontsize=<span class="tk-num">9</span>, color=<span class="tk-str">&quot;#333333&quot;</span>)
+
+    ax2.set_xticks(df[<span class="tk-str">&quot;esik&quot;</span>])
+
+    plt.tight_layout()
+
+    grafik_path = os.path.join(output_dir, <span class="tk-str">&quot;esik_analizi.png&quot;</span>)
+    plt.savefig(grafik_path, dpi=<span class="tk-num">150</span>, bbox_inches=<span class="tk-str">&quot;tight&quot;</span>)
+    plt.close()
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ Grafik: {grafik_path}&quot;</span>)
+
+
+<span class="tk-kw">def</span> analiz_calistir():
+    <span class="tk-str">&quot;&quot;&quot;Ana eşik analizi fonksiyonu.&quot;&quot;&quot;</span>
+    <span class="tk-kw">import</span> rasterio
+    <span class="tk-kw">import</span> pandas <span class="tk-kw">as</span> pd
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;🌲 GÜVEN EŞİĞİ DUYARLILIK ANALİZİ&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+
+    esikler = <span class="tk-bi">sorted</span>(CONFIG[<span class="tk-str">&quot;esikler&quot;</span>])
+    min_esik = esikler[<span class="tk-num">0</span>]
+
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n📋 Analiz edilecek eşikler: {esikler}&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Inference SADECE 1 kez, en düşük eşikle ({min_esik}) çalıştırılacak;&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   diğer eşikler güven skoruna göre filtrelenerek hesaplanacak.&quot;</span>)
+
+    <span class="tk-com"># Cihaz seçimi (CPU varsayılan, CUDA varsa otomatik GPU)</span>
+    device = cihaz_sec()
+
+    <span class="tk-com"># Dosya kontrolü (model + ortomozaik, inference CONFIG&#x27;inden)</span>
+    dosya_kontrol()
+
+    os.makedirs(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], exist_ok=<span class="tk-kw">True</span>)
+
+    <span class="tk-com"># Model yükle</span>
+    model = model_yukle(INFERENCE_CONFIG[<span class="tk-str">&quot;model_path&quot;</span>])
+
+    <span class="tk-com"># Ortomozaiği aç ve ham tespitleri EN DÜŞÜK eşikle topla</span>
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n🗺️ Ortomozaik açılıyor: {INFERENCE_CONFIG[&#x27;orthomosaic_path&#x27;]}&quot;</span>)
+
+    <span class="tk-kw">with</span> rasterio.<span class="tk-bi">open</span>(INFERENCE_CONFIG[<span class="tk-str">&quot;orthomosaic_path&quot;</span>]) <span class="tk-kw">as</span> src:
+        info = ortomozaik_bilgisi(src)
+
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   📐 Boyut: {info[&#x27;width&#x27;]} x {info[&#x27;height&#x27;]} piksel&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   🌍 CRS: {info[&#x27;crs&#x27;]}&quot;</span>)
+
+        ham_tespitler = ham_tespitleri_topla(
+            model=model,
+            src=src,
+            info=info,
+            conf_esigi=min_esik,
+            device=device,
+        )
+
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> ham_tespitler:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n⚠️ UYARI: Hiç tespit yapılamadı, analiz iptal edildi.&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;   Model veya ortomozaik yollarını ve eşik değerlerini kontrol edin.&quot;</span>)
+        <span class="tk-kw">return</span>
+
+    <span class="tk-com"># Her eşik için: filtrele → Global NMS → UTM dönüşümü → say/topla</span>
+    sonuclar = []
+
+    <span class="tk-kw">for</span> esik <span class="tk-kw">in</span> esikler:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;-&quot;</span> * <span class="tk-num">60</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;📊 Eşik analiz ediliyor: conf = {esik}&quot;</span>)
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;-&quot;</span> * <span class="tk-num">60</span>)
+
+        <span class="tk-com"># Güven skoruna göre filtrele</span>
+        filtreli = [t <span class="tk-kw">for</span> t <span class="tk-kw">in</span> ham_tespitler <span class="tk-kw">if</span> t[<span class="tk-str">&quot;confidence&quot;</span>] &gt;= esik]
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   Eşiği geçen ham tespit: {len(filtreli)}&quot;</span>)
+
+        <span class="tk-kw">if</span> <span class="tk-kw">not</span> filtreli:
+            sonuclar.append({
+                <span class="tk-str">&quot;esik&quot;</span>: esik,
+                <span class="tk-str">&quot;tespit_sayisi&quot;</span>: <span class="tk-num">0</span>,
+                <span class="tk-str">&quot;toplam_alan_m2&quot;</span>: <span class="tk-num">0.0</span>,
+                <span class="tk-str">&quot;ortalama_alan_m2&quot;</span>: <span class="tk-num">0.0</span>,
+            })
+            <span class="tk-bi">print</span>(<span class="tk-str">&quot;   ⚠️ Bu eşikte hiç tespit kalmadı.&quot;</span>)
+            <span class="tk-kw">continue</span>
+
+        <span class="tk-com"># Global NMS (her eşik için yeniden; kalan poligon kümesi değişir)</span>
+        nms_sonrasi = global_nms_poligonlar(filtreli, INFERENCE_CONFIG[<span class="tk-str">&quot;global_nms_iou&quot;</span>])
+
+        <span class="tk-com"># UTM&#x27;e dönüştür + minimum alan filtresi</span>
+        utm_poligonlar = utm_poligonlara_donustur(nms_sonrasi, info)
+
+        alanlar = np.array([p[<span class="tk-str">&quot;alan_m2&quot;</span>] <span class="tk-kw">for</span> p <span class="tk-kw">in</span> utm_poligonlar])
+
+        sonuclar.append({
+            <span class="tk-str">&quot;esik&quot;</span>: esik,
+            <span class="tk-str">&quot;tespit_sayisi&quot;</span>: <span class="tk-bi">len</span>(utm_poligonlar),
+            <span class="tk-str">&quot;toplam_alan_m2&quot;</span>: <span class="tk-bi">round</span>(<span class="tk-bi">float</span>(alanlar.<span class="tk-bi">sum</span>()) <span class="tk-kw">if</span> <span class="tk-bi">len</span>(alanlar) <span class="tk-kw">else</span> <span class="tk-num">0.0</span>, <span class="tk-num">2</span>),
+            <span class="tk-str">&quot;ortalama_alan_m2&quot;</span>: <span class="tk-bi">round</span>(<span class="tk-bi">float</span>(alanlar.mean()) <span class="tk-kw">if</span> <span class="tk-bi">len</span>(alanlar) <span class="tk-kw">else</span> <span class="tk-num">0.0</span>, <span class="tk-num">2</span>),
+        })
+
+    <span class="tk-com"># Sonuç tablosu</span>
+    df = pd.DataFrame(sonuclar)
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n&quot;</span> + <span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;📊 EŞİK ANALİZİ SONUÇ TABLOSU&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+    <span class="tk-bi">print</span>(df.to_string(index=<span class="tk-kw">False</span>))
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;=&quot;</span> * <span class="tk-num">60</span>)
+
+    <span class="tk-com"># CSV kaydet</span>
+    csv_path = os.path.join(CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>], <span class="tk-str">&quot;esik_analizi.csv&quot;</span>)
+    df.to_csv(csv_path, index=<span class="tk-kw">False</span>, encoding=<span class="tk-str">&quot;utf-8-sig&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n💾 Sonuçlar kaydediliyor...&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;   ✅ CSV: {csv_path}&quot;</span>)
+
+    <span class="tk-com"># Çizgi grafik</span>
+    grafik_ciz(df, CONFIG[<span class="tk-str">&quot;output_dir&quot;</span>])
+
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n✅ Eşik analizi tamamlandı!&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">f&quot;📂 Çıktı klasörü: {CONFIG[&#x27;output_dir&#x27;]}&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n💡 Tez için yorum: Eşik yükseldikçe tespit sayısı azalır (yanlış&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   alarmlar elenir ama bazı gerçek ağaçlar da kaçırılır). Doğruluk&quot;</span>)
+    <span class="tk-bi">print</span>(<span class="tk-str">&quot;   değerlendirmesindeki F1 skorunu maksimize eden eşiği tercih edin.&quot;</span>)
+
+
+<span class="tk-kw">if</span> __name__ == <span class="tk-str">&quot;__main__&quot;</span>:
+    <span class="tk-kw">try</span>:
+        analiz_calistir()
+    <span class="tk-kw">except</span> KeyboardInterrupt:
+        <span class="tk-bi">print</span>(<span class="tk-str">&quot;\n\n⚠️ İşlem kullanıcı tarafından iptal edildi.&quot;</span>)
+        sys.exit(<span class="tk-num">0</span>)
+    <span class="tk-kw">except</span> Exception <span class="tk-kw">as</span> e:
+        <span class="tk-bi">print</span>(<span class="tk-str">f&quot;\n❌ HATA: {str(e)}&quot;</span>)
+        <span class="tk-kw">import</span> traceback
+        traceback.print_exc()
+        sys.exit(<span class="tk-num">1</span>)
+</code></pre>
+</details>
+</section>
+<section id="requirements">
+<p class="eyebrow">Kurulum</p>
+<h2>requirements.txt — Bağımlılıklar</h2>
+<p class="desc">Kurulum: <code>pip install -r requirements.txt</code> — GPU (CUDA 11.8) için
+PyTorch'u ayrı index ile kurun. <code>scipy</code> (Macar algoritması için) listede zaten mevcuttur.</p>
+<details class="code">
+<summary><span class="fname">requirements.txt</span><span class="hint">42 satır — göster / gizle</span></summary>
+<pre><code><span class="tk-com"># YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation</span>
+<span class="tk-com"># Windows 11 + Python 3.11 için bağımlılıklar</span>
+<span class="tk-com">#</span>
+<span class="tk-com"># Kurulum:</span>
+<span class="tk-com">#   pip install -r requirements.txt</span>
+<span class="tk-com">#</span>
+<span class="tk-com"># GPU desteği için (CUDA 11.8):</span>
+<span class="tk-com">#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118</span>
+
+<span class="tk-com"># Derin öğrenme</span>
+ultralytics==<span class="tk-num">8.3</span>.<span class="tk-num">0</span>
+torch&gt;=<span class="tk-num">2.0</span>.<span class="tk-num">0</span>
+torchvision&gt;=<span class="tk-num">0.15</span>.<span class="tk-num">0</span>
+
+<span class="tk-com"># Coğrafi veri işleme</span>
+rasterio==<span class="tk-num">1.3</span>.<span class="tk-num">10</span>
+geopandas==<span class="tk-num">1.0</span>.<span class="tk-num">1</span>
+shapely==<span class="tk-num">2.0</span>.<span class="tk-num">6</span>
+pyproj==<span class="tk-num">3.6</span>.<span class="tk-num">1</span>
+fiona==<span class="tk-num">1.9</span>.<span class="tk-num">6</span>
+
+<span class="tk-com"># Zonal istatistik (CHM hesaplama)</span>
+rasterstats==<span class="tk-num">0.20</span>.<span class="tk-num">0</span>
+
+<span class="tk-com"># Veri analizi</span>
+numpy==<span class="tk-num">1.26</span>.<span class="tk-num">4</span>
+pandas==<span class="tk-num">2.2</span>.<span class="tk-num">2</span>
+scipy==<span class="tk-num">1.14</span>.<span class="tk-num">0</span>
+
+<span class="tk-com"># Görselleştirme</span>
+matplotlib==<span class="tk-num">3.9</span>.<span class="tk-num">2</span>
+seaborn==<span class="tk-num">0.13</span>.<span class="tk-num">2</span>
+
+<span class="tk-com"># İlerleme çubuğu</span>
+tqdm==<span class="tk-num">4.66</span>.<span class="tk-num">5</span>
+
+<span class="tk-com"># Görüntü işleme</span>
+opencv-python==<span class="tk-num">4.10</span>.<span class="tk-num">0.84</span>
+Pillow==<span class="tk-num">10.4</span>.<span class="tk-num">0</span>
+
+<span class="tk-com"># Roboflow (sadece Colab&#x27;da - eğitim için)</span>
+<span class="tk-com"># roboflow==1.1.46</span>
+</code></pre>
+</details>
+</section>
+<footer>
+YTÜ Harita Mühendisliği Yüksek Lisans Tezi — Çam Ağacı Instance Segmentation Pipeline'ı.
+Bu sayfa proje kodlarından otomatik üretilmiştir; güncel kod için depo dosyalarına bakın.
+</footer>
+</main></div>
+</body>
+</html>

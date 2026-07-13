@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Model ve veri dosyaları (depoya eklenmez)
+*.pt
+*.tif
+*.tiff
+*.pkl
+
+# Jupyter
+.ipynb_checkpoints/
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db

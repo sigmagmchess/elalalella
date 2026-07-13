@@ -1,0 +1,42 @@
+# YTÜ Harita Mühendisliği - Çam Ağacı Instance Segmentation
+# Windows 11 + Python 3.11 için bağımlılıklar
+#
+# Kurulum:
+#   pip install -r requirements.txt
+#
+# GPU desteği için (CUDA 11.8):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# Derin öğrenme
+ultralytics==8.3.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Coğrafi veri işleme
+rasterio==1.3.10
+geopandas==1.0.1
+shapely==2.0.6
+pyproj==3.6.1
+fiona==1.9.6
+
+# Zonal istatistik (CHM hesaplama)
+rasterstats==0.20.0
+
+# Veri analizi
+numpy==1.26.4
+pandas==2.2.2
+scipy==1.14.0
+
+# Görselleştirme
+matplotlib==3.9.2
+seaborn==0.13.2
+
+# İlerleme çubuğu
+tqdm==4.66.5
+
+# Görüntü işleme
+opencv-python==4.10.0.84
+Pillow==10.4.0
+
+# Roboflow (sadece Colab'da - eğitim için)
+# roboflow==1.1.46
