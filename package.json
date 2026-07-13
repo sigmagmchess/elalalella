@@ -1,0 +1,23 @@
+{
+  "name": "cam-agaci-segmentasyon",
+  "version": "1.0.0",
+  "description": "YTÜ Harita Mühendisliği - İHA görüntülerinden çam ağacı tespiti ve segmentasyonu (JavaScript/Node.js pipeline'ı)",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "inference": "node inference_orthomosaic.js",
+    "export": "node export_results.js",
+    "grid": "node make_reference_grid.js",
+    "accuracy": "node accuracy_assessment.js",
+    "threshold": "node threshold_analysis.js"
+  },
+  "dependencies": {
+    "d3-contour": "^4.0.2",
+    "gdal-async": "^3.11.0",
+    "munkres-js": "^1.2.2",
+    "onnxruntime-node": "^1.20.0"
+  }
+}
