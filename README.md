@@ -37,12 +37,16 @@ Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
    (tek tıkla benzer renkli bitişik alanı etiketler, tolerans ayarlı), **⬠ Çokgen**
    (köşe tıkla, çift tık/Enter ile kapat), **▭ Kutu** ve **🖌️ Fırça**;
    tümü geri alınabilir ve proje dosyasına kaydedilir.
-3. **Eğit (Oto-AI)** — 24 öznitelik (RGB/HSV istatistikleri, ExG, GLI, VARI, NGRDI,
-   doku) çıkarılır; **k-NN, Softmaks Regresyon, Yapay Sinir Ağı ve Rastgele Orman**
-   aileleri 3 öznitelik kümesiyle birlikte **33 kombinasyon** halinde katmanlı çapraz
-   doğrulamada yarıştırılır ve **en iyi öğrenme şekli otomatik seçilir** (ölçüt: makro-F1;
-   tohum=42 ile tekrarlanabilir). Verinizdeki en ayırt edici ortak özellikler Fisher
-   skoruyla raporlanır.
+3. **Eğit (Oto-AI)** — **36 öznitelik** çıkarılır: RGB/HSV istatistikleri; ExG, GLI, VARI,
+   NGRDI; temel doku ve **ince ayrım kanalları** (dairesel ton dağılımı, koyu/koyu-yeşil
+   piksel oranları, çok ölçekli doku enerjileri — iğne yaprağın yüksek frekanslı benekli
+   dokusu ile geniş yaprağın yumuşak dokusunu ayırt etmeye duyarlı —, yapı tensörü yön
+   tutarlılığı, GLCM kontrast/homojenlik/enerji, kenar yoğunluğu, parlaklık çarpıklığı).
+   Kanallar önsel kural içermez; **k-NN, Softmaks Regresyon, Yapay Sinir Ağı ve Rastgele
+   Orman** aileleri 4 öznitelik kümesiyle **44 kombinasyon** (geniş arama: 76) halinde
+   katmanlı çapraz doğrulamada yarıştırılır ve **en iyi öğrenme şekli ile işe yarayan
+   ipuçları veriden keşfedilir** (ölçüt: makro-F1; tohum=42 ile tekrarlanabilir).
+   En ayırt edici kanallar Fisher skoruyla raporlanır.
    **📚 Çoklu eğitim:** etiketleri **veri havuzuna** ekleyip başka görüntüler yükleyerek
    birden çok uçuş/bölgeden birleşik eğitim seti kurabilirsiniz (havuz proje dosyasıyla saklanır).
    **🔎 Analiz Et:** model hazırken bu bölüme **yeni bir harita/görüntü** bırakın —

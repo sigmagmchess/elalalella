@@ -480,6 +480,57 @@ bolum('Öznitelik çıkarımı');
   dogrula(!cikar(16, 32, ozY), 'geçersiz alanda çıkarım reddedilir');
 }
 
+/* ince ayrım kanalları: iğne benzeri (yüksek frekanslı benekli) doku ile
+   geniş yaprak benzeri (yumuşak lekeli) dokuyu ayırt edebiliyor mu? */
+bolum('İnce doku kanalları — iğne / geniş yaprak duyarlılığı');
+{
+  const w = 96, h = 48;
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  const gecerli = new Uint8Array(w * h).fill(1);
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      const p = (y * w + x) * 4;
+      /* iki yarının RENK ortalaması aynı (R40, G~130, B50) — yalnız DOKU farklı,
+         böylece Fisher'ın keşfi renkten değil dokudan gelmek zorunda */
+      if (x < 48){
+        const benek = ((x * 7 + y * 13 + ((x * x + y) % 5)) % 3) === 0 ? -60 : 30;
+        rgba[p] = 40; rgba[p + 1] = 130 + benek; rgba[p + 2] = 50;
+      } else {
+        const leke = Math.round(35 * Math.sin(x / 4) * Math.sin(y / 4));
+        rgba[p] = 40; rgba[p + 1] = 130 + leke; rgba[p + 2] = 50;
+      }
+      rgba[p + 3] = 255;
+    }
+  }
+  const cikar = C.ozellikCikarici(rgba, gecerli, w, h, 24);
+  const igne = new Float64Array(36), genis = new Float64Array(36);
+  dogrula(cikar(24, 24, igne) && cikar(72, 24, genis), '36 kanallı çıkarım başarılı');
+  dogrula(igne[27] > genis[27] * 1.4,
+    'ince doku enerjisi: iğne > geniş yaprak (' + igne[27].toFixed(3) + ' vs ' + genis[27].toFixed(3) + ')');
+  dogrula(igne[29] > genis[29],
+    'doku ölçek oranı iğnede yüksek (' + igne[29].toFixed(2) + ' vs ' + genis[29].toFixed(2) + ')');
+  dogrula(igne[31] > genis[31],
+    'GLCM kontrast iğnede yüksek (' + igne[31].toFixed(2) + ' vs ' + genis[31].toFixed(2) + ')');
+  dogrula(genis[32] > igne[32],
+    'GLCM homojenlik geniş yaprakta yüksek (' + genis[32].toFixed(3) + ' vs ' + igne[32].toFixed(3) + ')');
+  dogrula(igne[34] > genis[34],
+    'kenar yoğunluğu iğnede yüksek (' + igne[34].toFixed(2) + ' vs ' + genis[34].toFixed(2) + ')');
+  /* keşif mekanizması: Fisher bu kanalları kendiliğinden öne çıkarmalı */
+  const Xd = [], yd = [];
+  const oz = new Float64Array(36);
+  for (let t = 0; t < 60; t++){
+    const sinif = t % 2;
+    const cx = sinif === 0 ? 13 + ((t * 3) % 22) : 61 + ((t * 3) % 22);
+    if (!cikar(cx, 13 + ((t * 5) % 22), oz)) continue;
+    for (let j = 0; j < 36; j++) Xd.push(oz[j]);
+    yd.push(sinif);
+  }
+  const fisher = C.fisherSkorlari(Float32Array.from(Xd), Int32Array.from(yd), yd.length, 36, 2);
+  const enIyi = fisher.map((s, j) => [s, j]).sort((a, b) => b[0] - a[0]).slice(0, 6).map(p => p[1]);
+  dogrula(enIyi.some(j => j >= 24),
+    'Fisher, yeni doku kanallarını kendiliğinden keşfetti (ilk 6: ' + enIyi.join(',') + ')');
+}
+
 /* ================= 4. ML motoru ================= */
 bolum('ML motoru — modeller ve Oto-AI');
 function blobVeri(n, K, rng){
@@ -508,19 +559,20 @@ function blobVeri(n, K, rng){
   const enIyi10 = fisher.map((s, j) => [s, j]).sort((a, b) => b[0] - a[0]).slice(0, 10).map(p => p[1]);
   dogrula(enIyi10.filter(j => j < 10).length >= 8, 'Fisher: bilgi taşıyan boyutlar öne çıkar');
 
-  const std = C.standartlastiriciKur(X, 240, 24);
+  const OS = C.OZELLIK_SAYISI;
+  const std = C.standartlastiriciKur(X, 240, OS);
   const Xs = std.donustur(X, 240);
   for (const [ad, kur] of [
-    ['k-NN', () => C.knnKur(Xs, y, 240, 24, 2, 5)],
-    ['Softmaks', () => C.softmaksEgit(Xs, y, 240, 24, 2, { devir: 80 }, C.mulberry32(3))],
-    ['YSA', () => C.ysaEgit(Xs, y, 240, 24, 2, { gizli: [16], devir: 60 }, C.mulberry32(3))],
-    ['R.Orman', () => C.ormanEgit(Xs, y, 240, 24, 2, { agac: 25, derinlik: 8 }, C.mulberry32(3))]
+    ['k-NN', () => C.knnKur(Xs, y, 240, OS, 2, 5)],
+    ['Softmaks', () => C.softmaksEgit(Xs, y, 240, OS, 2, { devir: 80 }, C.mulberry32(3))],
+    ['YSA', () => C.ysaEgit(Xs, y, 240, OS, 2, { gizli: [16], devir: 60 }, C.mulberry32(3))],
+    ['R.Orman', () => C.ormanEgit(Xs, y, 240, OS, 2, { agac: 25, derinlik: 8 }, C.mulberry32(3))]
   ]){
     const model = await kur();
-    const x = new Float64Array(24), p = new Float32Array(2);
+    const x = new Float64Array(OS), p = new Float32Array(2);
     let dogru = 0;
     for (let i = 0; i < 240; i++){
-      for (let j = 0; j < 24; j++) x[j] = Xs[i * 24 + j];
+      for (let j = 0; j < OS; j++) x[j] = Xs[i * OS + j];
       model.tahminProba(x, p);
       if ((p[1] > p[0] ? 1 : 0) === y[i]) dogru++;
       const t = p[0] + p[1];
@@ -592,14 +644,14 @@ bolum('Harita sınıflandırma + yumuşatma + bölge sayımı');
   }
   // eğitim örnekleri: her iki yarıdan yamalar
   const cikar = C.ozellikCikarici(rgba, gecerli, w, h, 16);
-  const oz = new Float64Array(24);
+  const oz = new Float64Array(C.OZELLIK_SAYISI);
   const Xd = [], yd = [];
   for (let t = 0; t < 120; t++){
     const sinif = t % 2;
     const cx = sinif === 0 ? 12 + ((rng() * 56) | 0) : 92 + ((rng() * 56) | 0);
     const cy = 10 + ((rng() * 60) | 0);
     if (!cikar(cx, cy, oz)) continue;
-    for (let j = 0; j < 24; j++) Xd.push(oz[j]);
+    for (let j = 0; j < C.OZELLIK_SAYISI; j++) Xd.push(oz[j]);
     yd.push(sinif);
   }
   const X = Float32Array.from(Xd), y = Int32Array.from(yd), n = yd.length;

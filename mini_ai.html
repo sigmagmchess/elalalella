@@ -344,8 +344,9 @@ textarea.rapor{
     <summary><span class="no">3</span> Eğit — Oto-AI <span class="durum" id="durum3">bekliyor</span></summary>
     <div class="icerik">
       <div class="ipucu">Oto-AI, <b>4 model ailesini</b> (k-NN, Softmaks Regresyon, Yapay Sinir Ağı, Rastgele Orman)
-        farklı ayarlar ve <b>3 öznitelik kümesiyle</b> çapraz doğrulamada yarıştırır;
-        <b>en iyi öğrenme şeklini kendisi seçer</b> (ölçüt: makro-F1).</div>
+        farklı ayarlar ve <b>4 öznitelik kümesiyle</b> (36 kanala kadar: renk, bitki indeksi,
+        iğne/geniş yaprak dokusuna duyarlı ince doku, ton dağılımı, yön ve GLCM) çapraz doğrulamada yarıştırır;
+        <b>en iyi öğrenme şeklini ve işe yarayan ipuçlarını kendisi keşfeder</b> (ölçüt: makro-F1).</div>
       <div class="satir">
         <label for="secYama">Yama boyu:</label>
         <select id="secYama">
@@ -365,7 +366,7 @@ textarea.rapor{
       <div class="satir">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
           <input type="checkbox" id="chkGenisArama">
-          Geniş arama — 57 kombinasyon (daha titiz, daha yavaş)
+          Geniş arama — 76 kombinasyon (daha titiz, daha yavaş)
         </label>
       </div>
       <div style="border:1px solid var(--line);border-radius:8px;padding:8px 9px;display:flex;flex-direction:column;gap:6px">
@@ -564,11 +565,17 @@ textarea.rapor{
       <li><b>Örnekleme:</b> Etiketlenen piksellerden sınıf başına en çok N örnek, tekrarlanabilir şekilde
         (mulberry32, <b>tohum=42</b>) rastgele seçilir. Her örnek, merkezi etiketli piksel olan
         <i>w×w</i> pikselik bir yamadır (w: 16/24/32).</li>
-      <li><b>Öznitelik çıkarımı (ortak yanların tespiti):</b> Her yamadan 24 öznitelik:
+      <li><b>Öznitelik çıkarımı (ortak yanların tespiti):</b> Her yamadan <b>36 öznitelik</b>:
         RGB ortalama/std, parlaklık, HSV; bitki örtüsü indeksleri <b>ExG</b>, <b>GLI</b>, <b>VARI</b>,
-        <b>NGRDI</b> (ort/std); doku: gradyan büyüklüğü (ort/std), değer aralığı, 16 kutulu histogram entropisi.</li>
-      <li><b>Öznitelik kümeleri:</b> A=Renk, B=Renk+İndeks, C=Renk+İndeks+Doku — Oto-AI hangi kümenin daha iyi
-        olduğunu da öğrenir.</li>
+        <b>NGRDI</b> (ort/std); temel doku (gradyan, değer aralığı, histogram entropisi) ve
+        <b>ince ayrım kanalları</b>: dairesel ton dağılımı, koyu / koyu-yeşil piksel oranları,
+        çok ölçekli doku enerjileri ve oranı (iğne yaprağın yüksek frekanslı benekli dokusu ile
+        geniş yaprağın yumuşak lekeli dokusunu ayırt etmeye duyarlı), yapı tensörü yön tutarlılığı,
+        GLCM kontrast/homojenlik/enerji, kenar yoğunluğu ve parlaklık çarpıklığı.
+        <b>Önemli:</b> bu kanallar yalnızca modelin “duyularıdır”; hangilerinin çamı ayırt ettiğini
+        model ezber kural olmadan veriden öğrenir ve Fisher panelinde keşfettiği ipuçlarını görürsünüz.</li>
+      <li><b>Öznitelik kümeleri:</b> A=Renk, B=Renk+İndeks, C=Renk+İndeks+Doku, D=Tüm ipuçları (36) —
+        Oto-AI hangi kümenin daha iyi olduğunu da öğrenir.</li>
       <li><b>Modeller ve ayar taraması:</b> k-NN (k=3/5/7, mesafe ağırlıklı) · Softmaks (lojistik) regresyon
         (öğrenme hızı ve L2 taraması) · Çok katmanlı yapay sinir ağı (1–2 gizli katman, Adam eniyileyici) ·
         Rastgele Orman (30 veya 60 ağaç, derinlik 10/14, gini — 2 ayar). Tüm öznitelikler z-skor ile standartlaştırılır.</li>
@@ -1217,28 +1224,42 @@ const OZELLIK_ADLARI = [
   'Kırmızı ort.', 'Yeşil ort.', 'Mavi ort.', 'Kırmızı std', 'Yeşil std', 'Mavi std',
   'Parlaklık ort.', 'Parlaklık std', 'Ton (cos)', 'Ton (sin)', 'Doygunluk', 'Değer (V)',
   'ExG ort.', 'ExG std', 'GLI ort.', 'GLI std', 'VARI ort.', 'VARI std', 'NGRDI ort.', 'NGRDI std',
-  'Gradyan ort.', 'Gradyan std', 'Değer aralığı', 'Doku entropisi'
+  'Gradyan ort.', 'Gradyan std', 'Değer aralığı', 'Doku entropisi',
+  /* 24+ : ince ayrım kanalları — iğne/geniş yaprak dokusu, ton dağılımı, şekil/yön.
+     Hiçbiri kural içermez; hangisinin işe yaradığını model veriden öğrenir. */
+  'Ton dağılımı', 'Koyu piksel oranı', 'Koyu-yeşil doku', 'İnce doku enerjisi',
+  'Kaba doku enerjisi', 'Doku ölçek oranı', 'Yön tutarlılığı', 'GLCM kontrast',
+  'GLCM homojenlik', 'GLCM enerji', 'Kenar yoğunluğu', 'Parlaklık çarpıklığı'
 ];
-const OZELLIK_SAYISI = 24;
+const OZELLIK_SAYISI = 36;
 const OZELLIK_KUMELERI = {
   'Renk':             Array.from({ length: 12 }, (_, i) => i),
   'Renk+İndeks':      Array.from({ length: 20 }, (_, i) => i),
-  'Renk+İndeks+Doku': Array.from({ length: 24 }, (_, i) => i)
+  'Renk+İndeks+Doku': Array.from({ length: 24 }, (_, i) => i),
+  'Tüm ipuçları':     Array.from({ length: 36 }, (_, i) => i)
 };
 
 /* Verilen görüntü için yeniden kullanılabilir çıkarıcı üretir.
-   cikar(cx, cy, cikti[24]) → yeterli geçerli piksel yoksa false */
+   cikar(cx, cy, cikti[36]) → yeterli geçerli piksel yoksa false.
+   0–23: renk/indeks/temel doku; 24–35: ince ayrım kanalları (ton dağılımı,
+   çok ölçekli doku, yön tutarlılığı, GLCM, kenar yoğunluğu, çarpıklık).
+   Kanallar yalnızca "duyu"dur — ağırlıklarını model veriden öğrenir. */
 function ozellikCikarici(rgba, gecerli, W, H, yama){
   const yari = yama >> 1;
   const kenar = yama;
-  const gri = new Float32Array(kenar * kenar);
-  const gvar = new Uint8Array(kenar * kenar);
+  const N2 = kenar * kenar;
+  const gri = new Float32Array(N2);
+  const gvar = new Uint8Array(N2);
+  const integ = new Float64Array((kenar + 1) * (kenar + 1));
+  const hist = new Float64Array(16);
+  const glcm = new Float64Array(64);
   return function cikar(cx, cy, cikti){
     const x0 = cx - yari, y0 = cy - yari;
     let n = 0;
     let sR = 0, sG = 0, sB = 0, kR = 0, kG = 0, kB = 0;
-    let sGri = 0, kGri = 0;
+    let sGri = 0, kGri = 0, cGri = 0;
     let sExg = 0, kExg = 0, sGli = 0, kGli = 0, sVari = 0, kVari = 0, sNg = 0, kNg = 0;
+    let hCos = 0, hSin = 0, nHue = 0, nKoyu = 0, nKoyuYesil = 0;
     let enAz = 1e9, enCok = -1e9;
     for (let j = 0; j < kenar; j++){
       const y = y0 + j;
@@ -1252,7 +1273,7 @@ function ozellikCikarici(rgba, gecerli, W, H, yama){
         const griV = 0.299 * r + 0.587 * g + 0.114 * b;
         gri[yerel] = griV; gvar[yerel] = 1; n++;
         sR += r; sG += g; sB += b; kR += r * r; kG += g * g; kB += b * b;
-        sGri += griV; kGri += griV * griV;
+        sGri += griV; kGri += griV * griV; cGri += griV * griV * griV;
         if (griV < enAz) enAz = griV;
         if (griV > enCok) enCok = griV;
         const t = r + g + b + 1e-6;
@@ -1265,13 +1286,27 @@ function ozellikCikarici(rgba, gecerli, W, H, yama){
         sGli += gli; kGli += gli * gli;
         sVari += vari; kVari += vari * vari;
         sNg += ng; kNg += ng * ng;
+        /* piksel bazında ton (dairesel dağılım için) ve koyuluk sayaçları */
+        const pV = r > g ? (r > b ? r : b) : (g > b ? g : b);
+        const pK = r < g ? (r < b ? r : b) : (g < b ? g : b);
+        const pF = pV - pK;
+        if (pF > 0.02){
+          let h6;
+          if (pV === r) h6 = ((g - b) / pF) % 6;
+          else if (pV === g) h6 = (b - r) / pF + 2;
+          else h6 = (r - g) / pF + 4;
+          const hRad = h6 * Math.PI / 3;
+          hCos += Math.cos(hRad); hSin += Math.sin(hRad); nHue++;
+        }
+        if (pV < 0.35) nKoyu++;
+        if (exg > 0.05 && pV < 0.45) nKoyuYesil++;
       }
     }
-    if (n < kenar * kenar * 0.4) return false;
+    if (n < N2 * 0.4) return false;
     const ORT = s => s / n;
     const STD = (kk, s) => Math.sqrt(Math.max(0, kk / n - (s / n) * (s / n)));
     const rO = ORT(sR), gO = ORT(sG), bO = ORT(sB);
-    /* ortalama renkten HSV */
+    /* ortalama renkten HSV (8–11 no'lu kanallar, eski sürümle birebir) */
     const enB = Math.max(rO, gO, bO), enK = Math.min(rO, gO, bO), frk = enB - enK;
     let ton = 0;
     if (frk > 1e-9){
@@ -1281,19 +1316,67 @@ function ozellikCikarici(rgba, gecerli, W, H, yama){
       ton *= Math.PI / 3;
     }
     const doy = enB > 1e-9 ? frk / enB : 0;
-    /* doku: gradyan + entropi */
-    let sGr = 0, kGr = 0, nGr = 0;
-    const hist = new Float64Array(16);
+    const griOrt = ORT(sGri), griStd = STD(kGri, sGri);
+
+    /* boşlukları ortalamayla doldur, integral görüntü kur (çok ölçekli doku için) */
+    for (let i = 0; i < N2; i++) if (!gvar[i]) gri[i] = griOrt;
+    const k1 = kenar + 1;
+    for (let j = 0; j < kenar; j++){
+      let satir = 0;
+      for (let i = 0; i < kenar; i++){
+        satir += gri[j * kenar + i];
+        integ[(j + 1) * k1 + (i + 1)] = integ[j * k1 + (i + 1)] + satir;
+      }
+    }
+    const kutuOrt = (xa, ya, xb, yb) => {
+      if (xa < 0) xa = 0; if (ya < 0) ya = 0;
+      if (xb > kenar - 1) xb = kenar - 1; if (yb > kenar - 1) yb = kenar - 1;
+      const top = integ[(yb + 1) * k1 + (xb + 1)] - integ[ya * k1 + (xb + 1)]
+                - integ[(yb + 1) * k1 + xa] + integ[ya * k1 + xa];
+      return top / ((yb - ya + 1) * (xb - xa + 1));
+    };
+    let e1 = 0, e2 = 0, nE = 0;
+    for (let j = 0; j < kenar; j++){
+      for (let i = 0; i < kenar; i++){
+        const yerel = j * kenar + i;
+        if (!gvar[yerel]) continue;
+        const o3 = kutuOrt(i - 1, j - 1, i + 1, j + 1);
+        const o7 = kutuOrt(i - 3, j - 3, i + 3, j + 3);
+        e1 += Math.abs(gri[yerel] - o3);
+        e2 += Math.abs(o3 - o7);
+        nE++;
+      }
+    }
+    e1 = nE ? e1 / nE : 0;
+    e2 = nE ? e2 / nE : 0;
+
+    /* doku: gradyan + entropi + yön tutarlılığı + GLCM + kenar yoğunluğu */
+    let sGr = 0, kGr = 0, nGr = 0, nKenarPik = 0;
+    let jxx = 0, jyy = 0, jxy = 0;
+    hist.fill(0); glcm.fill(0);
+    const aralik = Math.max(1e-6, enCok - enAz);
+    let glcmN = 0;
     for (let j = 1; j < kenar - 1; j++){
       for (let i = 1; i < kenar - 1; i++){
         const yerel = j * kenar + i;
         if (!gvar[yerel]) continue;
         hist[Math.min(15, (gri[yerel] * 16) | 0)]++;
+        const qa = Math.min(7, ((gri[yerel] - enAz) / aralik * 8) | 0);
+        if (gvar[yerel + 1]){
+          const qb = Math.min(7, ((gri[yerel + 1] - enAz) / aralik * 8) | 0);
+          glcm[qa * 8 + qb]++; glcmN++;
+        }
+        if (gvar[yerel + kenar]){
+          const qb = Math.min(7, ((gri[yerel + kenar] - enAz) / aralik * 8) | 0);
+          glcm[qa * 8 + qb]++; glcmN++;
+        }
         if (gvar[yerel - 1] && gvar[yerel + 1] && gvar[yerel - kenar] && gvar[yerel + kenar]){
           const gx = (gri[yerel + 1] - gri[yerel - 1]) / 2;
           const gy = (gri[yerel + kenar] - gri[yerel - kenar]) / 2;
           const mag = Math.sqrt(gx * gx + gy * gy);
           sGr += mag; kGr += mag * mag; nGr++;
+          if (mag > 0.06) nKenarPik++;
+          jxx += gx * gx; jyy += gy * gy; jxy += gx * gy;
         }
       }
     }
@@ -1306,9 +1389,29 @@ function ozellikCikarici(rgba, gecerli, W, H, yama){
       }
       entropi /= 4;                                    // 0–1 aralığına indir
     }
+    let kontrast = 0, homojenlik = 0, enerji = 0;
+    if (glcmN > 0){
+      for (let a = 0; a < 8; a++){
+        for (let b2 = 0; b2 < 8; b2++){
+          const pr = glcm[a * 8 + b2] / glcmN;
+          if (!pr) continue;
+          const f = a - b2;
+          kontrast += pr * f * f;
+          homojenlik += pr / (1 + Math.abs(f));
+          enerji += pr * pr;
+        }
+      }
+    }
+    const izT = jxx + jyy;
+    const tutarlilik = izT > 1e-9
+      ? Math.sqrt((jxx - jyy) * (jxx - jyy) + 4 * jxy * jxy) / izT : 0;
+    const m3 = cGri / n - 3 * griOrt * (kGri / n) + 2 * griOrt * griOrt * griOrt;
+    let carpiklik = m3 / Math.max(griStd * griStd * griStd, 1e-6);
+    if (carpiklik > 3) carpiklik = 3; else if (carpiklik < -3) carpiklik = -3;
+
     cikti[0] = rO; cikti[1] = gO; cikti[2] = bO;
     cikti[3] = STD(kR, sR); cikti[4] = STD(kG, sG); cikti[5] = STD(kB, sB);
-    cikti[6] = ORT(sGri); cikti[7] = STD(kGri, sGri);
+    cikti[6] = griOrt; cikti[7] = griStd;
     cikti[8] = Math.cos(ton); cikti[9] = Math.sin(ton); cikti[10] = doy; cikti[11] = enB;
     cikti[12] = ORT(sExg); cikti[13] = STD(kExg, sExg);
     cikti[14] = ORT(sGli); cikti[15] = STD(kGli, sGli);
@@ -1318,6 +1421,18 @@ function ozellikCikarici(rgba, gecerli, W, H, yama){
     cikti[21] = nGr ? Math.sqrt(Math.max(0, kGr / nGr - (sGr / nGr) * (sGr / nGr))) : 0;
     cikti[22] = enCok > enAz ? enCok - enAz : 0;
     cikti[23] = entropi;
+    cikti[24] = nHue ? 1 - Math.sqrt((hCos / nHue) * (hCos / nHue) + (hSin / nHue) * (hSin / nHue)) : 0;
+    cikti[25] = nKoyu / n;
+    cikti[26] = nKoyuYesil / n;
+    cikti[27] = e1;
+    cikti[28] = e2;
+    cikti[29] = Math.min(8, e1 / (e2 + 1e-4));
+    cikti[30] = tutarlilik;
+    cikti[31] = kontrast;
+    cikti[32] = homojenlik;
+    cikti[33] = enerji;
+    cikti[34] = nGr ? nKenarPik / nGr : 0;
+    cikti[35] = carpiklik;
     return true;
   };
 }
@@ -2807,7 +2922,8 @@ $('btnHavuzaEkle').addEventListener('click', async () => {
   }
   D.havuz.push({
     ad: D.gorsel.dosyaAd || ('görüntü ' + (D.havuz.length + 1)),
-    yama, n: veri.n, sayimlar: veri.sayimlar, X24: veri.X24, y: veri.y,
+    yama, ozellik: OZELLIK_SAYISI,
+    n: veri.n, sayimlar: veri.sayimlar, X24: veri.X24, y: veri.y,
     gsd: (D.gorsel.geo && !D.gorsel.geo.cografi) ? D.gorsel.geo.sx * D.gorsel.olcek : null
   });
   D.vuruslar = [];
@@ -3749,7 +3865,7 @@ $('btnProjeAktar').addEventListener('click', () => {
     },
     gorselOzet: { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
       outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek },
-    havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, n: h.n, gsd: h.gsd,
+    havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd,
       sayimlar: h.sayimlar.slice(),
       y: Array.from(h.y),
       X24: Array.from(h.X24, v => Math.round(v * 1e4) / 1e4) })),
@@ -3828,13 +3944,18 @@ async function projeIceAktar(proje){
       ') aynı işleme çözünürlüğüyle yükleyin, sonra projeyi tekrar açın.';
   }
   if (Array.isArray(proje.havuz) && proje.havuz.length){
-    D.havuz = proje.havuz.map(h => ({
-      ad: h.ad, yama: h.yama, n: h.n, gsd: h.gsd ?? null,
+    const uyumlu = proje.havuz.filter(h => (h.ozellik || 24) === OZELLIK_SAYISI);
+    D.havuz = uyumlu.map(h => ({
+      ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
       sayimlar: (h.sayimlar || []).slice(),
       y: Int32Array.from(h.y), X24: Float32Array.from(h.X24)
     }));
     havuzGoster();
-    mesaj += '\nVeri havuzu geri yüklendi (' + D.havuz.length + ' kaynak, ' + sayiTR(havuzOzeti().n) + ' yama).';
+    if (D.havuz.length)
+      mesaj += '\nVeri havuzu geri yüklendi (' + D.havuz.length + ' kaynak, ' + sayiTR(havuzOzeti().n) + ' yama).';
+    if (uyumlu.length < proje.havuz.length)
+      mesaj += '\nEski sürümle kaydedilmiş ' + (proje.havuz.length - uyumlu.length) +
+        ' havuz kaynağı öznitelik sayısı değiştiği için atlandı — o görüntüleri yeniden etiketleyip ekleyin.';
   }
   if (proje.model){
     try{ await modelIceAktar(proje.model, true); mesaj += '\nKayıtlı model de yüklendi.'; }
@@ -3873,8 +3994,13 @@ $('btnRapor').addEventListener('click', () => {
   m.push('  Örnekleme        : Etiketli piksellerden sınıf başına en çok ' + $('secOrnekSiniri').value +
     ' yama, rezervuar örneklemesi (mulberry32, tohum=42).');
   m.push('  Yama boyu        : ' + e.yama + ' × ' + e.yama + ' px');
-  m.push('  Öznitelikler     : 24 adet — RGB/parlaklık/HSV istatistikleri, ExG, GLI, VARI, NGRDI,');
-  m.push('                     gradyan, değer aralığı ve histogram entropisi (yama bazında).');
+  m.push('  Öznitelikler     : 36 adet — RGB/parlaklık/HSV istatistikleri; ExG, GLI, VARI, NGRDI;');
+  m.push('                     gradyan, değer aralığı, histogram entropisi; ton dağılımı (dairesel),');
+  m.push('                     koyu ve koyu-yeşil piksel oranları, çok ölçekli doku enerjileri ve oranı,');
+  m.push('                     yön tutarlılığı (yapı tensörü), GLCM kontrast/homojenlik/enerji,');
+  m.push('                     kenar yoğunluğu, parlaklık çarpıklığı (yama bazında).');
+  m.push('                     Kanallar önsel kural içermez; ağırlıkları model veriden öğrenir');
+  m.push('                     (en ayırt edici kanallar Fisher skoruyla raporlanır).');
   m.push('  Aday modeller    : k-NN · Softmaks regresyon · YSA (Adam) · Rastgele Orman;');
   m.push('                     her biri 3 öznitelik kümesiyle → ' +
     (e.kombinasyon || otoAyarListesi().length) + ' kombinasyon.');
