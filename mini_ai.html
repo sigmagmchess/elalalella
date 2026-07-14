@@ -368,6 +368,18 @@ textarea.rapor{
           Geniş arama — 57 kombinasyon (daha titiz, daha yavaş)
         </label>
       </div>
+      <div style="border:1px solid var(--line);border-radius:8px;padding:8px 9px;display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:12.5px;font-weight:600">📚 Çoklu eğitim — veri havuzu</div>
+        <div class="ipucu" style="font-size:11px">Birden çok görüntüyle eğitmek için: etiketleyin →
+          <b>havuza ekle</b> → Adım 1'den yeni görüntü yükleyin → etiketleyin → yine ekleyin…
+          <b>Eğitimi Başlat</b>, havuzdaki tüm örnekleri + o anki etiketleri birlikte kullanır.
+          Farklı ışık/bölge/uçuş görüntüleri modeli genelleştirir.</div>
+        <div class="arac-grup">
+          <button class="btn kucuk" id="btnHavuzaEkle" disabled>➕ Örnekleri havuza ekle</button>
+          <button class="btn kucuk" id="btnHavuzBosalt" disabled>🗑️ Boşalt</button>
+        </div>
+        <div id="havuzDurum" style="font-size:11.5px;color:var(--ink2)">Havuz boş.</div>
+      </div>
       <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat</button>
       <div id="egitIlerlemeKutu" class="gizli">
         <div class="ilerleme"><div id="egitIlerleme"></div></div>
@@ -530,7 +542,10 @@ textarea.rapor{
         çim, toprak, yol, çatı ve <b>gölge</b> gibi alanları boyayın. İsterseniz “＋ Sınıf ekle” ile başka
         sınıflar (ör. yapraklı ağaç) tanımlayın.</li>
       <li><b>Eğit:</b> “Eğitimi Başlat”a basın. Oto-AI tüm model+ayar kombinasyonlarını çapraz doğrulamayla
-        dener ve en iyisini seçer; sıralamayı canlı görürsünüz.</li>
+        dener ve en iyisini seçer; sıralamayı canlı görürsünüz.
+        <b>Çoklu eğitim:</b> birden çok görüntüyle eğitmek için etiketledikten sonra
+        “➕ Örnekleri havuza ekle”ye basın, Adım 1'den yeni görüntü yükleyip yine etiketleyin ve ekleyin —
+        eğitim, havuzdaki tüm kaynakları birlikte kullanır (havuz proje dosyasıyla saklanır).</li>
       <li><b>Analiz Et (yeni görüntü):</b> Model hazırken 🔎 <b>Analiz Et</b> bölümüne yeni bir harita,
         ortomozaik ya da fotoğraf bırakın — uygulama <b>otomatik olarak</b> sınıflandırır, görüntü kararını
         verir ve ağaçları nokta atışı işaretler. Eğitilmiş model yeni görüntü yüklense de <b>korunur</b>;
@@ -2194,6 +2209,7 @@ const D = {
   isaretKnv: null,
   tacCalisPx: 12,
   gizliSiniflar: new Set(),
+  havuz: [],               // çoklu eğitim: {ad, yama, n, sayimlar, X24, y, gsd}
   mesgul: false,
   imlec: null              // {ekranX, ekranY, imgX, imgY}
 };
@@ -2571,6 +2587,7 @@ $('btnSinifEkle').addEventListener('click', async () => {
   D.siniflar.push({ ad: ad.trim(), renk: SINIF_RENKLERI[D.siniflar.length % SINIF_RENKLERI.length] });
   D.seciliSinif = D.siniflar.length - 1;
   if (D.egitim || D.sonuc) egitimiSifirla('sınıflar değişti — yeniden eğitin');
+  if (D.havuz.length){ havuzuBosalt(); $('durumBilgi').textContent = 'Sınıflar değişti — veri havuzu boşaltıldı.'; }
   sinifListesiCiz();
   lejantCiz();
   etiketDurumGuncelle();
@@ -2593,6 +2610,7 @@ async function sinifSil(i){
   if (D.seciliSinif >= D.siniflar.length) D.seciliSinif = 0;
   etiketKnvYenile();
   if (D.egitim || D.sonuc) egitimiSifirla('sınıflar değişti — yeniden eğitin');
+  if (D.havuz.length){ havuzuBosalt(); $('durumBilgi').textContent = 'Sınıflar değişti — veri havuzu boşaltıldı.'; }
   sinifListesiCiz();
   lejantCiz();
   etiketDurumGuncelle();
@@ -2730,15 +2748,130 @@ function etiketKnvYenile(){
 function egitimGecersizKil(){
   if (D.egitim && !D.egitim.iceAktarilan) durumYaz(3, 'etiketler değişti — yeniden eğitin');
 }
+function havuzOzeti(){
+  const K = D.siniflar.length;
+  const sayim = new Array(K).fill(0);
+  let n = 0;
+  for (const h of D.havuz){
+    n += h.n;
+    h.sayimlar.forEach((s, c) => { if (c < K) sayim[c] += s; });
+  }
+  return { n, sayim };
+}
+function havuzGoster(){
+  const el = $('havuzDurum');
+  if (!D.havuz.length){
+    el.textContent = 'Havuz boş — yalnız geçerli görüntünün etiketleriyle eğitilir.';
+  } else {
+    const oz = havuzOzeti();
+    el.innerHTML = '📚 <b>' + D.havuz.length + ' kaynak · ' + sayiTR(oz.n) + ' yama</b> — ' +
+      D.siniflar.map((s, c) => s.ad + ': ' + sayiTR(oz.sayim[c] || 0)).join(' · ') +
+      ' · yama ' + D.havuz[0].yama + ' px';
+  }
+  $('btnHavuzBosalt').disabled = !D.havuz.length || D.mesgul;
+}
+function havuzuBosalt(){
+  D.havuz = [];
+  havuzGoster();
+  etiketDurumGuncelle();
+}
 function etiketDurumGuncelle(){
   const sayim = sinifSayimlari();
+  const havuzSayim = havuzOzeti().sayim;
+  /* sınıf yeterli sayılır: geçerli görüntüde ≥30 px YA DA havuzda ≥10 yama */
+  let doluBirlesik = 0;
   const doluSinif = sayim.filter(s => s >= 30).length;
+  for (let c = 0; c < D.siniflar.length; c++)
+    if (sayim[c] >= 30 || (havuzSayim[c] || 0) >= 10) doluBirlesik++;
   const onceKapali = $('btnEgit').disabled;
-  $('btnEgit').disabled = !(D.gorsel && doluSinif >= 2) || D.mesgul;
+  $('btnEgit').disabled = !(D.gorsel && doluBirlesik >= 2) || D.mesgul;
+  $('btnHavuzaEkle').disabled = !(D.gorsel && sayim.some(s => s >= 30)) || D.mesgul;
   if (onceKapali && !$('btnEgit').disabled && !D.egitim) $('adim3').open = true;
   if (doluSinif >= 2) durumYaz(2, '✓ ' + sayiTR(sayim.reduce((a, b) => a + b, 0)) + ' px', true);
   else if (sayim.some(s => s > 0)) durumYaz(2, 'her sınıfa ≥30 px verin');
+  else if (D.havuz.length) durumYaz(2, 'havuzda ' + sayiTR(havuzOzeti().n) + ' yama hazır', true);
   else durumYaz(2, 'etiket bekleniyor');
+}
+
+$('btnHavuzaEkle').addEventListener('click', async () => {
+  if (D.mesgul || !D.gorsel) return;
+  let yama = parseInt($('secYama').value, 10);
+  if (D.havuz.length && D.havuz[0].yama !== yama){
+    yama = D.havuz[0].yama;                            // havuz tek yama boyuyla tutarlı kalır
+    $('secYama').value = String(yama);
+  }
+  const veri = ornekleriTopla(yama, parseInt($('secOrnekSiniri').value, 10));
+  if (!veri.n){
+    await bilgi('Havuza eklenecek örnek bulunamadı — önce fırça/değnek/çokgenle etiket işaretleyin.');
+    return;
+  }
+  D.havuz.push({
+    ad: D.gorsel.dosyaAd || ('görüntü ' + (D.havuz.length + 1)),
+    yama, n: veri.n, sayimlar: veri.sayimlar, X24: veri.X24, y: veri.y,
+    gsd: (D.gorsel.geo && !D.gorsel.geo.cografi) ? D.gorsel.geo.sx * D.gorsel.olcek : null
+  });
+  D.vuruslar = [];
+  D.etiketMaske.fill(0);
+  etiketKnvYenile();
+  sinifListesiCiz();
+  havuzGoster();
+  etiketDurumGuncelle();
+  ciz();
+  await bilgi('✓ ' + sayiTR(veri.n) + ' örnek yama havuza eklendi (' + D.havuz.length + '. kaynak).\n\n' +
+    'Görüntüdeki etiketler havuza taşındı. Şimdi Adım 1\'den yeni bir görüntü yükleyip etiketleyebilir ' +
+    'ya da aynı görüntüde farklı bölgeleri işaretleyip yine ekleyebilirsiniz.\n' +
+    '"Eğitimi Başlat" havuzdaki tüm kaynakları + o anki etiketleri birlikte kullanır.');
+});
+$('btnHavuzBosalt').addEventListener('click', async () => {
+  if (D.mesgul || !D.havuz.length) return;
+  if (!(await onayla('Veri havuzundaki ' + D.havuz.length + ' kaynak (' + sayiTR(havuzOzeti().n) +
+    ' yama) silinsin mi?'))) return;
+  havuzuBosalt();
+});
+
+/* havuz + geçerli etiketleri tek eğitim setinde birleştirir; sınıf başına üst sınırı uygular */
+function egitimVerisiBirlestir(guncel, sinir, K){
+  const parcalar = D.havuz.slice();
+  const kaynaklar = parcalar.map(h => h.ad + ' (' + h.n + ')');
+  if (guncel.n){
+    parcalar.push({ X24: guncel.X24, y: guncel.y, n: guncel.n });
+    kaynaklar.push((D.gorsel.dosyaAd || 'geçerli görüntü') + ' (' + guncel.n + ')');
+  }
+  const topN = parcalar.reduce((a, p) => a + p.n, 0);
+  const X = new Float32Array(topN * OZELLIK_SAYISI);
+  const y = new Int32Array(topN);
+  let o = 0;
+  for (const p of parcalar){
+    X.set(p.X24.subarray(0, p.n * OZELLIK_SAYISI), o * OZELLIK_SAYISI);
+    y.set(p.y.subarray(0, p.n), o);
+    o += p.n;
+  }
+  const sayim = new Array(K).fill(0);
+  for (let i = 0; i < topN; i++) if (y[i] < K) sayim[y[i]]++;
+  if (!sayim.some(s => s > sinir))
+    return { X24: X, y, n: topN, sayimlar: sayim, kaynaklar };
+  /* rezervuar altörnekleme (tohum=42) — kaynaklar orantılı temsil edilir */
+  const rng = mulberry32(42);
+  const kova = Array.from({ length: K }, () => []);
+  const gorulen = new Array(K).fill(0);
+  for (let i = 0; i < topN; i++){
+    const c = y[i];
+    if (c >= K) continue;
+    gorulen[c]++;
+    if (kova[c].length < sinir) kova[c].push(i);
+    else { const j = (rng() * gorulen[c]) | 0; if (j < sinir) kova[c][j] = i; }
+  }
+  const secim = kova.flat().sort((a, b) => a - b);
+  const n2 = secim.length;
+  const X2 = new Float32Array(n2 * OZELLIK_SAYISI);
+  const y2 = new Int32Array(n2);
+  secim.forEach((gi, i) => {
+    X2.set(X.subarray(gi * OZELLIK_SAYISI, (gi + 1) * OZELLIK_SAYISI), i * OZELLIK_SAYISI);
+    y2[i] = y[gi];
+  });
+  const s2 = new Array(K).fill(0);
+  y2.forEach(c => s2[c]++);
+  return { X24: X2, y: y2, n: n2, sayimlar: s2, kaynaklar };
 }
 
 /* =====================================================================
@@ -3118,7 +3251,11 @@ $('btnEgit').addEventListener('click', async () => {
   const K = D.siniflar.length;
   const hataEl = $('egitHata');
   goster(hataEl, false);
-  const yama = parseInt($('secYama').value, 10);
+  let yama = parseInt($('secYama').value, 10);
+  if (D.havuz.length && D.havuz[0].yama !== yama){
+    yama = D.havuz[0].yama;                            // havuzla aynı yama boyu kullanılmalı
+    $('secYama').value = String(yama);
+  }
   const sinifBasina = parseInt($('secOrnekSiniri').value, 10);
   D.mesgul = true;
   $('btnEgit').disabled = true;
@@ -3128,11 +3265,17 @@ $('btnEgit').addEventListener('click', async () => {
   await beklet();
   try{
     const baslangic = performance.now();
-    const veri = ornekleriTopla(yama, sinifBasina);
+    const sayimSimdi = sinifSayimlari();
+    const guncel = sayimSimdi.some(s => s > 0)
+      ? ornekleriTopla(yama, sinifBasina)
+      : { X24: new Float32Array(0), y: new Int32Array(0), n: 0, sayimlar: new Array(K).fill(0) };
+    const veri = egitimVerisiBirlestir(guncel, sinifBasina, K);
+    if (!veri.n)
+      throw new Error('Eğitilecek örnek yok — etiket işaretleyin ya da havuza kaynak ekleyin.');
     const azSinif = veri.sayimlar.findIndex(s => s < 10);
     if (azSinif >= 0)
-      throw new Error('"' + D.siniflar[azSinif].ad + '" sınıfında yeterli örnek yok (' +
-        veri.sayimlar[azSinif] + ' yama). Bu sınıfa daha fazla alan boyayın.');
+      throw new Error('"' + D.siniflar[azSinif].ad + '" sınıfında yeterli örnek yok (havuz + geçerli: ' +
+        veri.sayimlar[azSinif] + ' yama). Bu sınıfa daha fazla alan işaretleyin.');
     const govde = $('liderGovde');
     govde.innerHTML = '';
     goster($('liderKutu'), true);
@@ -3151,9 +3294,11 @@ $('btnEgit').addEventListener('click', async () => {
     });
     const sure = (performance.now() - baslangic) / 1000;
     D.egitim = { ...sonuc, yama, sayimlar: veri.sayimlar, n: veri.n, sure,
+      kaynaklar: veri.kaynaklar,
       kombinasyon: otoAyarListesi(genisArama).length,
       gsdCalisma: (D.gorsel.geo && !D.gorsel.geo.cografi)
-        ? D.gorsel.geo.sx * D.gorsel.olcek : null };
+        ? D.gorsel.geo.sx * D.gorsel.olcek
+        : (D.havuz.length ? D.havuz[0].gsd : null) };
     goster(kutu, false);
     const e = sonuc.enIyi;
     $('kazananKart').innerHTML =
@@ -3161,6 +3306,9 @@ $('btnEgit').addEventListener('click', async () => {
       '<br>Çapraz doğrulama (' + e.cv.katSayi + ' kat): doğruluk <b>' + yuzde(e.cv.dogruluk) +
       '</b>, makro-F1 <b>' + yuzde(e.cv.f1) + '</b>' +
       '<br>' + sayiTR(veri.n) + ' örnek yama · ' + D.siniflar.map((s, c) => s.ad + ': ' + veri.sayimlar[c]).join(' · ') +
+      (veri.kaynaklar.length > 1
+        ? '<br>📚 ' + veri.kaynaklar.length + ' kaynaktan eğitildi: ' + veri.kaynaklar.join(' · ')
+        : '') +
       '<br><small>Oto-AI ' + otoAyarListesi(genisArama).length + ' kombinasyonu ' + sure.toFixed(1).replace('.', ',') +
       ' saniyede denedi ve en iyi öğrenme şeklini seçti. Yeni bir haritayı 🔎 <b>Analiz Et</b> bölümüne ' +
       'bırakarak otomatik nokta atışı işaretleme yapabilirsiniz.</small>';
@@ -3601,6 +3749,10 @@ $('btnProjeAktar').addEventListener('click', () => {
     },
     gorselOzet: { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
       outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek },
+    havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, n: h.n, gsd: h.gsd,
+      sayimlar: h.sayimlar.slice(),
+      y: Array.from(h.y),
+      X24: Array.from(h.X24, v => Math.round(v * 1e4) / 1e4) })),
     model: D.egitim ? modelPaketle(D.egitim.enIyi, D.siniflar, D.egitim.yama) : null
   };
   indir(dosyaKok() + '_proje.json', JSON.stringify(proje), 'application/json');
@@ -3622,8 +3774,10 @@ $('iceAktarGirdi').addEventListener('change', async e => {
 });
 async function modelIceAktar(paket, sessiz){
   const acilan = modelAc(paket);
+  const sinifDegisti = acilan.siniflar.length !== D.siniflar.length;
   D.siniflar = acilan.siniflar.map((s, i) => ({ ad: s.ad, renk: s.renk || SINIF_RENKLERI[i % SINIF_RENKLERI.length] }));
   D.seciliSinif = 0;
+  if (sinifDegisti && D.havuz.length) havuzuBosalt();
   sonucuGecersizKil();
   etiketleriSiniflaraUydur();
   D.egitim = {
@@ -3672,6 +3826,15 @@ async function projeIceAktar(proje){
   } else if (proje.vuruslar && proje.vuruslar.length){
     mesaj += '\nEtiketler için önce aynı görüntüyü (' + (proje.gorselOzet ? proje.gorselOzet.ad : '?') +
       ') aynı işleme çözünürlüğüyle yükleyin, sonra projeyi tekrar açın.';
+  }
+  if (Array.isArray(proje.havuz) && proje.havuz.length){
+    D.havuz = proje.havuz.map(h => ({
+      ad: h.ad, yama: h.yama, n: h.n, gsd: h.gsd ?? null,
+      sayimlar: (h.sayimlar || []).slice(),
+      y: Int32Array.from(h.y), X24: Float32Array.from(h.X24)
+    }));
+    havuzGoster();
+    mesaj += '\nVeri havuzu geri yüklendi (' + D.havuz.length + ' kaynak, ' + sayiTR(havuzOzeti().n) + ' yama).';
   }
   if (proje.model){
     try{ await modelIceAktar(proje.model, true); mesaj += '\nKayıtlı model de yüklendi.'; }
@@ -3722,6 +3885,8 @@ $('btnRapor').addEventListener('click', () => {
   if (e.n){
     m.push('EĞİTİM VERİSİ');
     m.push('  Toplam yama      : ' + e.n);
+    if (e.kaynaklar && e.kaynaklar.length)
+      m.push('  Kaynaklar        : ' + e.kaynaklar.join(' + '));
     D.siniflar.forEach((s, c) => m.push('  ' + (s.ad + ' '.repeat(17)).slice(0, 17) + ': ' + (e.sayimlar[c] || 0) + ' yama'));
     m.push('');
   }
@@ -3800,6 +3965,7 @@ $('btnYardim').addEventListener('click', () => $('kipYardim').showModal());
 
 /* başlangıç */
 sinifListesiCiz();
+havuzGoster();
 kanvasBoyutla();
 </script>
 </body>

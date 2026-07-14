@@ -43,6 +43,8 @@ Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
    doğrulamada yarıştırılır ve **en iyi öğrenme şekli otomatik seçilir** (ölçüt: makro-F1;
    tohum=42 ile tekrarlanabilir). Verinizdeki en ayırt edici ortak özellikler Fisher
    skoruyla raporlanır.
+   **📚 Çoklu eğitim:** etiketleri **veri havuzuna** ekleyip başka görüntüler yükleyerek
+   birden çok uçuş/bölgeden birleşik eğitim seti kurabilirsiniz (havuz proje dosyasıyla saklanır).
    **🔎 Analiz Et:** model hazırken bu bölüme **yeni bir harita/görüntü** bırakın —
    eğitilmiş model korunur, görüntü otomatik sınıflandırılır, karar verilir ve ağaçlar
    nokta atışı işaretlenir (tepe konumları olasılık ağırlıklı merkezle inceltilir).
