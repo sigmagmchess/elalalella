@@ -396,8 +396,21 @@ textarea.rapor{
           <input type="checkbox" id="chkYumusat" checked> Komşuluk yumuşatması (3×3)
         </label>
       </div>
+      <div id="kararKutu" class="basari gizli" style="font-size:12.5px;line-height:1.5"></div>
       <table class="istat gizli" id="tabloIstat"></table>
       <div id="istatNot" class="ipucu gizli"></div>
+      <div class="satir gizli" id="agacSatir" style="border-top:1px solid var(--line);padding-top:9px">
+        <label for="tacCapi">Ort. taç çapı:</label>
+        <input type="number" id="tacCapi" min="0.5" step="0.5" value="3" style="max-width:64px">
+        <span id="tacBirim" style="font-size:11.5px;color:var(--ink2)">m</span>
+        <button class="btn kucuk birincil" id="btnAgacIsaretle">📍 Çamları İşaretle</button>
+      </div>
+      <div class="satir gizli" id="agacGosterSatir">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chkIsaretGoster" checked> Ağaç işaretlerini göster
+        </label>
+      </div>
+      <div id="agacSonucKutu" class="basari gizli" style="font-size:12.5px;line-height:1.5"></div>
     </div>
   </details>
 
@@ -409,6 +422,7 @@ textarea.rapor{
         <button class="btn kucuk" id="btnPngAktar" disabled>🖼️ PNG (görüntü+katman)</button>
         <button class="btn kucuk" id="btnCsvAktar" disabled>📄 CSV (bloklar)</button>
         <button class="btn kucuk" id="btnGeojsonAktar" disabled>🌍 GeoJSON (QGIS)</button>
+        <button class="btn kucuk" id="btnAgacGeojson" disabled>📍 Ağaç noktaları (GeoJSON)</button>
       </div>
       <div class="arac-grup">
         <button class="btn kucuk" id="btnModelAktar" disabled>🧠 Modeli kaydet (.json)</button>
@@ -477,7 +491,12 @@ textarea.rapor{
       <li><b>Eğit:</b> “Eğitimi Başlat”a basın. Oto-AI tüm model+ayar kombinasyonlarını çapraz doğrulamayla
         dener ve en iyisini seçer; sıralamayı canlı görürsünüz.</li>
       <li><b>Sınıflandır:</b> Model tüm görüntüyü tarar; renkli katman ve alan istatistikleri üretilir.
-        Güven eşiğini kaydırarak sonucu ayarlayın.</li>
+        Güven eşiğini kaydırarak sonucu ayarlayın. Üstte <b>görüntü kararı</b> görünür
+        (“çam VAR — %X kaplama” ya da “çam tespit edilmedi”).</li>
+      <li><b>Çamları işaretle:</b> Ortalama taç çapını girip “📍 Çamları İşaretle”ye basın —
+        her çam ağacı haritada tek tek daire ile işaretlenir ve sayılır; çamların
+        <b>en yoğun olduğu bölge</b> ⭐ ile gösterilir. İşaretler UTM koordinatlı GeoJSON
+        olarak QGIS'e aktarılabilir.</li>
       <li><b>Dışa aktar:</b> PNG, CSV, GeoJSON (QGIS'te açılır), model ve proje dosyaları.</li>
     </ol>
     <h3>Yöntem (tezinizin “Materyal ve Yöntem” bölümü için)</h3>
@@ -500,6 +519,10 @@ textarea.rapor{
         “Veri yok” (saydam) alanlar dışlanır.</li>
       <li><b>Alan hesabı:</b> GeoTIFF'ten okunan GSD ile blok alanları m²'ye çevrilir;
         bitişik çam bloklarının oluşturduğu birleşik bölgeler bağlı bileşen analiziyle sayılır.</li>
+      <li><b>Ağaç tespiti:</b> Çam olasılık yüzeyinde <b>yerel maksimumlar</b> bulunur ve girilen
+        taç çapına karşılık gelen en az mesafeyle seyreltilir (maksimum olmayanı bastırma / NMS) —
+        bitişik taçlar bu sayede ayrı ağaçlar olarak sayılır. <b>En yoğun bölge</b>, çam maskesine
+        integral görüntü tabanlı kutu-çekirdek yoğunluğu uygulanarak belirlenir.</li>
       <li><b>Doğruluk değerlendirmesi önerisi:</b> Bu hızlı yöntem, tezinizdeki YOLOv8-seg iş akışına
         (depodaki Node.js hattı) <b>ön etüt/karşılaştırma</b> olarak eklenebilir; ağaç bazlı doğruluk için
         <code>accuracy_assessment.js</code> hattını kullanın.</li>
@@ -1906,6 +1929,81 @@ function probYumusat(probs, gw, gh, K){
   return yeni;
 }
 
+/*
+  Tek tek ağaç işaretleme: çam olasılık ızgarasında yerel maksimumlar,
+  taç çapına karşılık gelen en az mesafeyle (NMS) seyreltilir.
+  minMesafe blok cinsindendir; dönen x/y blok koordinatıdır.
+*/
+function agacIsaretle(ayar){
+  const { probs, sinif, gw, gh, K, camIdx, esik, minMesafe } = ayar;
+  const d = Math.max(1, minMesafe | 0);
+  const d2 = d * d;
+  const adaylar = [];
+  for (let i = 0; i < gw * gh; i++){
+    if (sinif[i] === 255) continue;
+    const taban = i * K;
+    const p = probs[taban + camIdx];
+    if (p < esik) continue;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+    if (enC === camIdx) adaylar.push(i);
+  }
+  adaylar.sort((a, b) => probs[b * K + camIdx] - probs[a * K + camIdx]);
+  const sepet = new Map();                             // uzamsal kova: O(1) komşu denetimi
+  const kabul = [];
+  for (const i of adaylar){
+    const x = i % gw, y = (i / gw) | 0;
+    const sx = (x / d) | 0, sy = (y / d) | 0;
+    let yakinVar = false;
+    for (let by = sy - 1; by <= sy + 1 && !yakinVar; by++){
+      for (let bx = sx - 1; bx <= sx + 1 && !yakinVar; bx++){
+        const liste = sepet.get(by * 1048576 + bx);
+        if (!liste) continue;
+        for (const k of liste){
+          const dx = k.x - x, dy = k.y - y;
+          if (dx * dx + dy * dy < d2){ yakinVar = true; break; }
+        }
+      }
+    }
+    if (yakinVar) continue;
+    const kayit = { x, y, p: probs[i * K + camIdx] };
+    kabul.push(kayit);
+    const anahtar = sy * 1048576 + sx;
+    if (!sepet.has(anahtar)) sepet.set(anahtar, []);
+    sepet.get(anahtar).push(kayit);
+    if (kabul.length >= 50000) break;                  // emniyet sınırı
+  }
+  return kabul;
+}
+
+/* İntegral görüntüyle kutu-çekirdek yoğunluğu; en yoğun bloğu döndürür */
+function yogunlukHaritasi(maske, gw, gh, yaricap){
+  const r = Math.max(1, yaricap | 0);
+  const gw1 = gw + 1;
+  const integ = new Float64Array(gw1 * (gh + 1));
+  for (let y = 0; y < gh; y++){
+    let satir = 0;
+    for (let x = 0; x < gw; x++){
+      satir += maske[y * gw + x];
+      integ[(y + 1) * gw1 + (x + 1)] = integ[y * gw1 + (x + 1)] + satir;
+    }
+  }
+  const yog = new Float32Array(gw * gh);
+  let enDeger = -1, enX = 0, enY = 0;
+  for (let y = 0; y < gh; y++){
+    const y0 = Math.max(0, y - r), y1 = Math.min(gh - 1, y + r);
+    for (let x = 0; x < gw; x++){
+      const x0 = Math.max(0, x - r), x1 = Math.min(gw - 1, x + r);
+      const top = integ[(y1 + 1) * gw1 + (x1 + 1)] - integ[y0 * gw1 + (x1 + 1)]
+                - integ[(y1 + 1) * gw1 + x0] + integ[y0 * gw1 + x0];
+      const v = top / ((y1 - y0 + 1) * (x1 - x0 + 1));
+      yog[y * gw + x] = v;
+      if (v > enDeger){ enDeger = v; enX = x; enY = y; }
+    }
+  }
+  return { yog, enX, enY, enDeger };
+}
+
 function bagliBilesenSay(maske, gw, gh){
   const gezildi = new Uint8Array(gw * gh);
   const yigin = new Int32Array(gw * gh);
@@ -1955,6 +2053,10 @@ const D = {
   egitim: null,            // {enIyi, liderlik, fisher, yama, sayimlar, sure}
   sonuc: null,             // haritaSiniflandir çıktısı + probsYumusak
   sonucKnv: null,
+  agaclar: null,           // [{x, y (blok), p}] — işaretlenen çam tepe noktaları
+  enYogun: null,           // {gx, gy, deger} — çamların en yoğun olduğu blok
+  isaretKnv: null,
+  tacCalisPx: 12,
   gizliSiniflar: new Set(),
   mesgul: false,
   imlec: null              // {ekranX, ekranY, imgX, imgY}
@@ -2179,6 +2281,13 @@ function gorselKur(g){
   goster($('kanvasBos'), false);
   goster($('esikSatir'), false); goster($('opaklikSatir'), false); goster($('yumusatSatir'), false);
   goster($('tabloIstat'), false); goster($('istatNot'), false);
+  goster($('kararKutu'), false); goster($('agacSatir'), false);
+  goster($('agacGosterSatir'), false); goster($('agacSonucKutu'), false);
+  $('btnAgacGeojson').disabled = true;
+  D.agaclar = null; D.enYogun = null; D.isaretKnv = null;
+  const geoM = g.geo && !g.geo.cografi;
+  $('tacBirim').textContent = geoM ? 'm' : 'px (özgün)';
+  if (!$('tacCapi').dataset.elleDegisti) $('tacCapi').value = geoM ? '3' : '60';
   goster($('liderKutu'), false); goster($('kazananKart'), !!aktarilan); goster($('ozellikKutu'), false);
   $('durumBilgi').textContent = g.dosyaAd + ' · ' + sayiTR(g.w) + '×' + sayiTR(g.h) + ' px' +
     (g.geo && g.geo.epsg ? ' · EPSG:' + g.geo.epsg : '');
@@ -2227,11 +2336,21 @@ function sinifListesiCiz(){
 function sonucuGecersizKil(){
   D.sonuc = null;
   D.sonucKnv = null;
+  D.agaclar = null;
+  D.enYogun = null;
+  D.isaretKnv = null;
   D.gizliSiniflar.clear();
-  ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar'].forEach(b => $(b).disabled = true);
+  ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar', 'btnAgacGeojson'].forEach(b => $(b).disabled = true);
   goster($('tabloIstat'), false); goster($('istatNot'), false);
+  goster($('kararKutu'), false); goster($('agacSatir'), false);
+  goster($('agacGosterSatir'), false); goster($('agacSonucKutu'), false);
   goster($('esikSatir'), false); goster($('opaklikSatir'), false); goster($('yumusatSatir'), false);
   if (D.gorsel) durumYaz(4, D.egitim ? 'hazır' : 'bekliyor');
+}
+function camSinifIdx(){
+  const i = D.siniflar.findIndex(s =>
+    /çam|cam|pine/i.test(s.ad) && !/değil|degil|yok|not/i.test(s.ad));
+  return i >= 0 ? i : 0;
 }
 function egitimiSifirla(neden){
   D.egitim = null;
@@ -2439,6 +2558,10 @@ function ciz(){
       D.sonuc.yari - ken / 2, D.sonuc.yari - ken / 2,
       D.sonuc.gw * ken, D.sonuc.gh * ken);
     ctxAna.globalAlpha = eskiAlfa;
+  }
+  if (D.isaretKnv && D.agaclar && $('chkIsaretGoster').checked){
+    ctxAna.imageSmoothingEnabled = true;
+    ctxAna.drawImage(D.isaretKnv, 0, 0);
   }
   /* fırça ön izlemesi */
   if (D.imlec && (D.arac === 'kalem' || D.arac === 'silgi')){
@@ -2768,10 +2891,14 @@ $('btnSiniflandir').addEventListener('click', async () => {
     });
     sonuc.probsYumusak = probYumusat(sonuc.probs, sonuc.gw, sonuc.gh, K);
     D.sonuc = sonuc;
+    D.agaclar = null; D.enYogun = null; D.isaretKnv = null;
     goster(kutu, false);
     goster($('esikSatir'), true);
     goster($('opaklikSatir'), true);
     goster($('yumusatSatir'), true);
+    goster($('agacSatir'), true);
+    goster($('agacSonucKutu'), false);
+    $('btnAgacGeojson').disabled = true;
     sonucKatmaniGuncelle();
     durumYaz(4, '✓ ' + sayiTR(sonuc.gw * sonuc.gh) + ' blok', true);
     durumYaz(5, 'hazır', true);
@@ -2809,6 +2936,8 @@ function sonucKatmaniGuncelle(){
   });
   const sayimlar = new Array(K).fill(0);
   let gecerliBlok = 0, kararsiz = 0;
+  const camIdx = camSinifIdx();
+  let camGuvenTop = 0;
   const sinifMaskeleri = Array.from({ length: K }, () => new Uint8Array(s.gw * s.gh));
   for (let i = 0; i < s.gw * s.gh; i++){
     if (s.sinif[i] === 255) continue;
@@ -2819,11 +2948,28 @@ function sonucKatmaniGuncelle(){
     if (probs[taban + enC] < esik){ kararsiz++; continue; }
     sayimlar[enC]++;
     sinifMaskeleri[enC][i] = 1;
+    if (enC === camIdx) camGuvenTop += probs[taban + enC];
     if (D.gizliSiniflar.has(enC)) continue;
     const p = i * 4, rk = renkler[enC];
     veri[p] = rk[0]; veri[p + 1] = rk[1]; veri[p + 2] = rk[2]; veri[p + 3] = 255;
   }
   ctx.putImageData(gd, 0, 0);
+
+  /* görüntü kararı: çam var mı, ne kadar? */
+  const kk = $('kararKutu');
+  const kapla = gecerliBlok ? sayimlar[camIdx] / gecerliBlok : 0;
+  if (!sayimlar[camIdx]){
+    kk.className = 'uyari';
+    kk.innerHTML = '🚫 <b>KARAR:</b> Bu görüntüde eşik üstünde <b>' + D.siniflar[camIdx].ad +
+      '</b> tespit edilmedi. Güven eşiğini düşürmeyi ya da daha çeşitli örnek etiketleyip yeniden eğitmeyi deneyin.';
+  } else {
+    const hukum = kapla >= 0.5 ? 'görüntü büyük oranda <b>ÇAM</b>'
+      : (kapla >= 0.03 ? 'görüntüde <b>çam VAR</b>' : 'görüntüde <b>az miktarda çam</b> var');
+    kk.className = 'basari';
+    kk.innerHTML = '🌲 <b>KARAR:</b> ' + hukum + ' — kaplama <b>' + yuzde(kapla) +
+      '</b>, ortalama güven ' + yuzde(camGuvenTop / sayimlar[camIdx]) + '.';
+  }
+  goster(kk, true);
 
   /* istatistik tablosu */
   const g = D.gorsel;
@@ -2849,7 +2995,106 @@ function sonucKatmaniGuncelle(){
     (g.geo && g.geo.cografi ? ' · CRS derece cinsinden olduğu için m² hesaplanamadı' : '');
   goster($('istatNot'), true);
   lejantCiz();
+  if (D.agaclar) agaclariHesapla(true);               // eşik/yumuşatma değişti → işaretleri tazele
   ciz();
+}
+
+/* =====================================================================
+   4b) TEK TEK AĞAÇ İŞARETLEME + EN YOĞUN BÖLGE
+   ===================================================================== */
+function agaclariHesapla(sessiz){
+  const s = D.sonuc, g = D.gorsel;
+  if (!s || !g) return;
+  const K = D.siniflar.length;
+  const camIdx = camSinifIdx();
+  const esik = parseInt($('esik').value, 10) / 100;
+  const probs = aktifProbs();
+  const geoVar = g.geo && !g.geo.cografi;
+  let tac = parseFloat(String($('tacCapi').value || '').replace(',', '.'));
+  if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
+  const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
+  const dBlok = Math.max(1, Math.round(tacCalisPx / s.adim));
+  const agaclar = agacIsaretle({
+    probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik, minMesafe: dBlok
+  });
+  const maske = new Uint8Array(s.gw * s.gh);
+  for (let i = 0; i < s.gw * s.gh; i++){
+    if (s.sinif[i] === 255) continue;
+    const taban = i * K;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+    if (enC === camIdx && probs[taban + camIdx] >= esik) maske[i] = 1;
+  }
+  const yog = yogunlukHaritasi(maske, s.gw, s.gh, Math.max(3, dBlok * 3));
+  D.agaclar = agaclar;
+  D.enYogun = agaclar.length && yog.enDeger > 0.02
+    ? { gx: yog.enX, gy: yog.enY, deger: yog.enDeger } : null;
+  D.tacCalisPx = Math.max(4, tacCalisPx);
+  isaretKnvOlustur();
+
+  const kutu = $('agacSonucKutu');
+  let metin = '📍 <b>' + sayiTR(agaclar.length) + ' çam ağacı</b> işaretlendi (taç çapı ~' +
+    String(tac).replace('.', ',') + (geoVar ? ' m' : ' px') + ', eşik %' + $('esik').value + ').';
+  if (D.enYogun){
+    const wx = s.yari + D.enYogun.gx * s.adim, wy = s.yari + D.enYogun.gy * s.adim;
+    const ozX = wx * g.olcek, ozY = wy * g.olcek;
+    if (geoVar){
+      const E = g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx;
+      const N = g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy;
+      metin += '<br>⭐ <b>En yoğun bölge:</b> E ' + sayiTR(E, 1) + ', N ' + sayiTR(N, 1) +
+        (g.geo.epsg ? ' (EPSG:' + g.geo.epsg + ')' : '') +
+        ' — yerel kaplama ' + yuzde(D.enYogun.deger);
+    } else {
+      metin += '<br>⭐ <b>En yoğun bölge:</b> px ' + sayiTR(ozX) + ', ' + sayiTR(ozY) +
+        ' — yerel kaplama ' + yuzde(D.enYogun.deger);
+    }
+  }
+  if (!agaclar.length)
+    metin = '🚫 Eşik üstünde işaretlenecek çam bulunamadı. Eşiği düşürüp yeniden deneyin.';
+  kutu.className = agaclar.length ? 'basari' : 'uyari';
+  kutu.innerHTML = metin;
+  goster(kutu, true);
+  goster($('agacGosterSatir'), true);
+  $('btnAgacGeojson').disabled = !agaclar.length;
+  if (!sessiz) $('adim5').open = true;
+  ciz();
+}
+$('btnAgacIsaretle').addEventListener('click', () => agaclariHesapla(false));
+$('tacCapi').addEventListener('input', e => { e.target.dataset.elleDegisti = '1'; });
+$('tacCapi').addEventListener('change', () => { if (D.agaclar) agaclariHesapla(true); });
+$('chkIsaretGoster').addEventListener('change', ciz);
+
+function isaretKnvOlustur(){
+  const g = D.gorsel, s = D.sonuc;
+  if (!D.isaretKnv) D.isaretKnv = document.createElement('canvas');
+  D.isaretKnv.width = g.outW;
+  D.isaretKnv.height = g.outH;
+  if (!D.agaclar) return;
+  const ctx = D.isaretKnv.getContext('2d');
+  const r = Math.max(3, D.tacCalisPx / 2);
+  const kalin = Math.max(1.2, r * 0.18);
+  for (const a of D.agaclar){
+    const x = s.yari + a.x * s.adim, y = s.yari + a.y * s.adim;
+    ctx.lineWidth = kalin * 1.9;
+    ctx.strokeStyle = 'rgba(255,255,255,.92)';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.lineWidth = kalin;
+    ctx.strokeStyle = '#137a2f';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+  }
+  if (D.enYogun){
+    const x = s.yari + D.enYogun.gx * s.adim, y = s.yari + D.enYogun.gy * s.adim;
+    const R = Math.max(r * 3.2, 20);
+    ctx.setLineDash([R * 0.35, R * 0.22]);
+    ctx.lineWidth = Math.max(2.5, kalin * 1.6);
+    ctx.strokeStyle = '#ffb300';
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 2 * Math.PI); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = Math.round(Math.max(16, R * 0.55)) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⭐', x, y);
+  }
 }
 let sonucPlanli = false;
 function sonucKatmaniPlanla(){
@@ -2901,7 +3146,37 @@ $('btnPngAktar').addEventListener('click', () => {
       D.sonuc.gw * ken, D.sonuc.gh * ken);
     ctx.globalAlpha = 1;
   }
+  if (D.isaretKnv && D.agaclar && $('chkIsaretGoster').checked) ctx.drawImage(D.isaretKnv, 0, 0);
   knv.toBlob(b => indir(dosyaKok() + '_siniflandirma.png', b), 'image/png');
+});
+
+$('btnAgacGeojson').addEventListener('click', () => {
+  if (!D.agaclar || !D.sonuc) return;
+  const g = D.gorsel, s = D.sonuc;
+  const geoVar = !!g.geo;
+  const koordinat = (gx, gy) => {
+    const ozX = (s.yari + gx * s.adim) * g.olcek, ozY = (s.yari + gy * s.adim) * g.olcek;
+    return geoVar
+      ? [g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx, g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy]
+      : [ozX, -ozY];
+  };
+  const ozellikler = D.agaclar.map((a, i) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: koordinat(a.x, a.y) },
+    properties: { no: i + 1, tur: 'cam_agaci', guven: +a.p.toFixed(4) }
+  }));
+  if (D.enYogun)
+    ozellikler.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: koordinat(D.enYogun.gx, D.enYogun.gy) },
+      properties: { tur: 'en_yogun_bolge', yerel_kaplama: +D.enYogun.deger.toFixed(4) }
+    });
+  const fc = { type: 'FeatureCollection', features: ozellikler };
+  if (geoVar && g.geo.epsg)
+    fc.crs = { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::' + g.geo.epsg } };
+  indir(dosyaKok() + '_cam_agaclari.geojson', JSON.stringify(fc), 'application/geo+json');
+  $('durumBilgi').textContent = '📍 ' + D.agaclar.length + ' ağaç noktası GeoJSON olarak indirildi' +
+    (geoVar ? ' (QGIS: EPSG:' + (g.geo.epsg || 'ortomozaikle aynı') + ').' : ' (piksel koordinatlı).');
 });
 
 function blokVerileri(){
@@ -3146,6 +3421,28 @@ $('btnRapor').addEventListener('click', () => {
       const h = [...tr.children].map(td => td.textContent.trim());
       if (h.length >= 5) m.push('  ' + (h[0] + ' '.repeat(17)).slice(0, 17) + ': ' + h[1] + ' blok, ' + h[2] + ', alan ' + h[3] + ', ' + h[4] + ' bölge');
     });
+  }
+  if (D.agaclar && D.agaclar.length){
+    m.push('');
+    m.push('AĞAÇ TESPİTİ');
+    m.push('  Yöntem           : çam olasılık yüzeyinde yerel maksimum + en az mesafe bastırması (NMS)');
+    m.push('  Taç çapı         : ' + $('tacCapi').value + ' ' + $('tacBirim').textContent);
+    m.push('  Tespit edilen    : ' + D.agaclar.length + ' çam ağacı');
+    if (D.enYogun && D.sonuc){
+      const s = D.sonuc;
+      const ozX = (s.yari + D.enYogun.gx * s.adim) * g.olcek;
+      const ozY = (s.yari + D.enYogun.gy * s.adim) * g.olcek;
+      if (g.geo && !g.geo.cografi){
+        const E = g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx;
+        const N = g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy;
+        m.push('  En yoğun bölge   : E ' + E.toFixed(2) + ', N ' + N.toFixed(2) +
+          (g.geo.epsg ? ' (EPSG:' + g.geo.epsg + ')' : '') +
+          ' — yerel kaplama %' + (D.enYogun.deger * 100).toFixed(1));
+      } else {
+        m.push('  En yoğun bölge   : piksel ' + Math.round(ozX) + ', ' + Math.round(ozY) +
+          ' — yerel kaplama %' + (D.enYogun.deger * 100).toFixed(1));
+      }
+    }
   }
   m.push('');
   m.push('NOT: Bu hızlı sınıflandırma, tez ana iş akışındaki (YOLOv8-seg) ağaç bazlı tespitin');

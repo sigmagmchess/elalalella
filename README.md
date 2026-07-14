@@ -42,10 +42,14 @@ Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
    skoruyla raporlanır.
 4. **Sınıflandır** — kayan pencere tüm görüntüyü tarar; güven eşiği ve saydamlık
    kaydırıcılarıyla katmanı ayarlayın; sınıf başına blok/%, **m² alan** (GeoTIFF ise)
-   ve bölge sayısı hesaplanır.
-5. **Dışa aktar** — PNG, CSV, **GeoJSON (QGIS'te açılır)**, model `.json`
-   (başka uçuşta yeniden eğitmeden kullanın), proje `.json` (etiketler dahil) ve
-   tez için otomatik **yöntem raporu**.
+   ve bölge sayısı hesaplanır. Üstte **görüntü kararı** verilir: *"çam VAR — %X kaplama"*
+   ya da *"çam tespit edilmedi"*.
+5. **Çamları işaretle** — ortalama taç çapını girin; çam olasılık yüzeyindeki
+   **yerel maksimumlar** NMS ile seyreltilerek **her çam ağacı tek tek işaretlenir ve
+   sayılır**; çamların **en yoğun olduğu bölge** ⭐ ile (UTM koordinatıyla) gösterilir.
+6. **Dışa aktar** — PNG, CSV, **GeoJSON (QGIS'te açılır)**, **ağaç noktaları GeoJSON**
+   (her ağacın UTM koordinatı), model `.json` (başka uçuşta yeniden eğitmeden kullanın),
+   proje `.json` (etiketler dahil) ve tez için otomatik **yöntem raporu**.
 
 Çekirdek (TIFF çözücü + ML motoru) `node test/cekirdek_test.mjs` ile test edilir (46 test).
 Bu araç, ana YOLOv8-seg hattının **ön etüdü/karşılaştırması** olarak tasarlanmıştır;

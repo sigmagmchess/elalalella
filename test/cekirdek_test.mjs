@@ -21,7 +21,7 @@ const cekirdek = new Function(es[1] + `;
     standartlastiriciKur, kolonSec, knnKur, softmaksEgit, ysaEgit, ormanEgit,
     karisiklikOlc, dogrulukVeF1, katmanliKatlar, fisherSkorlari,
     otoAyarListesi, otoEgit, modelPaketle, modelAc,
-    haritaSiniflandir, probYumusat, bagliBilesenSay };`)();
+    haritaSiniflandir, probYumusat, bagliBilesenSay, agacIsaretle, yogunlukHaritasi };`)();
 const C = cekirdek;
 
 let gecti = 0, kaldi = 0;
@@ -625,6 +625,43 @@ bolum('Harita sınıflandırma + yumuşatma + bölge sayımı');
   for (let i = 0; i < maske.length; i++) maske[i] = sonuc.sinif[i] === 0 ? 1 : 0;
   const bolgeler = C.bagliBilesenSay(maske, sonuc.gw, sonuc.gh);
   dogrula(bolgeler >= 1 && bolgeler <= 3, 'bağlı bileşen: yeşil yarı ~1 bölge (' + bolgeler + ')');
+}
+
+/* ================= 6. Ağaç işaretleme ve yoğunluk ================= */
+bolum('Ağaç işaretleme (NMS) ve en yoğun bölge');
+{
+  const gw = 40, gh = 30, K = 2;
+  const probs = new Float32Array(gw * gh * K);
+  const sinif = new Uint8Array(gw * gh).fill(255);
+  function tac(cx, cy, r, p){
+    for (let y = Math.max(0, cy - r); y <= Math.min(gh - 1, cy + r); y++)
+      for (let x = Math.max(0, cx - r); x <= Math.min(gw - 1, cx + r); x++){
+        const u = Math.hypot(x - cx, y - cy);
+        if (u > r) continue;
+        const i = y * gw + x;
+        const deger = p * (1 - u / (r + 1));
+        if (deger > probs[i * K]){
+          probs[i * K] = deger;
+          probs[i * K + 1] = 1 - deger;
+          sinif[i] = deger >= 0.5 ? 0 : 1;
+        }
+      }
+  }
+  tac(8, 8, 3, 1.0);
+  tac(30, 20, 3, 0.95);
+  tac(34, 22, 3, 0.9);                                  // bitişik komşu taç (~4,5 blok)
+  const agaclar = C.agacIsaretle({ probs, sinif, gw, gh, K, camIdx: 0, esik: 0.5, minMesafe: 4 });
+  dogrula(agaclar.length === 3, 'üç taç ayrı ayrı bulundu (' + agaclar.length + ')');
+  dogrula(agaclar.some(a => Math.abs(a.x - 8) <= 1 && Math.abs(a.y - 8) <= 1) &&
+          agaclar.every(a => a.p >= 0.5), 'tepe noktaları doğru konumda ve eşik üstünde');
+  const kaba = C.agacIsaretle({ probs, sinif, gw, gh, K, camIdx: 0, esik: 0.5, minMesafe: 8 });
+  dogrula(kaba.length === 2, 'büyük taç çapı bitişik taçları birleştirir (' + kaba.length + ')');
+  const maske = new Uint8Array(gw * gh);
+  for (let i = 0; i < gw * gh; i++) maske[i] = (sinif[i] === 0 && probs[i * K] >= 0.5) ? 1 : 0;
+  const yog = C.yogunlukHaritasi(maske, gw, gh, 5);
+  dogrula(Math.hypot(yog.enX - 32, yog.enY - 21) <= 6,
+    'en yoğun bölge çift taç kümesinde (' + yog.enX + ',' + yog.enY + ')');
+  dogrula(yog.enDeger > 0 && yog.enDeger <= 1, 'yoğunluk 0-1 aralığında');
 }
 
 console.log('\n================================');
