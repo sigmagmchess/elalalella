@@ -273,6 +273,8 @@ textarea.rapor{
           <option value="2048">2048 px (hızlı)</option>
           <option value="3072" selected>3072 px (dengeli)</option>
           <option value="4096">4096 px (ayrıntılı)</option>
+          <option value="6144">6144 px (yüksek — bellek ister)</option>
+          <option value="8192">8192 px (en yüksek — bol RAM ister)</option>
         </select>
       </div>
       <div class="satir">
@@ -342,7 +344,15 @@ textarea.rapor{
           <option value="500">500</option>
           <option value="1000" selected>1000</option>
           <option value="2000">2000</option>
+          <option value="4000">4000 (yavaş)</option>
+          <option value="8000">8000 (çok yavaş)</option>
         </select>
+      </div>
+      <div class="satir">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chkGenisArama">
+          Geniş arama — 57 kombinasyon (daha titiz, daha yavaş)
+        </label>
       </div>
       <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat</button>
       <div id="egitIlerlemeKutu" class="gizli">
@@ -1667,19 +1677,25 @@ function fisherSkorlari(X, y, n, d, K){
   return skorlar;
 }
 
-/* --- Oto-AI ayar uzayı --- */
-function otoAyarListesi(){
+/* --- Oto-AI ayar uzayı (genis=true: daha geniş hiperparametre taraması) --- */
+function otoAyarListesi(genis){
   const liste = [];
+  const kkListe = genis ? [1, 3, 5, 7, 9] : [3, 5, 7];
+  const smListe = genis
+    ? [[0.3, 1e-3], [0.1, 1e-4], [0.05, 1e-3], [0.5, 1e-4], [0.02, 1e-3]]
+    : [[0.3, 1e-3], [0.1, 1e-4], [0.05, 1e-3]];
+  const ysaListe = genis ? [[24], [48], [32, 16], [64], [64, 32]] : [[24], [48], [32, 16]];
+  const rfListe = genis ? [[30, 10], [60, 14], [100, 16], [40, 6]] : [[30, 10], [60, 14]];
   for (const kume of Object.keys(OZELLIK_KUMELERI)){
-    for (const kk of [3, 5, 7])
+    for (const kk of kkListe)
       liste.push({ model: 'k-NN (k=' + kk + ')', kume, kur: (X, y, n, d, K, rng) => knnKur(X, y, n, d, K, kk) });
-    for (const [hiz, l2] of [[0.3, 1e-3], [0.1, 1e-4], [0.05, 1e-3]])
+    for (const [hiz, l2] of smListe)
       liste.push({ model: 'Softmaks (η=' + hiz + ')', kume,
         kur: (X, y, n, d, K, rng) => softmaksEgit(X, y, n, d, K, { hiz, l2, devir: 150 }, rng) });
-    for (const gizli of [[24], [48], [32, 16]])
+    for (const gizli of ysaListe)
       liste.push({ model: 'YSA [' + gizli.join('·') + ']', kume,
         kur: (X, y, n, d, K, rng) => ysaEgit(X, y, n, d, K, { gizli, hiz: 0.01, devir: 90 }, rng) });
-    for (const [agac, derinlik] of [[30, 10], [60, 14]])
+    for (const [agac, derinlik] of rfListe)
       liste.push({ model: 'R.Orman (' + agac + ' ağaç)', kume,
         kur: (X, y, n, d, K, rng) => ormanEgit(X, y, n, d, K, { agac, derinlik }, rng) });
   }
@@ -1695,7 +1711,7 @@ async function otoEgit(X24, y, n, K, secenek = {}){
   const katSayi = Math.max(2, Math.min(secenek.katSayi || 5, n));
   const bildir = secenek.onProgress || (() => {});
   const sonucBildir = secenek.onSonuc || (() => {});
-  const ayarlar = otoAyarListesi();
+  const ayarlar = otoAyarListesi(!!secenek.genisArama);
   const liderlik = [];
   const rngKat = mulberry32(42);
   const katlar = katmanliKatlar(y, n, katSayi, rngKat);
@@ -1992,7 +2008,7 @@ function agacIsaretle(ayar){
     const anahtar = sy * 1048576 + sx;
     if (!sepet.has(anahtar)) sepet.set(anahtar, []);
     sepet.get(anahtar).push(kayit);
-    if (kabul.length >= 50000) break;                  // emniyet sınırı
+    if (kabul.length >= 200000) break;                 // emniyet sınırı (çok geniş ormanlar)
   }
   /* nokta atışı: tepe konumunu taç penceresi içindeki olasılık ağırlıklı merkeze incelt */
   const yariP = Math.max(1, Math.round(d / 2));
@@ -2183,11 +2199,17 @@ async function dosyaYukle(dosya){
     goster(hataEl, true);
     return false;
   }
-  if (dosya.size > 1610612736){
-    hataEl.textContent = 'Dosya 1,5 GB sınırını aşıyor (' + (dosya.size / 1048576 / 1024).toFixed(2) +
-      ' GB). Pix4D\'den LZW sıkıştırmalı GeoTIFF ya da daha küçük bir bölge dışa aktarın.';
+  if (dosya.size > 4080218931){                        // ~3,8 GB: tek parça ArrayBuffer üst sınırı
+    hataEl.textContent = 'Dosya ' + (dosya.size / 1073741824).toFixed(2) +
+      ' GB — tarayıcının tek parça bellek sınırının üzerinde okunamıyor.\n' +
+      'Pix4D\'den LZW sıkıştırmalı GeoTIFF ya da bölünmüş (karolu) dışa aktarım kullanın.';
     goster(hataEl, true);
     return false;
+  }
+  if (dosya.size > 1610612736){
+    const devam = await onayla('Dosya ' + (dosya.size / 1073741824).toFixed(2) +
+      ' GB — oldukça büyük.\nİşlem yine şerit şerit, küçültülerek yapılır; ancak RAM yetersizse sekme çökebilir.\nDenemek ister misiniz?');
+    if (!devam) return false;
   }
   D.mesgul = true;
   const kutu = $('yukleIlerlemeKutu'), cubuk = $('yukleIlerleme'), yazi = $('yukleIlerlemeYazi');
@@ -2463,7 +2485,7 @@ function egitimiSifirla(neden){
   sonucuGecersizKil();
 }
 $('btnSinifEkle').addEventListener('click', async () => {
-  if (D.mesgul || D.siniflar.length >= 8) return;
+  if (D.mesgul || D.siniflar.length >= 12) return;
   const ad = await sor('Yeni sınıf adı (ör. Yapraklı ağaç, Gölge):', 'Sınıf ' + (D.siniflar.length + 1));
   if (!ad || !ad.trim()) return;
   D.siniflar.push({ ad: ad.trim(), renk: SINIF_RENKLERI[D.siniflar.length % SINIF_RENKLERI.length] });
@@ -2923,7 +2945,9 @@ $('btnEgit').addEventListener('click', async () => {
     govde.innerHTML = '';
     goster($('liderKutu'), true);
     goster($('kazananKart'), false);
+    const genisArama = $('chkGenisArama').checked;
     const sonuc = await otoEgit(veri.X24, veri.y, veri.n, K, {
+      genisArama,
       katSayi: Math.min(5, Math.min(...veri.sayimlar)),
       onProgress: (oran, mesaj) => ilerlemeKur(kutu, cubuk, yazi, oran, mesaj),
       onSonuc: (kayit, sirali) => {
@@ -2935,6 +2959,7 @@ $('btnEgit').addEventListener('click', async () => {
     });
     const sure = (performance.now() - baslangic) / 1000;
     D.egitim = { ...sonuc, yama, sayimlar: veri.sayimlar, n: veri.n, sure,
+      kombinasyon: otoAyarListesi(genisArama).length,
       gsdCalisma: (D.gorsel.geo && !D.gorsel.geo.cografi)
         ? D.gorsel.geo.sx * D.gorsel.olcek : null };
     goster(kutu, false);
@@ -2944,7 +2969,7 @@ $('btnEgit').addEventListener('click', async () => {
       '<br>Çapraz doğrulama (' + e.cv.katSayi + ' kat): doğruluk <b>' + yuzde(e.cv.dogruluk) +
       '</b>, makro-F1 <b>' + yuzde(e.cv.f1) + '</b>' +
       '<br>' + sayiTR(veri.n) + ' örnek yama · ' + D.siniflar.map((s, c) => s.ad + ': ' + veri.sayimlar[c]).join(' · ') +
-      '<br><small>Oto-AI ' + otoAyarListesi().length + ' kombinasyonu ' + sure.toFixed(1).replace('.', ',') +
+      '<br><small>Oto-AI ' + otoAyarListesi(genisArama).length + ' kombinasyonu ' + sure.toFixed(1).replace('.', ',') +
       ' saniyede denedi ve en iyi öğrenme şeklini seçti. Yeni bir haritayı 🔎 <b>Analiz Et</b> bölümüne ' +
       'bırakarak otomatik nokta atışı işaretleme yapabilirsiniz.</small>';
     goster($('kazananKart'), true);
@@ -3487,9 +3512,9 @@ $('btnRapor').addEventListener('click', () => {
   m.push('  Yama boyu        : ' + e.yama + ' × ' + e.yama + ' px');
   m.push('  Öznitelikler     : 24 adet — RGB/parlaklık/HSV istatistikleri, ExG, GLI, VARI, NGRDI,');
   m.push('                     gradyan, değer aralığı ve histogram entropisi (yama bazında).');
-  m.push('  Aday modeller    : k-NN (k=3/5/7) · Softmaks regresyon (3 ayar) · YSA (3 mimari, Adam) ·');
-  m.push('                     Rastgele Orman (2 ayar); her biri 3 öznitelik kümesiyle → ' +
-    otoAyarListesi().length + ' kombinasyon.');
+  m.push('  Aday modeller    : k-NN · Softmaks regresyon · YSA (Adam) · Rastgele Orman;');
+  m.push('                     her biri 3 öznitelik kümesiyle → ' +
+    (e.kombinasyon || otoAyarListesi().length) + ' kombinasyon.');
   if (e.enIyi && e.enIyi.cv)
     m.push('  Model seçimi     : Katmanlı ' + e.enIyi.cv.katSayi + '-kat çapraz doğrulama, ölçüt makro-F1.');
   m.push('  Standartlaştırma : z-skor (eğitim katmanı istatistikleriyle).');

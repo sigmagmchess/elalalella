@@ -533,6 +533,8 @@ function blobVeri(n, K, rng){
   const { X, y } = blobVeri(180, 3, rng);
   const sonuc = await C.otoEgit(X, y, 180, 3, { katSayi: 3 });
   dogrula(sonuc.liderlik.length === C.otoAyarListesi().length, 'Oto-AI: tüm kombinasyonlar denendi (' + sonuc.liderlik.length + ')');
+  dogrula(C.otoAyarListesi(true).length > C.otoAyarListesi().length,
+    'geniş arama daha çok kombinasyon dener (' + C.otoAyarListesi(true).length + ')');
   dogrula(sonuc.enIyi.cv.f1 > 0.85, 'Oto-AI: kazanan F1 > 0,85 (gerçek: ' + sonuc.enIyi.cv.f1.toFixed(3) + ')');
   dogrula(sonuc.liderlik.every((r, i, a) => i === 0 || a[i - 1].f1 >= r.f1), 'lider tablosu sıralı');
   const sonuc2 = await C.otoEgit(X, y, 180, 3, { katSayi: 3 });
