@@ -21,7 +21,8 @@ const cekirdek = new Function(es[1] + `;
     standartlastiriciKur, kolonSec, knnKur, softmaksEgit, ysaEgit, ormanEgit,
     karisiklikOlc, dogrulukVeF1, katmanliKatlar, fisherSkorlari,
     otoAyarListesi, otoEgit, modelPaketle, modelAc,
-    haritaSiniflandir, probYumusat, bagliBilesenSay, agacIsaretle, yogunlukHaritasi };`)();
+    haritaSiniflandir, probYumusat, bagliBilesenSay, agacIsaretle, yogunlukHaritasi,
+    cokgenDoldur, tasmaDoldur };`)();
 const C = cekirdek;
 
 let gecti = 0, kaldi = 0;
@@ -664,6 +665,38 @@ bolum('Ağaç işaretleme (NMS) ve en yoğun bölge');
   dogrula(Math.hypot(yog.enX - 32, yog.enY - 21) <= 6,
     'en yoğun bölge çift taç kümesinde (' + yog.enX + ',' + yog.enY + ')');
   dogrula(yog.enDeger > 0 && yog.enDeger <= 1, 'yoğunluk 0-1 aralığında');
+}
+
+/* ================= 7. Etiketleme araçları ================= */
+bolum('Etiketleme araçları: çokgen dolgusu ve sihirli değnek');
+{
+  const W = 60, H = 40;
+  const maske = new Uint8Array(W * H);
+  const yaz = C.cokgenDoldur(maske, W, H, [10, 10, 50, 10, 30, 30], 2);   // taban 40, yükseklik 20
+  dogrula(yaz > 320 && yaz < 480, 'üçgen dolgu alanı makul (' + yaz + ' ≈ 400)');
+  dogrula(maske[15 * W + 30] === 2 && maske[5 * W + 30] === 0 && maske[15 * W + 5] === 0,
+    'üçgenin içi dolu, dışı boş');
+  dogrula(C.cokgenDoldur(maske, W, H, [1, 1, 5, 5], 3) === 0, 'iki köşeli "çokgen" reddedilir');
+
+  /* değnek: sol yarı yeşil, sağ yarı gri */
+  const rgba = new Uint8ClampedArray(W * H * 4);
+  const gecerli = new Uint8Array(W * H).fill(1);
+  for (let i = 0; i < W * H; i++){
+    const x = i % W, p = i * 4;
+    if (x < 30){ rgba[p] = 40; rgba[p + 1] = 160; rgba[p + 2] = 60; }
+    else { rgba[p] = 150; rgba[p + 1] = 150; rgba[p + 2] = 150; }
+    rgba[p + 3] = 255;
+  }
+  const m2 = new Uint8Array(W * H);
+  const dolan = C.tasmaDoldur(rgba, gecerli, W, H, 10, 20, 25, m2, 1, 1e6);
+  dogrula(dolan === 30 * H, 'değnek yalnız bitişik benzer alanı doldurur (' + dolan + '/' + 30 * H + ')');
+  dogrula(m2[20 * W + 45] === 0, 'farklı renkli bölgeye taşmaz');
+  const m3 = new Uint8Array(W * H);
+  dogrula(C.tasmaDoldur(rgba, gecerli, W, H, 10, 20, 200, m3, 1, 1e6) === W * H,
+    'yüksek tolerans tüm görüntüyü kapsar');
+  gecerli[20 * W + 10] = 0;
+  dogrula(C.tasmaDoldur(rgba, gecerli, W, H, 10, 20, 25, new Uint8Array(W * H), 1, 1e6) === 0,
+    '"veri yok" tohumdan doldurma yapılmaz');
 }
 
 console.log('\n================================');
