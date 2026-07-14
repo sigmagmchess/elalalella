@@ -33,7 +33,10 @@ Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
 
 1. **Veri Yükle** — büyük dosyalar seçilen işleme çözünürlüğüne akıllıca küçültülür
    (şerit/karo bazında örnekleme; tüm görüntü belleğe alınmaz).
-2. **Etiketle** — fırçayla örnek boyayın: 🌲 Çam / Çam değil (+ isteğe bağlı ek sınıflar).
+2. **Etiketle** — 🌲 Çam / Çam değil (+ ek sınıflar) için dört araç: **🪄 Sihirli Değnek**
+   (tek tıkla benzer renkli bitişik alanı etiketler, tolerans ayarlı), **⬠ Çokgen**
+   (köşe tıkla, çift tık/Enter ile kapat), **▭ Kutu** ve **🖌️ Fırça**;
+   tümü geri alınabilir ve proje dosyasına kaydedilir.
 3. **Eğit (Oto-AI)** — 24 öznitelik (RGB/HSV istatistikleri, ExG, GLI, VARI, NGRDI,
    doku) çıkarılır; **k-NN, Softmaks Regresyon, Yapay Sinir Ağı ve Rastgele Orman**
    aileleri 3 öznitelik kümesiyle birlikte **33 kombinasyon** halinde katmanlı çapraz
