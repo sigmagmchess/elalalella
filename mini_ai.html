@@ -1,0 +1,3174 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Çam-AI — İHA Ortomozaiğinden Çam Sınıflandırma (Mini-AI)</title>
+</head>
+<body>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f7f3; --surface:#ffffff; --surface2:#eef1ea; --line:#dde3d8;
+  --ink:#20261f; --ink2:#5a6656; --ink3:#8a947f;
+  --accent:#2e6b3f; --accent-ink:#ffffff; --accent-soft:#e2ecdd;
+  --warn:#9a5a1a; --warn-soft:#f4e8d8; --err:#a03636; --err-soft:#f6e2e2;
+  --ok:#2e6b3f; --ok-soft:#e2ecdd;
+  --code-bg:#f0f2ec;
+  --shadow:0 1px 3px rgba(32,38,31,.08), 0 4px 16px rgba(32,38,31,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#141813; --surface:#1b201a; --surface2:#232a21; --line:#313a2e;
+    --ink:#e4e8df; --ink2:#a7b19d; --ink3:#77816d;
+    --accent:#7fbe8f; --accent-ink:#0f130e; --accent-soft:#24331f;
+    --warn:#e0aa72; --warn-soft:#3a2d1c; --err:#e08a8a; --err-soft:#3a2020;
+    --ok:#7fbe8f; --ok-soft:#24331f;
+    --code-bg:#191e18;
+    --shadow:0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#141813; --surface:#1b201a; --surface2:#232a21; --line:#313a2e;
+  --ink:#e4e8df; --ink2:#a7b19d; --ink3:#77816d;
+  --accent:#7fbe8f; --accent-ink:#0f130e; --accent-soft:#24331f;
+  --warn:#e0aa72; --warn-soft:#3a2d1c; --err:#e08a8a; --err-soft:#3a2020;
+  --ok:#7fbe8f; --ok-soft:#24331f;
+  --code-bg:#191e18;
+  --shadow:0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f6f7f3; --surface:#ffffff; --surface2:#eef1ea; --line:#dde3d8;
+  --ink:#20261f; --ink2:#5a6656; --ink3:#8a947f;
+  --accent:#2e6b3f; --accent-ink:#ffffff; --accent-soft:#e2ecdd;
+  --warn:#9a5a1a; --warn-soft:#f4e8d8; --err:#a03636; --err-soft:#f6e2e2;
+  --ok:#2e6b3f; --ok-soft:#e2ecdd;
+  --code-bg:#f0f2ec;
+  --shadow:0 1px 3px rgba(32,38,31,.08), 0 4px 16px rgba(32,38,31,.06);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+button{font:inherit; color:inherit}
+h1,h2,h3{margin:0; font-weight:650}
+small{color:var(--ink2)}
+code{background:var(--code-bg); padding:1px 5px; border-radius:4px; font-size:12px}
+
+/* ---------- üst çubuk ---------- */
+header.app{
+  display:flex; align-items:center; gap:12px; padding:8px 14px;
+  background:var(--surface); border-bottom:1px solid var(--line); flex:0 0 auto;
+}
+header.app .logo{font-size:22px}
+header.app .baslik h1{font-size:15px; line-height:1.2}
+header.app .baslik .alt{font-size:11.5px; color:var(--ink2)}
+header.app .bosluk{flex:1}
+.btn{
+  display:inline-flex; align-items:center; gap:6px; padding:6px 12px;
+  border:1px solid var(--line); border-radius:8px; background:var(--surface);
+  cursor:pointer; font-size:13px; transition:background .15s, border-color .15s;
+  -webkit-user-select:none; user-select:none; white-space:nowrap;
+}
+.btn:hover:not(:disabled){background:var(--surface2)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn.birincil{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600}
+.btn.birincil:hover:not(:disabled){filter:brightness(1.08); background:var(--accent)}
+.btn.kucuk{padding:3px 8px; font-size:12px; border-radius:6px}
+.btn.aktif{background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600}
+:root[data-theme="dark"] .btn.aktif, .dark .btn.aktif{color:var(--accent)}
+
+/* ---------- ana yerleşim ---------- */
+main.app{flex:1; display:flex; min-height:0}
+aside.panel{
+  width:340px; flex:0 0 340px; overflow-y:auto; background:var(--surface);
+  border-right:1px solid var(--line); padding:10px;
+}
+@media (max-width:900px){
+  main.app{flex-direction:column; overflow-y:auto}
+  aside.panel{width:auto; flex:0 0 auto; border-right:none; border-bottom:1px solid var(--line); max-height:none; overflow:visible}
+  section.sahne{min-height:60vh}
+  body{overflow:auto}
+}
+
+/* ---------- adım kartları ---------- */
+details.adim{
+  border:1px solid var(--line); border-radius:10px; background:var(--surface);
+  margin-bottom:8px; overflow:hidden;
+}
+details.adim[open]{box-shadow:var(--shadow)}
+details.adim > summary{
+  list-style:none; cursor:pointer; padding:9px 12px; display:flex; align-items:center; gap:9px;
+  font-weight:600; font-size:13.5px; background:var(--surface2);
+}
+details.adim > summary::-webkit-details-marker{display:none}
+details.adim > summary .no{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--accent-ink);
+  font-size:12px; font-weight:700; flex:0 0 22px;
+}
+details.adim > summary .durum{margin-left:auto; font-size:11px; font-weight:500; color:var(--ink3)}
+details.adim > summary .durum.tamam{color:var(--ok)}
+details.adim .icerik{padding:10px 12px; display:flex; flex-direction:column; gap:9px}
+.satir{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.satir label{font-size:12.5px; color:var(--ink2)}
+.satir select,.satir input[type=number],.satir input[type=text]{
+  font:inherit; font-size:12.5px; padding:4px 6px; border:1px solid var(--line);
+  border-radius:6px; background:var(--surface); color:var(--ink); max-width:130px;
+}
+input[type=range]{accent-color:var(--accent)}
+.ipucu{font-size:11.5px; color:var(--ink2); background:var(--surface2); border-radius:7px; padding:7px 9px; line-height:1.45}
+.uyari{font-size:12px; color:var(--warn); background:var(--warn-soft); border-radius:7px; padding:7px 9px}
+.hata{font-size:12px; color:var(--err); background:var(--err-soft); border-radius:7px; padding:7px 9px; white-space:pre-wrap}
+.basari{font-size:12px; color:var(--ok); background:var(--ok-soft); border-radius:7px; padding:7px 9px}
+.gizli{display:none !important}
+
+/* ---------- yükleme bölgesi ---------- */
+.birak{
+  border:2px dashed var(--line); border-radius:10px; padding:18px 10px; text-align:center;
+  cursor:pointer; transition:border-color .15s, background .15s; color:var(--ink2); font-size:12.5px;
+}
+.birak:hover,.birak.ustunde{border-color:var(--accent); background:var(--accent-soft); color:var(--ink)}
+.birak .buyuk{font-size:26px; display:block; margin-bottom:4px}
+
+table.bilgi{width:100%; border-collapse:collapse; font-size:12px}
+table.bilgi td{padding:2.5px 4px; border-bottom:1px solid var(--line); vertical-align:top}
+table.bilgi td:first-child{color:var(--ink2); white-space:nowrap; width:42%}
+table.bilgi tr:last-child td{border-bottom:none}
+
+/* ---------- sınıf çipleri ---------- */
+.sinif-liste{display:flex; flex-direction:column; gap:5px}
+.sinif{
+  display:flex; align-items:center; gap:8px; padding:5px 8px; border:1.5px solid var(--line);
+  border-radius:8px; cursor:pointer; background:var(--surface); transition:border-color .12s;
+}
+.sinif.secili{border-color:var(--accent); background:var(--accent-soft)}
+.sinif .renk{width:15px; height:15px; border-radius:4px; flex:0 0 15px; border:1px solid rgba(0,0,0,.25)}
+.sinif .ad{flex:1; font-size:13px; font-weight:550}
+.sinif .adet{font-size:11px; color:var(--ink2)}
+.sinif .sil{border:none; background:none; cursor:pointer; color:var(--ink3); font-size:14px; padding:0 3px}
+.sinif .sil:hover{color:var(--err)}
+
+/* ---------- araç butonları ---------- */
+.arac-grup{display:flex; gap:5px; flex-wrap:wrap}
+
+/* ---------- ilerleme ---------- */
+.ilerleme{height:8px; background:var(--surface2); border-radius:5px; overflow:hidden}
+.ilerleme > div{height:100%; width:0%; background:var(--accent); transition:width .2s; border-radius:5px}
+.ilerleme-yazi{font-size:11.5px; color:var(--ink2); margin-top:3px}
+
+/* ---------- lider tablosu ---------- */
+table.lider{width:100%; border-collapse:collapse; font-size:11.5px}
+table.lider th{
+  text-align:left; padding:4px 5px; border-bottom:2px solid var(--line);
+  color:var(--ink2); font-weight:600; position:sticky; top:0; background:var(--surface);
+}
+table.lider td{padding:3.5px 5px; border-bottom:1px solid var(--line)}
+table.lider tr.kazanan td{background:var(--accent-soft); font-weight:650}
+.lider-kutu{max-height:230px; overflow-y:auto; border:1px solid var(--line); border-radius:8px}
+
+.kazanan-kart{
+  border:1.5px solid var(--accent); border-radius:10px; padding:9px 11px;
+  background:var(--accent-soft); font-size:12.5px; line-height:1.5;
+}
+.kazanan-kart b{font-size:13.5px}
+
+.ozellik-cubuk{display:flex; align-items:center; gap:7px; font-size:11.5px; margin:2px 0}
+.ozellik-cubuk .ad{width:110px; flex:0 0 110px; text-align:right; color:var(--ink2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ozellik-cubuk .cubuk{flex:1; height:9px; background:var(--surface2); border-radius:5px; overflow:hidden}
+.ozellik-cubuk .cubuk > div{height:100%; background:var(--accent); border-radius:5px}
+.ozellik-cubuk .deger{width:40px; flex:0 0 40px; color:var(--ink2)}
+
+/* ---------- istatistik ---------- */
+table.istat{width:100%; border-collapse:collapse; font-size:12px}
+table.istat th{text-align:left; padding:3px 5px; border-bottom:2px solid var(--line); color:var(--ink2); font-weight:600}
+table.istat td{padding:3px 5px; border-bottom:1px solid var(--line)}
+table.istat .renk-kare{display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px; border:1px solid rgba(0,0,0,.2)}
+
+/* ---------- sahne (kanvas alanı) ---------- */
+section.sahne{flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; position:relative}
+.sahne-arac{
+  display:flex; align-items:center; gap:6px; padding:6px 10px; flex-wrap:wrap;
+  background:var(--surface); border-bottom:1px solid var(--line); flex:0 0 auto;
+}
+.sahne-arac .ayrac{width:1px; height:20px; background:var(--line); margin:0 3px}
+.kanvas-kap{flex:1; position:relative; min-height:0; background:
+  repeating-conic-gradient(var(--surface2) 0% 25%, var(--bg) 0% 50%) 50% / 24px 24px;}
+canvas#ana{position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:crosshair}
+.kanvas-bos{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:8px; color:var(--ink3); pointer-events:none; text-align:center; padding:20px;
+}
+.kanvas-bos .dev{font-size:52px; opacity:.5}
+.lejant{
+  position:absolute; right:10px; top:10px; background:var(--surface); border:1px solid var(--line);
+  border-radius:9px; padding:7px 10px; font-size:11.5px; box-shadow:var(--shadow); max-width:190px;
+}
+.lejant .oge{display:flex; align-items:center; gap:6px; margin:2px 0; cursor:pointer; -webkit-user-select:none; user-select:none}
+.lejant .oge.kapali{opacity:.35}
+.lejant .oge .renk-kare{width:11px; height:11px; border-radius:3px; border:1px solid rgba(0,0,0,.2); flex:0 0 11px}
+footer.durum{
+  display:flex; align-items:center; gap:14px; padding:4px 12px; font-size:11.5px;
+  color:var(--ink2); background:var(--surface); border-top:1px solid var(--line); flex:0 0 auto;
+  flex-wrap:wrap; min-height:26px;
+}
+footer.durum .bosluk{flex:1}
+
+/* ---------- kip penceresi (modal) ---------- */
+dialog{
+  border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--ink);
+  max-width:720px; width:calc(100vw - 40px); max-height:85vh; padding:0; box-shadow:var(--shadow);
+}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog .kip-baslik{
+  display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line);
+  font-weight:650; font-size:15px; position:sticky; top:0; background:var(--surface);
+}
+dialog .kip-baslik .kapat{margin-left:auto}
+dialog .kip-icerik{padding:14px 18px; overflow-y:auto; max-height:calc(85vh - 55px); font-size:13px; line-height:1.6}
+dialog .kip-icerik h3{margin:14px 0 6px; font-size:14px; color:var(--accent)}
+dialog .kip-icerik h3:first-child{margin-top:0}
+dialog .kip-icerik ul,dialog .kip-icerik ol{margin:4px 0; padding-left:20px}
+dialog .kip-icerik li{margin:3px 0}
+textarea.rapor{
+  width:100%; min-height:260px; font:12px/1.5 ui-monospace,Consolas,monospace;
+  border:1px solid var(--line); border-radius:8px; background:var(--code-bg); color:var(--ink); padding:10px;
+  resize:vertical;
+}
+</style>
+
+<header class="app">
+  <span class="logo">🌲</span>
+  <div class="baslik">
+    <h1>Çam-AI · Mini Öğrenen Sınıflandırıcı</h1>
+    <div class="alt">İHA (Pix4D) ortomozaiğinden makine öğrenmesiyle çam ağacı sınıflandırma — tarayıcıda çalışır, veri dışarı gönderilmez</div>
+  </div>
+  <div class="bosluk"></div>
+  <button class="btn kucuk" id="btnYardim">❓ Yardım &amp; Yöntem</button>
+</header>
+
+<main class="app">
+<aside class="panel">
+
+  <!-- ============ ADIM 1: VERİ YÜKLE ============ -->
+  <details class="adim" id="adim1" open>
+    <summary><span class="no">1</span> Veri Yükle <span class="durum" id="durum1">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="birak" id="birakAlani" tabindex="0" role="button" aria-label="Dosya seç veya sürükleyip bırak">
+        <span class="buyuk">📂</span>
+        <b>Pix4D çıktınızı buraya bırakın</b> ya da tıklayıp seçin<br>
+        <small>GeoTIFF ortomozaik (<code>.tif</code>), DSM/DTM (<code>.tif</code>), <code>.jpg</code>, <code>.png</code></small>
+      </div>
+      <input type="file" id="dosyaGirdi" accept=".tif,.tiff,.jpg,.jpeg,.png,image/tiff,image/jpeg,image/png" class="gizli">
+      <div class="satir">
+        <label for="secCozunurluk">İşleme çözünürlüğü:</label>
+        <select id="secCozunurluk">
+          <option value="2048">2048 px (hızlı)</option>
+          <option value="3072" selected>3072 px (dengeli)</option>
+          <option value="4096">4096 px (ayrıntılı)</option>
+        </select>
+      </div>
+      <div class="satir">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chkSafNodata">
+          Saf siyah/beyaz pikselleri “veri yok” say
+        </label>
+      </div>
+      <div id="yukleIlerlemeKutu" class="gizli">
+        <div class="ilerleme"><div id="yukleIlerleme"></div></div>
+        <div class="ilerleme-yazi" id="yukleIlerlemeYazi">okunuyor…</div>
+      </div>
+      <div id="yukleHata" class="hata gizli"></div>
+      <table class="bilgi gizli" id="tabloBilgi"></table>
+      <div class="ipucu">💡 GeoTIFF yüklerseniz <b>GSD (yer örnekleme aralığı)</b> ve <b>koordinat sistemi</b>
+        (Pix4D'de genellikle UTM) otomatik okunur; alan hesapları m² cinsinden yapılır ve sonuçlar CBS'ye (QGIS) aktarılabilir.
+        Dosyanız çok büyükse Pix4D'den LZW sıkıştırmalı GeoTIFF ya da JPG dışa aktarımı da kullanabilirsiniz.</div>
+    </div>
+  </details>
+
+  <!-- ============ ADIM 2: ETİKETLE ============ -->
+  <details class="adim" id="adim2">
+    <summary><span class="no">2</span> Etiketle <span class="durum" id="durum2">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="ipucu">Görüntü üzerinde <b>fırça ile boyayarak</b> örnek verin: önce <b>Çam</b> sınıfını seçip
+        birkaç çam tacını boyayın, sonra <b>Çam değil</b> ile çim, yol, çatı, gölge gibi alanları boyayın.
+        Her sınıfta <b>en az 60 piksel</b> önerilir (asgari eşik 30 px); ne kadar çeşitli örnek, o kadar iyi sonuç.</div>
+      <div class="sinif-liste" id="sinifListe"></div>
+      <div class="satir">
+        <button class="btn kucuk" id="btnSinifEkle">＋ Sınıf ekle</button>
+      </div>
+      <div class="arac-grup">
+        <button class="btn kucuk arac" data-arac="kalem" id="aracKalem">🖌️ Fırça</button>
+        <button class="btn kucuk arac" data-arac="silgi" id="aracSilgi">🧽 Silgi</button>
+        <button class="btn kucuk arac" data-arac="tasi" id="aracTasi">✋ Taşı</button>
+        <button class="btn kucuk arac" data-arac="incele" id="aracIncele">🔍 İncele</button>
+      </div>
+      <div class="satir">
+        <label for="fircaBoyu">Fırça boyu:</label>
+        <input type="range" id="fircaBoyu" min="3" max="60" value="14" style="flex:1">
+        <span id="fircaBoyuYazi" style="font-size:11.5px;color:var(--ink2)">14 px</span>
+      </div>
+      <div class="arac-grup">
+        <button class="btn kucuk" id="btnGeriAl">↩️ Geri al</button>
+        <button class="btn kucuk" id="btnEtiketTemizle">🗑️ Tümünü temizle</button>
+        <button class="btn kucuk" id="btnEtiketGoster">👁️ Etiketleri gizle</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- ============ ADIM 3: EĞİT ============ -->
+  <details class="adim" id="adim3">
+    <summary><span class="no">3</span> Eğit — Oto-AI <span class="durum" id="durum3">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="ipucu">Oto-AI, <b>4 model ailesini</b> (k-NN, Softmaks Regresyon, Yapay Sinir Ağı, Rastgele Orman)
+        farklı ayarlar ve <b>3 öznitelik kümesiyle</b> çapraz doğrulamada yarıştırır;
+        <b>en iyi öğrenme şeklini kendisi seçer</b> (ölçüt: makro-F1).</div>
+      <div class="satir">
+        <label for="secYama">Yama boyu:</label>
+        <select id="secYama">
+          <option value="16">16 px</option>
+          <option value="24" selected>24 px</option>
+          <option value="32">32 px</option>
+        </select>
+        <label for="secOrnekSiniri">Sınıf başına örnek:</label>
+        <select id="secOrnekSiniri">
+          <option value="500">500</option>
+          <option value="1000" selected>1000</option>
+          <option value="2000">2000</option>
+        </select>
+      </div>
+      <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat</button>
+      <div id="egitIlerlemeKutu" class="gizli">
+        <div class="ilerleme"><div id="egitIlerleme"></div></div>
+        <div class="ilerleme-yazi" id="egitIlerlemeYazi"></div>
+      </div>
+      <div id="egitHata" class="hata gizli"></div>
+      <div class="lider-kutu gizli" id="liderKutu">
+        <table class="lider">
+          <thead><tr><th>#</th><th>Model</th><th>Öznitelik</th><th>Doğruluk</th><th>F1</th></tr></thead>
+          <tbody id="liderGovde"></tbody>
+        </table>
+      </div>
+      <div class="kazanan-kart gizli" id="kazananKart"></div>
+      <div id="ozellikKutu" class="gizli">
+        <div style="font-size:12.5px;font-weight:600;margin-bottom:4px">🔎 Verinizde tespit edilen ayırt edici ortak özellikler</div>
+        <div id="ozellikListe"></div>
+        <small style="font-size:11px">Fisher skoru: sınıfları en iyi ayıran öznitelikler (yüksek = ayırt edici).</small>
+      </div>
+    </div>
+  </details>
+
+  <!-- ============ ADIM 4: SINIFLANDIR ============ -->
+  <details class="adim" id="adim4">
+    <summary><span class="no">4</span> Sınıflandır <span class="durum" id="durum4">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="satir">
+        <label for="secAdimlama">Tarama sıklığı:</label>
+        <select id="secAdimlama">
+          <option value="1">Sık (yavaş, ayrıntılı)</option>
+          <option value="2" selected>Orta</option>
+          <option value="3">Seyrek (hızlı)</option>
+        </select>
+      </div>
+      <button class="btn birincil" id="btnSiniflandir" disabled>🗺️ Tüm Görüntüyü Sınıflandır</button>
+      <div id="sinifIlerlemeKutu" class="gizli">
+        <div class="ilerleme"><div id="sinifIlerleme"></div></div>
+        <div class="ilerleme-yazi" id="sinifIlerlemeYazi"></div>
+      </div>
+      <div class="satir gizli" id="esikSatir">
+        <label for="esik">Güven eşiği:</label>
+        <input type="range" id="esik" min="30" max="95" value="50" style="flex:1">
+        <span id="esikYazi" style="font-size:11.5px;color:var(--ink2)">%50</span>
+      </div>
+      <div class="satir gizli" id="opaklikSatir">
+        <label for="opaklik">Katman saydamlığı:</label>
+        <input type="range" id="opaklik" min="10" max="100" value="55" style="flex:1">
+      </div>
+      <div class="satir gizli" id="yumusatSatir">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chkYumusat" checked> Komşuluk yumuşatması (3×3)
+        </label>
+      </div>
+      <table class="istat gizli" id="tabloIstat"></table>
+      <div id="istatNot" class="ipucu gizli"></div>
+    </div>
+  </details>
+
+  <!-- ============ ADIM 5: KAYDET / DIŞA AKTAR ============ -->
+  <details class="adim" id="adim5">
+    <summary><span class="no">5</span> Kaydet / Dışa Aktar <span class="durum" id="durum5">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="arac-grup">
+        <button class="btn kucuk" id="btnPngAktar" disabled>🖼️ PNG (görüntü+katman)</button>
+        <button class="btn kucuk" id="btnCsvAktar" disabled>📄 CSV (bloklar)</button>
+        <button class="btn kucuk" id="btnGeojsonAktar" disabled>🌍 GeoJSON (QGIS)</button>
+      </div>
+      <div class="arac-grup">
+        <button class="btn kucuk" id="btnModelAktar" disabled>🧠 Modeli kaydet (.json)</button>
+        <button class="btn kucuk" id="btnProjeAktar" disabled>💾 Projeyi kaydet (.json)</button>
+      </div>
+      <div class="arac-grup">
+        <button class="btn kucuk" id="btnIceAktar">📥 Model / proje yükle…</button>
+        <input type="file" id="iceAktarGirdi" accept=".json,application/json" class="gizli">
+      </div>
+      <button class="btn" id="btnRapor" disabled>📑 Tez için yöntem raporu üret</button>
+      <div class="ipucu">Model dosyasını kaydedip <b>başka bir uçuşun ortomozaiğinde</b> yeniden eğitmeden kullanabilirsiniz
+        (yükle → Adım 4). Proje dosyası etiketlerinizi de saklar.</div>
+    </div>
+  </details>
+
+</aside>
+
+<section class="sahne">
+  <div class="sahne-arac">
+    <button class="btn kucuk" id="btnYaklas" aria-label="Yakınlaştır">＋</button>
+    <button class="btn kucuk" id="btnUzaklas" aria-label="Uzaklaştır">−</button>
+    <button class="btn kucuk" id="btnSigdir">⤢ Sığdır</button>
+    <span class="ayrac"></span>
+    <span style="font-size:11.5px;color:var(--ink2)" id="yakinlikYazi">%100</span>
+    <span class="ayrac"></span>
+    <span style="font-size:11.5px;color:var(--ink2)">Kısayollar: <code>F</code> fırça · <code>S</code> silgi · <code>T</code> taşı · <code>Boşluk</code> basılıyken taşı · tekerlek = yakınlaştır</span>
+  </div>
+  <div class="kanvas-kap" id="kanvasKap">
+    <canvas id="ana" role="img" aria-label="Ortomozaik görüntüsü ve etiketleme tuvali"></canvas>
+    <div class="kanvas-bos" id="kanvasBos">
+      <span class="dev">🛩️</span>
+      <b>Henüz görüntü yok</b>
+      <span style="max-width:420px">Sol panelden Pix4D ortomozaiğinizi (GeoTIFF/JPG/PNG) yükleyin.
+      Tüm işlem tarayıcınızda yapılır; görüntüleriniz hiçbir sunucuya gönderilmez.</span>
+    </div>
+    <div class="lejant gizli" id="lejant"></div>
+  </div>
+  <footer class="durum">
+    <span id="durumPiksel">—</span>
+    <span id="durumGeo"></span>
+    <span class="bosluk"></span>
+    <span id="durumBilgi"></span>
+  </footer>
+</section>
+</main>
+
+<!-- ============ YARDIM ============ -->
+<dialog id="kipYardim">
+  <div class="kip-baslik">🌲 Çam-AI — Kullanım ve Yöntem
+    <button class="btn kucuk kapat">✕ Kapat</button>
+  </div>
+  <div class="kip-icerik">
+    <h3>Bu araç nedir?</h3>
+    <p>Çam-AI; İHA uçuşunuzdan Pix4D ile ürettiğiniz <b>ortomozaik</b> üzerinde, sizin verdiğiniz örneklerden
+    öğrenen ve görüntünün tamamında çam ağaçlarını sınıflandıran, tamamen tarayıcıda (HTML+JavaScript) çalışan
+    bir mini makine öğrenmesi uygulamasıdır. Hiçbir veri internete gönderilmez.</p>
+    <h3>Adım adım kullanım</h3>
+    <ol>
+      <li><b>Veri Yükle:</b> Pix4D çıktınızı seçin. GeoTIFF (<code>.tif</code>) önerilir: GSD ve UTM koordinatları
+        otomatik okunur. Desteklenen TIFF türleri: sıkıştırmasız, LZW, Deflate/ZIP, PackBits, JPEG-in-TIFF;
+        şerit veya karo düzeni; 8/16 bit ve 32-bit float (DSM); BigTIFF. Çok büyük dosyalar otomatik olarak
+        seçtiğiniz işleme çözünürlüğüne küçültülür.</li>
+      <li><b>Etiketle:</b> “🌲 Çam” sınıfını seçin, birkaç çam tacını fırçayla boyayın. Sonra “Çam değil” ile
+        çim, toprak, yol, çatı ve <b>gölge</b> gibi alanları boyayın. İsterseniz “＋ Sınıf ekle” ile başka
+        sınıflar (ör. yapraklı ağaç) tanımlayın.</li>
+      <li><b>Eğit:</b> “Eğitimi Başlat”a basın. Oto-AI tüm model+ayar kombinasyonlarını çapraz doğrulamayla
+        dener ve en iyisini seçer; sıralamayı canlı görürsünüz.</li>
+      <li><b>Sınıflandır:</b> Model tüm görüntüyü tarar; renkli katman ve alan istatistikleri üretilir.
+        Güven eşiğini kaydırarak sonucu ayarlayın.</li>
+      <li><b>Dışa aktar:</b> PNG, CSV, GeoJSON (QGIS'te açılır), model ve proje dosyaları.</li>
+    </ol>
+    <h3>Yöntem (tezinizin “Materyal ve Yöntem” bölümü için)</h3>
+    <ul>
+      <li><b>Örnekleme:</b> Etiketlenen piksellerden sınıf başına en çok N örnek, tekrarlanabilir şekilde
+        (mulberry32, <b>tohum=42</b>) rastgele seçilir. Her örnek, merkezi etiketli piksel olan
+        <i>w×w</i> pikselik bir yamadır (w: 16/24/32).</li>
+      <li><b>Öznitelik çıkarımı (ortak yanların tespiti):</b> Her yamadan 24 öznitelik:
+        RGB ortalama/std, parlaklık, HSV; bitki örtüsü indeksleri <b>ExG</b>, <b>GLI</b>, <b>VARI</b>,
+        <b>NGRDI</b> (ort/std); doku: gradyan büyüklüğü (ort/std), değer aralığı, 16 kutulu histogram entropisi.</li>
+      <li><b>Öznitelik kümeleri:</b> A=Renk, B=Renk+İndeks, C=Renk+İndeks+Doku — Oto-AI hangi kümenin daha iyi
+        olduğunu da öğrenir.</li>
+      <li><b>Modeller ve ayar taraması:</b> k-NN (k=3/5/7, mesafe ağırlıklı) · Softmaks (lojistik) regresyon
+        (öğrenme hızı ve L2 taraması) · Çok katmanlı yapay sinir ağı (1–2 gizli katman, Adam eniyileyici) ·
+        Rastgele Orman (30 veya 60 ağaç, derinlik 10/14, gini — 2 ayar). Tüm öznitelikler z-skor ile standartlaştırılır.</li>
+      <li><b>Model seçimi:</b> Katmanlı (stratified) <b>5-kat çapraz doğrulama</b>; ölçüt <b>makro-F1</b>
+        (sınıf dengesizliğine dayanıklı). En iyi kombinasyon tüm veriyle yeniden eğitilir.</li>
+      <li><b>Sınıflandırma:</b> Görüntü, “Tarama sıklığı” ayarına göre yama boyunun ¼'ü, yarısı veya tamamı
+        adımla kayan pencereyle taranır (varsayılan: yarısı); isteğe bağlı 3×3 komşuluk yumuşatması uygulanır.
+        “Veri yok” (saydam) alanlar dışlanır.</li>
+      <li><b>Alan hesabı:</b> GeoTIFF'ten okunan GSD ile blok alanları m²'ye çevrilir;
+        bitişik çam bloklarının oluşturduğu birleşik bölgeler bağlı bileşen analiziyle sayılır.</li>
+      <li><b>Doğruluk değerlendirmesi önerisi:</b> Bu hızlı yöntem, tezinizdeki YOLOv8-seg iş akışına
+        (depodaki Node.js hattı) <b>ön etüt/karşılaştırma</b> olarak eklenebilir; ağaç bazlı doğruluk için
+        <code>accuracy_assessment.js</code> hattını kullanın.</li>
+    </ul>
+    <h3>İpuçları — “doğru sonuç alamadım” diyorsanız</h3>
+    <ul>
+      <li>Gölgeleri ve koyu yeşil çalıları ayrı örnekleyin (“Çam değil” içine boyayın) — en sık karışan sınıflar bunlardır.</li>
+      <li>Çam örneklerini görüntünün <b>farklı bölgelerinden</b> verin (aydınlık/gölgeli taçlar).</li>
+      <li>F1 düşükse yama boyunu değiştirin (taç çapınız kaç piksel? GSD'nize bakın) ve örnek sayısını artırın.</li>
+      <li>Sonuç katmanında yanlış alan görürseniz oraya birkaç düzeltici etiket ekleyip yeniden eğitin —
+        bu döngü (aktif öğrenme) doğruluğu hızla yükseltir.</li>
+    </ul>
+  </div>
+</dialog>
+
+<!-- ============ RAPOR ============ -->
+<dialog id="kipRapor">
+  <div class="kip-baslik">📑 Tez İçin Yöntem Raporu
+    <button class="btn kucuk" id="btnRaporKopyala">📋 Kopyala</button>
+    <button class="btn kucuk kapat">✕ Kapat</button>
+  </div>
+  <div class="kip-icerik">
+    <textarea class="rapor" id="raporMetni" readonly></textarea>
+  </div>
+</dialog>
+
+<!-- ============ SORU / ONAY / BİLGİ (prompt-confirm-alert yerine) ============ -->
+<dialog id="kipSoru" style="max-width:440px">
+  <div class="kip-baslik" id="soruBaslik">Çam-AI</div>
+  <div class="kip-icerik">
+    <div id="soruMetin" style="white-space:pre-wrap"></div>
+    <input type="text" id="soruGirdi" style="width:100%;margin-top:10px;font:inherit;padding:6px 8px;
+      border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" id="soruIptal">Vazgeç</button>
+      <button class="btn birincil" id="soruTamam">Tamam</button>
+    </div>
+  </div>
+</dialog>
+<script>
+/*__CEKIRDEK_BASLA__*/
+/* =====================================================================
+   ÇAM-AI ÇEKİRDEK — DOM'suz saf işlev katmanı
+   1) TIFF/GeoTIFF çözücü (şerit+karo, LZW/Deflate/PackBits/JPEG, BigTIFF)
+   2) Öznitelik çıkarımı (renk, bitki indeksi, doku)
+   3) ML motoru (k-NN, Softmaks, YSA, Rastgele Orman) + Oto-AI seçimi
+   Tümü tekrarlanabilirlik için tohumlu RNG (mulberry32, tohum=42) kullanır.
+   ===================================================================== */
+'use strict';
+
+/* ---------- yardımcılar ---------- */
+function mulberry32(tohum){
+  let t = tohum >>> 0;
+  return function(){
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/* tarayıcıda MessageChannel: arka plan sekmesindeki setTimeout kısıtlamasına takılmaz */
+let _bekletKanal = null;
+const _bekletKuyruk = [];
+function beklet(){
+  if (typeof window === 'undefined' || typeof MessageChannel === 'undefined')
+    return new Promise(r => setTimeout(r, 0));
+  if (!_bekletKanal){
+    _bekletKanal = new MessageChannel();
+    _bekletKanal.port1.onmessage = () => { const f = _bekletKuyruk.shift(); if (f) f(); };
+  }
+  return new Promise(r => { _bekletKuyruk.push(r); _bekletKanal.port2.postMessage(0); });
+}
+function karistir(dizi, rng){
+  for (let i = dizi.length - 1; i > 0; i--){
+    const j = (rng() * (i + 1)) | 0;
+    const t = dizi[i]; dizi[i] = dizi[j]; dizi[j] = t;
+  }
+  return dizi;
+}
+
+/* =====================================================================
+   1) TIFF / GeoTIFF ÇÖZÜCÜ
+   ===================================================================== */
+
+const TIFF_SIKISTIRMA_ADLARI = {
+  1:'sıkıştırmasız', 5:'LZW', 6:'eski JPEG', 7:'JPEG', 8:'Deflate/ZIP',
+  32946:'Deflate', 32773:'PackBits', 34712:'JPEG2000', 50001:'WebP'
+};
+
+function lzwAc(girdi, beklenenBoy){
+  const cikti = new Uint8Array(beklenenBoy);
+  let ciktiN = 0;
+  const onek = new Int32Array(4096), sonek = new Uint8Array(4096);
+  const yigin = new Uint8Array(4200);
+  let bitTampon = 0, bitSayi = 0, poz = 0;
+  let kodBoyu = 9, sonraki = 258, onceki = -1;
+
+  function kodOku(){
+    while (bitSayi < kodBoyu){
+      if (poz >= girdi.length) return 257;           // veri bitti → EOI say
+      bitTampon = ((bitTampon << 8) | girdi[poz++]) >>> 0;
+      bitSayi += 8;
+    }
+    bitSayi -= kodBoyu;
+    return (bitTampon >>> bitSayi) & ((1 << kodBoyu) - 1);
+  }
+  function diziYaz(kod){                              // kodun dizisini yazar, ilk baytı döndürür
+    let n = 0, c = kod;
+    while (c >= 258){ yigin[n++] = sonek[c]; c = onek[c]; }
+    yigin[n++] = c;
+    const ilk = c;
+    for (let i = n - 1; i >= 0; i--){
+      if (ciktiN < cikti.length) cikti[ciktiN++] = yigin[i];
+    }
+    return ilk;
+  }
+  for (;;){
+    const kod = kodOku();
+    if (kod === 257) break;                           // EOI
+    if (kod === 256){ kodBoyu = 9; sonraki = 258; onceki = -1; continue; }
+    if (onceki < 0){
+      if (kod > 255) break;                           // bozuk akış
+      diziYaz(kod); onceki = kod; continue;
+    }
+    let ilk;
+    if (kod < sonraki){
+      ilk = diziYaz(kod);
+      if (sonraki < 4096){ onek[sonraki] = onceki; sonek[sonraki] = ilk; sonraki++; }
+    } else if (kod === sonraki && sonraki < 4096){    // KwKwK durumu
+      let c = onceki; while (c >= 258) c = onek[c];
+      onek[sonraki] = onceki; sonek[sonraki] = c; sonraki++;
+      diziYaz(kod);
+    } else break;                                     // bozuk akış
+    onceki = kod;
+    if (sonraki === (1 << kodBoyu) - 1 && kodBoyu < 12) kodBoyu++;  // TIFF erken geçiş
+    if (ciktiN >= cikti.length) break;
+  }
+  return cikti;
+}
+
+function packbitsAc(girdi, beklenenBoy){
+  const cikti = new Uint8Array(beklenenBoy);
+  let i = 0, o = 0;
+  while (o < beklenenBoy && i < girdi.length){
+    let n = girdi[i++];
+    if (n > 127) n -= 256;
+    if (n >= 0){
+      for (let j = 0; j <= n && i < girdi.length && o < beklenenBoy; j++) cikti[o++] = girdi[i++];
+    } else if (n !== -128){
+      const b = girdi[i++];
+      for (let j = 0; j < 1 - n && o < beklenenBoy; j++) cikti[o++] = b;
+    }
+  }
+  return cikti;
+}
+
+async function deflateAc(girdi, beklenenBoy){
+  if (typeof DecompressionStream === 'undefined')
+    throw new Error('Bu tarayıcı Deflate açmayı desteklemiyor (DecompressionStream yok). Güncel Chrome/Edge/Firefox/Safari kullanın.');
+  for (const bicim of ['deflate', 'deflate-raw']){
+    try{
+      const akis = new Blob([girdi]).stream().pipeThrough(new DecompressionStream(bicim));
+      const ab = await new Response(akis).arrayBuffer();
+      const u8 = new Uint8Array(ab);
+      if (u8.length) return u8;
+    }catch(_e){ /* diğer biçimi dene */ }
+  }
+  throw new Error('Deflate/ZIP verisi açılamadı (bozuk sıkıştırma bloğu olabilir).');
+}
+
+/* JPEG-in-TIFF: JPEGTables (347) + karo verisini tek akışa birleştirip tarayıcıya çözdürt */
+async function jpegParcaCoz(veri, tablolar){
+  if (typeof createImageBitmap === 'undefined')
+    throw new Error('JPEG sıkıştırmalı TIFF bu ortamda çözülemiyor.');
+  let blob;
+  if (tablolar && tablolar.length > 4 && !(veri.length > 3 && veri[2] === 0xFF && veri[3] === 0xDB)){
+    // tablolar: SOI...EOI → SOI ve EOI atılır; veri: SOI atılır
+    blob = new Blob([tablolar.subarray(2, tablolar.length - 2), veri.subarray(2)].map(p => p.slice()),
+                    { type: 'image/jpeg' });
+    blob = new Blob([new Uint8Array([0xFF, 0xD8]), blob], { type: 'image/jpeg' });
+  } else {
+    blob = new Blob([veri.slice()], { type: 'image/jpeg' });
+  }
+  const bmp = await createImageBitmap(blob);
+  const knv = (typeof OffscreenCanvas !== 'undefined')
+    ? new OffscreenCanvas(bmp.width, bmp.height)
+    : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+  const ctx = knv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, 0, 0);
+  const gd = ctx.getImageData(0, 0, bmp.width, bmp.height);
+  bmp.close && bmp.close();
+  return { rgba: gd.data, w: bmp.width, h: bmp.height };
+}
+
+/* --- IFD okuma --- */
+function tiffTipBoyu(tip){
+  return {1:1,2:1,3:2,4:4,5:8,6:1,7:1,8:2,9:4,10:8,11:4,12:8,13:4,16:8,17:8,18:8}[tip] || 1;
+}
+function tiffDegerOku(dv, tip, ofs, az){
+  switch (tip){
+    case 1: case 7: return dv.getUint8(ofs);
+    case 2: return dv.getUint8(ofs);
+    case 3: return dv.getUint16(ofs, az);
+    case 4: case 13: return dv.getUint32(ofs, az);
+    case 5: return dv.getUint32(ofs, az) / (dv.getUint32(ofs + 4, az) || 1);
+    case 6: return dv.getInt8(ofs);
+    case 8: return dv.getInt16(ofs, az);
+    case 9: return dv.getInt32(ofs, az);
+    case 10: return dv.getInt32(ofs, az) / (dv.getInt32(ofs + 4, az) || 1);
+    case 11: return dv.getFloat32(ofs, az);
+    case 12: return dv.getFloat64(ofs, az);
+    case 16: case 17: case 18: return Number(az ? dv.getBigUint64(ofs, true) : dv.getBigUint64(ofs, false));
+    default: return 0;
+  }
+}
+function ifdOku(dv, ofs, az, big){
+  const etiketler = new Map();
+  const girisBoyu = big ? 20 : 12;
+  const adet = big ? Number(dv.getBigUint64(ofs, az)) : dv.getUint16(ofs, az);
+  let p = ofs + (big ? 8 : 2);
+  if (adet > 65535) throw new Error('Bozuk TIFF: IFD girdi sayısı aşırı büyük.');
+  for (let i = 0; i < adet; i++, p += girisBoyu){
+    const etiket = dv.getUint16(p, az);
+    const tip = dv.getUint16(p + 2, az);
+    const sayi = big ? Number(dv.getBigUint64(p + 4, az)) : dv.getUint32(p + 4, az);
+    const birim = tiffTipBoyu(tip);
+    const toplam = birim * sayi;
+    const alanOfs = p + (big ? 12 : 8);
+    const verOfs = toplam <= (big ? 8 : 4)
+      ? alanOfs
+      : (big ? Number(dv.getBigUint64(alanOfs, az)) : dv.getUint32(alanOfs, az));
+    etiketler.set(etiket, { tip, sayi, ofs: verOfs });
+  }
+  const sonraki = big ? Number(dv.getBigUint64(p, az)) : dv.getUint32(p, az);
+  return { etiketler, sonraki };
+}
+function etiketDizi(dv, giris, az, enCok){
+  if (!giris) return null;
+  const n = enCok ? Math.min(giris.sayi, enCok) : giris.sayi;
+  const birim = tiffTipBoyu(giris.tip);
+  const dizi = new Array(n);
+  for (let i = 0; i < n; i++) dizi[i] = tiffDegerOku(dv, giris.tip, giris.ofs + i * birim, az);
+  return dizi;
+}
+function etiketMetin(dv, giris, az){
+  if (!giris) return null;
+  let s = '';
+  for (let i = 0; i < giris.sayi; i++){
+    const c = dv.getUint8(giris.ofs + i);
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s;
+}
+function etiketHam(dv, giris){
+  if (!giris) return null;
+  return new Uint8Array(dv.buffer, dv.byteOffset + giris.ofs, giris.sayi * tiffTipBoyu(giris.tip));
+}
+
+/* --- GeoTIFF coğrafi bilgiler --- */
+function geoOku(dv, etiketler, az){
+  const olcek = etiketDizi(dv, etiketler.get(33550), az, 3);
+  const bagla = etiketDizi(dv, etiketler.get(33922), az, 6);
+  const matris = etiketDizi(dv, etiketler.get(34264), az, 16);
+  let sx = null, sy = null, ox = null, oy = null, donuk = false;
+  if (olcek && bagla && olcek[0] > 0 && olcek[1] > 0){
+    sx = olcek[0]; sy = olcek[1];
+    ox = bagla[3] - bagla[0] * sx;
+    oy = bagla[4] + bagla[1] * sy;
+  } else if (matris && matris.length === 16 && matris[0] !== 0){
+    sx = Math.abs(matris[0]); sy = Math.abs(matris[5]);
+    ox = matris[3]; oy = matris[7];
+    donuk = Math.abs(matris[1]) > 1e-12 || Math.abs(matris[4]) > 1e-12;
+  } else return null;
+
+  /* GeoKey'ler: 32767 = KvUserDefined (EPSG değildir); ModelType 1=projeksiyonlu, 2=coğrafi */
+  let epsg = null, cografi = false, ad = null;
+  const anahtarlar = etiketDizi(dv, etiketler.get(34735), az);
+  const ascii = etiketMetin(dv, etiketler.get(34737), az) || '';
+  if (anahtarlar && anahtarlar.length >= 4){
+    const adet = anahtarlar[3];
+    let modelTip = 0, projKod = null, cogrKod = null;
+    for (let i = 0; i < adet; i++){
+      const b = 4 + i * 4;
+      const anahtar = anahtarlar[b], konum = anahtarlar[b + 1],
+            sayi = anahtarlar[b + 2], deger = anahtarlar[b + 3];
+      if (anahtar === 1024 && konum === 0) modelTip = deger;
+      if (anahtar === 3072 && konum === 0 && deger > 0 && deger < 32767) projKod = deger;
+      if (anahtar === 2048 && konum === 0 && deger > 0 && deger < 32767) cogrKod = deger;
+      if ((anahtar === 1026 || anahtar === 3073) && konum === 34737 && !ad)
+        ad = ascii.substr(deger, sayi).replace(/[|\0]+$/g, '').trim();
+    }
+    if (modelTip === 2){ cografi = true; epsg = cogrKod; }
+    else if (projKod !== null){ epsg = projKod; }
+    else if (cogrKod !== null && modelTip !== 1){ epsg = cogrKod; cografi = true; }
+  }
+  return { sx, sy, ox, oy, epsg, cografi, ad, donuk };
+}
+
+/*
+  tiffCoz(arrayBuffer, secenek) →
+  { w, h, outW, outH, olcek, rgba, gecerli, geo, meta }
+  secenek: { maxDim, safNodata, onProgress(oran, mesaj) }
+  Büyük dosyalar tam çözünürlükte belleğe alınmaz: her şerit/karo açılır,
+  hedef çözünürlüğe örneklenerek yazılır (k≥2 iken 2×2 ortalama).
+*/
+async function tiffCoz(buf, secenek = {}){
+  const maxDim = secenek.maxDim || 3072;
+  const bildir = secenek.onProgress || (() => {});
+  const dv = new DataView(buf);
+  if (buf.byteLength < 16) throw new Error('Dosya çok küçük — geçerli bir TIFF değil.');
+  const imza = dv.getUint16(0, false);
+  let az;                                             // az = küçük endian (II)
+  if (imza === 0x4949) az = true;
+  else if (imza === 0x4D4D) az = false;
+  else throw new Error('TIFF imzası bulunamadı. Dosya .tif uzantılı ama içeriği farklı olabilir.');
+  const surum = dv.getUint16(2, az);
+  let big = false, ifdOfs;
+  if (surum === 42) ifdOfs = dv.getUint32(4, az);
+  else if (surum === 43){
+    big = true;
+    if (dv.getUint16(4, az) !== 8) throw new Error('Desteklenmeyen BigTIFF ofset boyutu.');
+    ifdOfs = Number(dv.getBigUint64(8, az));
+  } else throw new Error('Bilinmeyen TIFF sürümü: ' + surum);
+
+  /* tüm sayfaları oku; tam çözünürlüklü en büyük sayfayı seç
+     (Pix4D/GDAL bazen küçültülmüş ön izleme sayfaları da yazar) */
+  const sayfalar = [];
+  let bekci = 0;
+  while (ifdOfs > 0 && bekci++ < 64){
+    const s = ifdOku(dv, ifdOfs, az, big);
+    sayfalar.push(s.etiketler);
+    ifdOfs = s.sonraki;
+  }
+  if (!sayfalar.length) throw new Error('TIFF içinde görüntü dizini (IFD) bulunamadı.');
+  let sayfa = null, enBuyuk = -1;
+  for (const e of sayfalar){
+    const altTip = etiketDizi(dv, e.get(254), az, 1);
+    if (altTip && (altTip[0] & 1)) continue;          // küçültülmüş kopya → atla
+    const w0 = (etiketDizi(dv, e.get(256), az, 1) || [0])[0];
+    const h0 = (etiketDizi(dv, e.get(257), az, 1) || [0])[0];
+    if (w0 * h0 > enBuyuk){ enBuyuk = w0 * h0; sayfa = e; }
+  }
+  if (!sayfa) sayfa = sayfalar[0];
+
+  const D = (t, varsayilan) => {
+    const dizi = etiketDizi(dv, sayfa.get(t), az);
+    return dizi === null ? varsayilan : dizi;
+  };
+  const w = D(256, [0])[0], h = D(257, [0])[0];
+  if (!w || !h) throw new Error('TIFF boyutları okunamadı.');
+  if (w * h > 4e9) throw new Error('Görüntü aşırı büyük (' + w + '×' + h + ').');
+  const bitler = D(258, [8]);
+  const bit = bitler[0];
+  const sik = D(259, [1])[0];
+  const foto = D(262, [1])[0];
+  const bantSayi = D(277, [bitler.length || 1])[0];
+  const planar = D(284, [1])[0];
+  const ongoru = D(317, [1])[0];
+  const fmt = D(339, [1])[0];                          // 1 uint, 2 int, 3 float
+  const renkHarita = D(320, null);
+  const jpegTablolar = etiketHam(dv, sayfa.get(347));
+  const nodataYazi = etiketMetin(dv, sayfa.get(42113), az);
+  const ekstraOrnekler = D(338, null);                 // 4. bandın alfa olup olmadığını söyler
+  const alfaVar = !ekstraOrnekler || !ekstraOrnekler.length ||
+    ekstraOrnekler[0] === 1 || ekstraOrnekler[0] === 2;
+  const sikAd = TIFF_SIKISTIRMA_ADLARI[sik] || ('bilinmeyen (' + sik + ')');
+
+  let nodata = null;
+  if (nodataYazi != null && nodataYazi.trim() !== ''){
+    const f = parseFloat(nodataYazi);
+    if (isFinite(f)) nodata = f;
+    else if (/nan/i.test(nodataYazi)) nodata = NaN;
+  }
+
+  if (planar === 2 && bantSayi > 1)
+    throw new Error('PlanarConfiguration=2 (bant bant ayrık) TIFF desteklenmiyor. Pix4D\'den standart (chunky) GeoTIFF veya JPG dışa aktarın.');
+  if (![1, 5, 7, 8, 32946, 32773].includes(sik))
+    throw new Error('Desteklenmeyen sıkıştırma: ' + sikAd + '. LZW, Deflate, PackBits, JPEG veya sıkıştırmasız GeoTIFF kullanın.');
+  if (bit !== 8 && bit !== 16 && bit !== 32)
+    throw new Error('Desteklenmeyen bit derinliği: ' + bit + ' bit (8/16/32 desteklenir).');
+  if (bit === 32 && fmt !== 3)
+    throw new Error('32-bit tamsayı TIFF desteklenmiyor (yalnız 32-bit float).');
+  if (ongoru === 3) throw new Error('Öngörücü=3 (kayan nokta farkı) desteklenmiyor.');
+  if (foto === 6 && sik !== 7) throw new Error('JPEG dışı YCbCr TIFF desteklenmiyor.');
+
+  const jpegMi = sik === 7;
+  const karoMu = sayfa.has(322);
+  const cW = karoMu ? D(322, [w])[0] : w;
+  const cH = karoMu ? D(323, [h])[0] : D(278, [h])[0];
+  const ofsGiris = sayfa.get(karoMu ? 324 : 273);
+  const boyGiris = sayfa.get(karoMu ? 325 : 279);
+  if (!ofsGiris) throw new Error('TIFF veri konumları (strip/tile offsets) eksik.');
+  const ofsListe = etiketDizi(dv, ofsGiris, az);
+  let boyListe = boyGiris ? etiketDizi(dv, boyGiris, az) : null;
+  const baytBirim = bit >> 3;
+  if (!boyListe){
+    if (sik !== 1) throw new Error('Sıkıştırılmış TIFF için ByteCounts eksik.');
+    boyListe = ofsListe.map(() => cW * cH * bantSayi * baytBirim);
+  }
+  const karoSutun = karoMu ? Math.ceil(w / cW) : 1;
+
+  /* hedef (çalışma) çözünürlüğü */
+  const k = Math.max(1, Math.ceil(Math.max(w, h) / maxDim));
+  const outW = Math.ceil(w / k), outH = Math.ceil(h / k);
+  const N = outW * outH;
+  const ortalamaVar = k > 1 && foto !== 3;             // palet indeksi ortalanmaz
+  const Tur = bit <= 8 ? Uint8Array : (fmt === 3 || fmt === 2 ? Float32Array : Uint16Array);
+  const bantOut = jpegMi ? Math.min(4, Math.max(3, bantSayi)) : Math.min(4, bantSayi);
+  const bantlar = [];
+  for (let b = 0; b < bantOut; b++) bantlar.push(new Tur(N));
+  const kapsandi = new Uint8Array(N);
+
+  /* parça parça çöz ve örnekle */
+  const toplamParca = ofsListe.length;
+  for (let pi = 0; pi < toplamParca; pi++){
+    if ((pi & 63) === 0){ bildir(pi / toplamParca, 'çözülüyor'); await beklet(); }
+    const px0 = karoMu ? (pi % karoSutun) * cW : 0;
+    const py0 = karoMu ? ((pi / karoSutun) | 0) * cH : pi * cH;
+    if (py0 >= h) break;
+    const px1 = Math.min(w, px0 + cW);
+    const py1 = Math.min(h, py0 + cH);
+    let tyBas = Math.ceil(py0 / k);
+    let txBas = Math.ceil(px0 / k);
+    if (tyBas * k >= py1 || txBas * k >= px1) continue;          // bu parçadan örnek alınmıyor
+    if (!ofsListe[pi] || !boyListe[pi]) continue;                // seyrek (boş) karo
+    if (ofsListe[pi] + boyListe[pi] > buf.byteLength){
+      if (sik !== 1 || ofsListe[pi] >= buf.byteLength) continue; // bozuk kayıt
+      boyListe[pi] = buf.byteLength - ofsListe[pi];              // kırpılmış son parça
+    }
+
+    const ham = new Uint8Array(buf, ofsListe[pi], boyListe[pi]);
+    const parcaW = karoMu ? cW : w;
+    const parcaH = karoMu ? cH : (py1 - py0);
+    const beklenen = parcaW * parcaH * bantSayi * baytBirim;
+    if (beklenen > 268435456)
+      throw new Error('TIFF şerit/karo boyutu çok büyük (' + Math.round(beklenen / 1048576) +
+        ' MB) — dosya tek parça (RowsPerStrip\'siz) yazılmış olabilir. Pix4D/GDAL\'dan karolu ya da LZW şeritli GeoTIFF olarak yeniden dışa aktarın.');
+
+    let rgbaParca = null, orn = null, jpegW = 0;       // orn: sayısal örnek dizisi
+    if (jpegMi){
+      const j = await jpegParcaCoz(ham, jpegTablolar);
+      rgbaParca = j.rgba; jpegW = j.w;
+      if (j.w < px1 - px0) continue;
+    } else {
+      let bayt;
+      if (sik === 1) bayt = (ongoru === 2 ? ham.slice() : ham);  // öngörücü kaynağı bozmasın
+      else if (sik === 5) bayt = lzwAc(ham, beklenen);
+      else if (sik === 32773) bayt = packbitsAc(ham, beklenen);
+      else bayt = await deflateAc(ham, beklenen);
+      if (bayt.length < beklenen && sik === 1 && !karoMu){
+        // bazı yazıcılar son şeridi kırpar — kalan kısmı sıfırla doldur
+        const tam = new Uint8Array(beklenen); tam.set(bayt.subarray(0, Math.min(bayt.length, beklenen)));
+        bayt = tam;
+      }
+      if (bit === 8) orn = bayt;
+      else {
+        const adet = Math.min(beklenen, bayt.length) >> (bit === 16 ? 1 : 2);
+        const dv2 = new DataView(bayt.buffer, bayt.byteOffset, bayt.byteLength);
+        if (bit === 16){
+          orn = new Uint16Array(parcaW * parcaH * bantSayi);
+          if (fmt === 2){ const o2 = new Float32Array(orn.length);
+            for (let i = 0; i < adet; i++) o2[i] = dv2.getInt16(i << 1, az); orn = o2;
+          } else for (let i = 0; i < adet; i++) orn[i] = dv2.getUint16(i << 1, az);
+        } else {
+          orn = new Float32Array(parcaW * parcaH * bantSayi);
+          for (let i = 0; i < adet; i++) orn[i] = dv2.getFloat32(i << 2, az);
+        }
+      }
+      if (ongoru === 2){                                // yatay fark öngörücüsü
+        const maske = bit === 8 ? 0xFF : 0xFFFF;
+        const satirOrn = parcaW * bantSayi;
+        for (let r = 0; r < parcaH; r++){
+          const b0 = r * satirOrn;
+          if (bit === 32 || fmt === 2){
+            for (let i = bantSayi; i < satirOrn; i++) orn[b0 + i] += orn[b0 + i - bantSayi];
+          } else {
+            for (let i = bantSayi; i < satirOrn; i++)
+              orn[b0 + i] = (orn[b0 + i] + orn[b0 + i - bantSayi]) & maske;
+          }
+        }
+      }
+    }
+
+    /* hedefe örnekle */
+    const kanalSayi = jpegMi ? 4 : bantSayi;
+    const kaynakW = jpegMi ? jpegW : parcaW;
+    for (let ty = tyBas; ty < outH; ty++){
+      const sy = ty * k;
+      if (sy >= py1) break;
+      const ly = sy - py0;
+      const ly2 = ortalamaVar ? Math.min(sy + 1, py1 - 1) - py0 : ly;
+      const tabanH = ty * outW;
+      for (let tx = txBas; tx < outW; tx++){
+        const sx = tx * k;
+        if (sx >= px1) break;
+        const lx = sx - px0;
+        const lx2 = ortalamaVar ? Math.min(sx + 1, px1 - 1) - px0 : lx;
+        const hIdx = tabanH + tx;
+        for (let b = 0; b < bantOut; b++){
+          let v;
+          if (jpegMi){
+            const kb = b < 3 ? b : 3;
+            const i00 = (ly * kaynakW + lx) * 4 + kb, i01 = (ly * kaynakW + lx2) * 4 + kb;
+            const i10 = (ly2 * kaynakW + lx) * 4 + kb, i11 = (ly2 * kaynakW + lx2) * 4 + kb;
+            v = ortalamaVar
+              ? (rgbaParca[i00] + rgbaParca[i01] + rgbaParca[i10] + rgbaParca[i11] + 2) >> 2
+              : rgbaParca[i00];
+            if (b === 3 && bantSayi < 4) v = 255;
+          } else {
+            const i00 = (ly * kaynakW + lx) * kanalSayi + b, i01 = (ly * kaynakW + lx2) * kanalSayi + b;
+            const i10 = (ly2 * kaynakW + lx) * kanalSayi + b, i11 = (ly2 * kaynakW + lx2) * kanalSayi + b;
+            if (ortalamaVar){
+              const v00 = orn[i00], v01 = orn[i01], v10 = orn[i10], v11 = orn[i11];
+              /* nodata komşusu olan pikselde ortalama alma — "geçerli çöp" üretir */
+              v = (nodata !== null && (v00 === nodata || v01 === nodata || v10 === nodata || v11 === nodata))
+                ? v00
+                : (v00 + v01 + v10 + v11) / 4;
+            } else v = orn[i00];
+          }
+          bantlar[b][hIdx] = v;
+        }
+        kapsandi[hIdx] = 1;
+      }
+    }
+  }
+  bildir(0.97, 'renkler hazırlanıyor');
+  await beklet();
+
+  /* --- gerdirme (8 bit üstü için yüzde 2–98) --- */
+  const renkBantSayisi = (foto === 2 || jpegMi) && bantOut >= 3 ? 3 : 1;
+  let alfaIdx = -1;
+  if (jpegMi && bantOut >= 4) alfaIdx = 3;
+  else if (!jpegMi){
+    if (foto === 2 && bantOut >= 4 && alfaVar) alfaIdx = 3;
+    else if ((foto === 0 || foto === 1) && bantOut >= 2 && alfaVar) alfaIdx = 1;
+  }
+  const gerdirici = [];
+  for (let b = 0; b < renkBantSayisi; b++){
+    if (Tur === Uint8Array){ gerdirici.push(null); continue; }
+    const veri = bantlar[b];
+    let enAz = Infinity, enCok = -Infinity;
+    for (let i = 0; i < N; i++){
+      if (!kapsandi[i]) continue;
+      const v = veri[i];
+      if (!isFinite(v)) continue;
+      if (nodata !== null && (v === nodata || (isNaN(nodata) && isNaN(v)))) continue;
+      if (v < enAz) enAz = v;
+      if (v > enCok) enCok = v;
+    }
+    if (!isFinite(enAz) || enCok <= enAz){ gerdirici.push({ a: 0, b: 1 }); continue; }
+    const KUTU = 2048;
+    const his = new Float64Array(KUTU);
+    let sayim = 0;
+    const olcekH = (KUTU - 1) / (enCok - enAz);
+    for (let i = 0; i < N; i++){
+      if (!kapsandi[i]) continue;
+      const v = veri[i];
+      if (!isFinite(v)) continue;
+      if (nodata !== null && (v === nodata || (isNaN(nodata) && isNaN(v)))) continue;
+      his[((v - enAz) * olcekH) | 0]++; sayim++;
+    }
+    let alt = enAz, ust = enCok, top = 0;
+    for (let i = 0; i < KUTU; i++){ top += his[i]; if (top >= sayim * 0.02){ alt = enAz + i / olcekH; break; } }
+    top = 0;
+    for (let i = KUTU - 1; i >= 0; i--){ top += his[i]; if (top >= sayim * 0.02){ ust = enAz + (i + 1) / olcekH; break; } }
+    if (ust <= alt){ alt = enAz; ust = enCok; }
+    gerdirici.push({ a: alt, b: ust - alt });
+  }
+  const gerdir = (b, v) => {
+    const g = gerdirici[b];
+    if (!g) return v;
+    return Math.max(0, Math.min(255, Math.round((v - g.a) / g.b * 255)));
+  };
+
+  /* --- RGBA + geçerlilik maskesi --- */
+  const rgba = new Uint8ClampedArray(N * 4);
+  const gecerli = new Uint8Array(N);
+  const paletMi = foto === 3 && renkHarita;
+  const paletBoy = paletMi ? renkHarita.length / 3 : 0;
+  const safKontrol = !!secenek.safNodata;
+  for (let i = 0; i < N; i++){
+    const p = i * 4;
+    if (!kapsandi[i]){ rgba[p + 3] = 0; continue; }
+    let r, g, b2;
+    if (paletMi){
+      const ix = Math.max(0, Math.min(paletBoy - 1, bantlar[0][i] | 0));
+      r = renkHarita[ix] >> 8; g = renkHarita[paletBoy + ix] >> 8; b2 = renkHarita[2 * paletBoy + ix] >> 8;
+    } else if (renkBantSayisi === 3){
+      r = gerdir(0, bantlar[0][i]); g = gerdir(1, bantlar[1][i]); b2 = gerdir(2, bantlar[2][i]);
+    } else {
+      let v = gerdir(0, bantlar[0][i]);
+      if (foto === 0) v = 255 - v;
+      r = g = b2 = v;
+    }
+    let alfa = 255;
+    if (alfaIdx >= 0 && alfaIdx < bantOut){
+      const av = bantlar[alfaIdx][i];
+      alfa = Tur === Uint8Array ? av : (Tur === Uint16Array ? av / 257 : Math.max(0, Math.min(255, av * 255)));
+    }
+    let tamam = alfa > 16;
+    if (tamam && nodata !== null){
+      const v0 = bantlar[0][i];
+      if (v0 === nodata || (isNaN(nodata) && isNaN(v0))) tamam = false;
+    }
+    if (tamam && !isFinite(bantlar[0][i])) tamam = false;
+    if (tamam && safKontrol && renkBantSayisi === 3){
+      if ((r === 0 && g === 0 && b2 === 0) || (r === 255 && g === 255 && b2 === 255)) tamam = false;
+    }
+    rgba[p] = r; rgba[p + 1] = g; rgba[p + 2] = b2; rgba[p + 3] = tamam ? 255 : 0;
+    gecerli[i] = tamam ? 1 : 0;
+  }
+
+  const geo = geoOku(dv, sayfa, az);
+  bildir(1, 'bitti');
+  return {
+    w, h, outW, outH, olcek: k, rgba, gecerli, geo,
+    meta: {
+      sikAd, bit, fmt, bantSayi, karoMu, big,
+      parcaBoy: karoMu ? (cW + '×' + cH) : ('şerit ' + cH + ' satır'),
+      sayfaSayisi: sayfalar.length, nodata,
+      gri: renkBantSayisi === 1 && !paletMi
+    }
+  };
+}
+
+/* =====================================================================
+   2) ÖZNİTELİK ÇIKARIMI — "verideki ortak yanların" sayısal özeti
+   ===================================================================== */
+
+const OZELLIK_ADLARI = [
+  'Kırmızı ort.', 'Yeşil ort.', 'Mavi ort.', 'Kırmızı std', 'Yeşil std', 'Mavi std',
+  'Parlaklık ort.', 'Parlaklık std', 'Ton (cos)', 'Ton (sin)', 'Doygunluk', 'Değer (V)',
+  'ExG ort.', 'ExG std', 'GLI ort.', 'GLI std', 'VARI ort.', 'VARI std', 'NGRDI ort.', 'NGRDI std',
+  'Gradyan ort.', 'Gradyan std', 'Değer aralığı', 'Doku entropisi'
+];
+const OZELLIK_SAYISI = 24;
+const OZELLIK_KUMELERI = {
+  'Renk':             Array.from({ length: 12 }, (_, i) => i),
+  'Renk+İndeks':      Array.from({ length: 20 }, (_, i) => i),
+  'Renk+İndeks+Doku': Array.from({ length: 24 }, (_, i) => i)
+};
+
+/* Verilen görüntü için yeniden kullanılabilir çıkarıcı üretir.
+   cikar(cx, cy, cikti[24]) → yeterli geçerli piksel yoksa false */
+function ozellikCikarici(rgba, gecerli, W, H, yama){
+  const yari = yama >> 1;
+  const kenar = yama;
+  const gri = new Float32Array(kenar * kenar);
+  const gvar = new Uint8Array(kenar * kenar);
+  return function cikar(cx, cy, cikti){
+    const x0 = cx - yari, y0 = cy - yari;
+    let n = 0;
+    let sR = 0, sG = 0, sB = 0, kR = 0, kG = 0, kB = 0;
+    let sGri = 0, kGri = 0;
+    let sExg = 0, kExg = 0, sGli = 0, kGli = 0, sVari = 0, kVari = 0, sNg = 0, kNg = 0;
+    let enAz = 1e9, enCok = -1e9;
+    for (let j = 0; j < kenar; j++){
+      const y = y0 + j;
+      const satirOk = y >= 0 && y < H;
+      for (let i = 0; i < kenar; i++){
+        const x = x0 + i;
+        const yerel = j * kenar + i;
+        if (!satirOk || x < 0 || x >= W || !gecerli[y * W + x]){ gvar[yerel] = 0; continue; }
+        const p = (y * W + x) * 4;
+        const r = rgba[p] / 255, g = rgba[p + 1] / 255, b = rgba[p + 2] / 255;
+        const griV = 0.299 * r + 0.587 * g + 0.114 * b;
+        gri[yerel] = griV; gvar[yerel] = 1; n++;
+        sR += r; sG += g; sB += b; kR += r * r; kG += g * g; kB += b * b;
+        sGri += griV; kGri += griV * griV;
+        if (griV < enAz) enAz = griV;
+        if (griV > enCok) enCok = griV;
+        const t = r + g + b + 1e-6;
+        const exg = (2 * g - r - b) / t;
+        const gli = (2 * g - r - b) / (2 * g + r + b + 1e-6);
+        let vari = (g - r) / (g + r - b + 1e-6);
+        if (vari > 1.5) vari = 1.5; else if (vari < -1.5) vari = -1.5;
+        const ng = (g - r) / (g + r + 1e-6);
+        sExg += exg; kExg += exg * exg;
+        sGli += gli; kGli += gli * gli;
+        sVari += vari; kVari += vari * vari;
+        sNg += ng; kNg += ng * ng;
+      }
+    }
+    if (n < kenar * kenar * 0.4) return false;
+    const ORT = s => s / n;
+    const STD = (kk, s) => Math.sqrt(Math.max(0, kk / n - (s / n) * (s / n)));
+    const rO = ORT(sR), gO = ORT(sG), bO = ORT(sB);
+    /* ortalama renkten HSV */
+    const enB = Math.max(rO, gO, bO), enK = Math.min(rO, gO, bO), frk = enB - enK;
+    let ton = 0;
+    if (frk > 1e-9){
+      if (enB === rO) ton = ((gO - bO) / frk) % 6;
+      else if (enB === gO) ton = (bO - rO) / frk + 2;
+      else ton = (rO - gO) / frk + 4;
+      ton *= Math.PI / 3;
+    }
+    const doy = enB > 1e-9 ? frk / enB : 0;
+    /* doku: gradyan + entropi */
+    let sGr = 0, kGr = 0, nGr = 0;
+    const hist = new Float64Array(16);
+    for (let j = 1; j < kenar - 1; j++){
+      for (let i = 1; i < kenar - 1; i++){
+        const yerel = j * kenar + i;
+        if (!gvar[yerel]) continue;
+        hist[Math.min(15, (gri[yerel] * 16) | 0)]++;
+        if (gvar[yerel - 1] && gvar[yerel + 1] && gvar[yerel - kenar] && gvar[yerel + kenar]){
+          const gx = (gri[yerel + 1] - gri[yerel - 1]) / 2;
+          const gy = (gri[yerel + kenar] - gri[yerel - kenar]) / 2;
+          const mag = Math.sqrt(gx * gx + gy * gy);
+          sGr += mag; kGr += mag * mag; nGr++;
+        }
+      }
+    }
+    let hTop = 0;
+    for (let i = 0; i < 16; i++) hTop += hist[i];
+    let entropi = 0;
+    if (hTop > 0){
+      for (let i = 0; i < 16; i++){
+        if (hist[i] > 0){ const pr = hist[i] / hTop; entropi -= pr * Math.log2(pr); }
+      }
+      entropi /= 4;                                    // 0–1 aralığına indir
+    }
+    cikti[0] = rO; cikti[1] = gO; cikti[2] = bO;
+    cikti[3] = STD(kR, sR); cikti[4] = STD(kG, sG); cikti[5] = STD(kB, sB);
+    cikti[6] = ORT(sGri); cikti[7] = STD(kGri, sGri);
+    cikti[8] = Math.cos(ton); cikti[9] = Math.sin(ton); cikti[10] = doy; cikti[11] = enB;
+    cikti[12] = ORT(sExg); cikti[13] = STD(kExg, sExg);
+    cikti[14] = ORT(sGli); cikti[15] = STD(kGli, sGli);
+    cikti[16] = ORT(sVari); cikti[17] = STD(kVari, sVari);
+    cikti[18] = ORT(sNg); cikti[19] = STD(kNg, sNg);
+    cikti[20] = nGr ? sGr / nGr : 0;
+    cikti[21] = nGr ? Math.sqrt(Math.max(0, kGr / nGr - (sGr / nGr) * (sGr / nGr))) : 0;
+    cikti[22] = enCok > enAz ? enCok - enAz : 0;
+    cikti[23] = entropi;
+    return true;
+  };
+}
+
+/* =====================================================================
+   3) ML MOTORU — sıfırdan yazılmış dört model ailesi
+   Ortak arayüz: model.tahminProba(x: Float64Array(d), cikti: Float32Array(K))
+   ===================================================================== */
+
+function standartlastiriciKur(X, n, d){
+  const ort = new Float64Array(d), std = new Float64Array(d);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < d; j++) ort[j] += X[i * d + j];
+  for (let j = 0; j < d; j++) ort[j] /= Math.max(1, n);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < d; j++){ const f = X[i * d + j] - ort[j]; std[j] += f * f; }
+  for (let j = 0; j < d; j++) std[j] = Math.max(1e-8, Math.sqrt(std[j] / Math.max(1, n)));
+  return {
+    ort, std,
+    donustur(Xk, nk){
+      const Y = new Float32Array(nk * d);
+      for (let i = 0; i < nk; i++)
+        for (let j = 0; j < d; j++) Y[i * d + j] = (Xk[i * d + j] - ort[j]) / std[j];
+      return Y;
+    },
+    tek(x, cikti){
+      for (let j = 0; j < d; j++) cikti[j] = (x[j] - ort[j]) / std[j];
+    }
+  };
+}
+
+function kolonSec(X, n, kolonlar){
+  const dk = kolonlar.length;
+  const Y = new Float32Array(n * dk);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < dk; j++) Y[i * dk + j] = X[i * OZELLIK_SAYISI + kolonlar[j]];
+  return Y;
+}
+
+/* --- k-NN --- */
+function knnKur(X, y, n, d, K, kk){
+  const enD = new Float64Array(kk), enI = new Int32Array(kk);
+  return {
+    tip: 'knn', k: kk, X, y, n, d, K,
+    tahminProba(x, cikti){
+      let dolu = 0;
+      for (let i = 0; i < n; i++){
+        let mesafe = 0;
+        const taban = i * d;
+        for (let j = 0; j < d; j++){ const f = x[j] - X[taban + j]; mesafe += f * f; }
+        if (dolu < kk){
+          let p = dolu++;
+          enD[p] = mesafe; enI[p] = i;
+          while (p > 0 && enD[p] < enD[p - 1]){
+            const td = enD[p]; enD[p] = enD[p - 1]; enD[p - 1] = td;
+            const ti = enI[p]; enI[p] = enI[p - 1]; enI[p - 1] = ti; p--;
+          }
+        } else if (mesafe < enD[kk - 1]){
+          let p = kk - 1;
+          enD[p] = mesafe; enI[p] = i;
+          while (p > 0 && enD[p] < enD[p - 1]){
+            const td = enD[p]; enD[p] = enD[p - 1]; enD[p - 1] = td;
+            const ti = enI[p]; enI[p] = enI[p - 1]; enI[p - 1] = ti; p--;
+          }
+        }
+      }
+      cikti.fill(0);
+      let top = 0;
+      for (let i = 0; i < dolu; i++){
+        const agirlik = 1 / (Math.sqrt(enD[i]) + 1e-3);
+        cikti[y[enI[i]]] += agirlik; top += agirlik;
+      }
+      if (top > 0) for (let c = 0; c < K; c++) cikti[c] /= top;
+    }
+  };
+}
+
+/* --- Softmaks (çok sınıflı lojistik) regresyon --- */
+async function softmaksEgit(X, y, n, d, K, ayar, rng){
+  const { hiz = 0.1, l2 = 1e-3, devir = 200, parti = 32 } = ayar;
+  const W = new Float64Array(K * d), b = new Float64Array(K);
+  const skor = new Float64Array(K);
+  const sira = Array.from({ length: n }, (_, i) => i);
+  for (let e = 0; e < devir; e++){
+    karistir(sira, rng);
+    const lr = hiz / (1 + 0.02 * e);
+    for (let p0 = 0; p0 < n; p0 += parti){
+      const p1 = Math.min(n, p0 + parti);
+      for (let s = p0; s < p1; s++){
+        const i = sira[s], taban = i * d;
+        let enB = -1e30;
+        for (let c = 0; c < K; c++){
+          let z = b[c];
+          const wb = c * d;
+          for (let j = 0; j < d; j++) z += W[wb + j] * X[taban + j];
+          skor[c] = z;
+          if (z > enB) enB = z;
+        }
+        let top = 0;
+        for (let c = 0; c < K; c++){ skor[c] = Math.exp(skor[c] - enB); top += skor[c]; }
+        for (let c = 0; c < K; c++){
+          const hata = skor[c] / top - (y[i] === c ? 1 : 0);
+          const adim = lr * hata;
+          const wb = c * d;
+          for (let j = 0; j < d; j++) W[wb + j] -= adim * X[taban + j] + lr * l2 * W[wb + j];
+          b[c] -= adim;
+        }
+      }
+    }
+    if ((e & 15) === 15) await beklet();               // arayüz nefes alsın
+  }
+  return {
+    tip: 'softmaks', W, b, d, K,
+    tahminProba(x, cikti){
+      let enB = -1e30;
+      for (let c = 0; c < K; c++){
+        let z = b[c];
+        const wb = c * d;
+        for (let j = 0; j < d; j++) z += W[wb + j] * x[j];
+        cikti[c] = z;
+        if (z > enB) enB = z;
+      }
+      let top = 0;
+      for (let c = 0; c < K; c++){ cikti[c] = Math.exp(cikti[c] - enB); top += cikti[c]; }
+      for (let c = 0; c < K; c++) cikti[c] /= top;
+    }
+  };
+}
+
+/* --- Çok katmanlı yapay sinir ağı (ReLU + softmaks, Adam) --- */
+async function ysaEgit(X, y, n, d, K, ayar, rng){
+  const { gizli = [24], hiz = 0.01, devir = 150, parti = 32 } = ayar;
+  const boyut = [d, ...gizli, K];
+  const L = boyut.length - 1;
+  const W = [], b = [], mW = [], vW = [], mB = [], vB = [];
+  const gauss = () => {
+    const u = Math.max(rng(), 1e-12), v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  for (let l = 0; l < L; l++){
+    const nin = boyut[l], nout = boyut[l + 1];
+    const w = new Float64Array(nout * nin);
+    const olc = Math.sqrt(2 / nin);
+    for (let i = 0; i < w.length; i++) w[i] = gauss() * olc;
+    W.push(w); b.push(new Float64Array(nout));
+    mW.push(new Float64Array(nout * nin)); vW.push(new Float64Array(nout * nin));
+    mB.push(new Float64Array(nout)); vB.push(new Float64Array(nout));
+  }
+  const akt = boyut.map(s => new Float64Array(s));
+  const del = boyut.map(s => new Float64Array(s));
+  const gW = W.map(w => new Float64Array(w.length));
+  const gB = b.map(bb => new Float64Array(bb.length));
+  const B1 = 0.9, B2 = 0.999, EPS = 1e-8;
+  let t = 0;
+  const sira = Array.from({ length: n }, (_, i) => i);
+
+  function ileri(){
+    for (let l = 0; l < L; l++){
+      const nin = boyut[l], nout = boyut[l + 1];
+      const w = W[l], bb = b[l], girdiA = akt[l], ciktiA = akt[l + 1];
+      for (let o = 0; o < nout; o++){
+        let z = bb[o];
+        const wb = o * nin;
+        for (let j = 0; j < nin; j++) z += w[wb + j] * girdiA[j];
+        ciktiA[o] = (l === L - 1) ? z : (z > 0 ? z : 0);
+      }
+    }
+    const son = akt[L];
+    let enB = -1e30;
+    for (let c = 0; c < K; c++) if (son[c] > enB) enB = son[c];
+    let top = 0;
+    for (let c = 0; c < K; c++){ son[c] = Math.exp(son[c] - enB); top += son[c]; }
+    for (let c = 0; c < K; c++) son[c] /= top;
+  }
+
+  for (let e = 0; e < devir; e++){
+    karistir(sira, rng);
+    for (let p0 = 0; p0 < n; p0 += parti){
+      const p1 = Math.min(n, p0 + parti);
+      for (let l = 0; l < L; l++){ gW[l].fill(0); gB[l].fill(0); }
+      for (let s = p0; s < p1; s++){
+        const i = sira[s];
+        for (let j = 0; j < d; j++) akt[0][j] = X[i * d + j];
+        ileri();
+        const son = akt[L];
+        for (let c = 0; c < K; c++) del[L][c] = son[c] - (y[i] === c ? 1 : 0);
+        for (let l = L - 1; l >= 0; l--){
+          const nin = boyut[l], nout = boyut[l + 1];
+          const w = W[l], girdiA = akt[l], dOut = del[l + 1], dIn = del[l];
+          for (let o = 0; o < nout; o++){
+            const dv2 = dOut[o];
+            gB[l][o] += dv2;
+            const wb = o * nin;
+            for (let j = 0; j < nin; j++) gW[l][wb + j] += dv2 * girdiA[j];
+          }
+          if (l > 0){
+            dIn.fill(0);
+            for (let o = 0; o < nout; o++){
+              const dv2 = dOut[o], wb = o * nin;
+              for (let j = 0; j < nin; j++) dIn[j] += dv2 * w[wb + j];
+            }
+            for (let j = 0; j < nin; j++) if (akt[l][j] <= 0) dIn[j] = 0;
+          }
+        }
+      }
+      const bolen = p1 - p0;
+      t++;
+      const d1 = 1 - Math.pow(B1, t), d2 = 1 - Math.pow(B2, t);
+      for (let l = 0; l < L; l++){
+        const w = W[l], gg = gW[l], mm = mW[l], vv = vW[l];
+        for (let i = 0; i < w.length; i++){
+          const g = gg[i] / bolen;
+          mm[i] = B1 * mm[i] + (1 - B1) * g;
+          vv[i] = B2 * vv[i] + (1 - B2) * g * g;
+          w[i] -= hiz * (mm[i] / d1) / (Math.sqrt(vv[i] / d2) + EPS);
+        }
+        const bb = b[l], gb = gB[l], mb = mB[l], vb = vB[l];
+        for (let i = 0; i < bb.length; i++){
+          const g = gb[i] / bolen;
+          mb[i] = B1 * mb[i] + (1 - B1) * g;
+          vb[i] = B2 * vb[i] + (1 - B2) * g * g;
+          bb[i] -= hiz * (mb[i] / d1) / (Math.sqrt(vb[i] / d2) + EPS);
+        }
+      }
+    }
+    if ((e & 7) === 7) await beklet();                 // arayüz nefes alsın
+  }
+  return {
+    tip: 'ysa', W, b, boyut, K,
+    tahminProba(x, cikti){
+      for (let j = 0; j < d; j++) akt[0][j] = x[j];
+      ileri();
+      for (let c = 0; c < K; c++) cikti[c] = akt[L][c];
+    }
+  };
+}
+
+/* --- Rastgele Orman --- */
+async function ormanEgit(X, y, n, d, K, ayar, rng){
+  const { agac = 40, derinlik = 10, minYaprak = 3 } = ayar;
+  const mtry = Math.max(1, Math.round(Math.sqrt(d)));
+  const agaclar = [];
+  const onem = new Float64Array(d);
+
+  function yaprakYap(idx){
+    const dagilim = new Float32Array(K);
+    for (const i of idx) dagilim[y[i]]++;
+    let top = 0;
+    for (let c = 0; c < K; c++) top += dagilim[c];
+    if (top > 0) for (let c = 0; c < K; c++) dagilim[c] /= top;
+    return { yaprak: dagilim };
+  }
+  function gini(sayim, top){
+    if (!top) return 0;
+    let s = 0;
+    for (let c = 0; c < K; c++){ const p = sayim[c] / top; s += p * p; }
+    return 1 - s;
+  }
+  function dugumKur(idx, seviye){
+    if (idx.length < 2 * minYaprak || seviye >= derinlik) return yaprakYap(idx);
+    const sayimT = new Float64Array(K);
+    for (const i of idx) sayimT[y[i]]++;
+    let saf = false;
+    for (let c = 0; c < K; c++) if (sayimT[c] === idx.length) saf = true;
+    if (saf) return yaprakYap(idx);
+    const anaGini = gini(sayimT, idx.length);
+    let enJ = -1, enEsik = 0, enKazanc = 1e-9, enSol = null;
+    for (let f = 0; f < mtry; f++){
+      const j = (rng() * d) | 0;
+      const sirali = idx.slice().sort((a, bx) => X[a * d + j] - X[bx * d + j]);
+      const solSayim = new Float64Array(K);
+      for (let s = 0; s < sirali.length - 1; s++){
+        solSayim[y[sirali[s]]]++;
+        const solN = s + 1, sagN = sirali.length - solN;
+        if (solN < minYaprak || sagN < minYaprak) continue;
+        const v1 = X[sirali[s] * d + j], v2 = X[sirali[s + 1] * d + j];
+        if (v2 <= v1) continue;
+        let sagGini;
+        {
+          let sTop = 0;
+          for (let c = 0; c < K; c++){ const kalan = sayimT[c] - solSayim[c]; sTop += (kalan / sagN) * (kalan / sagN); }
+          sagGini = 1 - sTop;
+        }
+        const solGini = gini(solSayim, solN);
+        const kazanc = anaGini - (solN * solGini + sagN * sagGini) / sirali.length;
+        if (kazanc > enKazanc){
+          enKazanc = kazanc; enJ = j; enEsik = (v1 + v2) / 2;
+          enSol = solN;
+        }
+      }
+    }
+    if (enJ < 0) return yaprakYap(idx);
+    const sol = [], sag = [];
+    for (const i of idx) (X[i * d + enJ] <= enEsik ? sol : sag).push(i);
+    if (!sol.length || !sag.length) return yaprakYap(idx);
+    onem[enJ] += enKazanc * idx.length;
+    return {
+      j: enJ, esik: enEsik,
+      sol: dugumKur(sol, seviye + 1),
+      sag: dugumKur(sag, seviye + 1)
+    };
+  }
+  for (let a = 0; a < agac; a++){
+    const orneklem = new Array(n);
+    for (let i = 0; i < n; i++) orneklem[i] = (rng() * n) | 0;
+    agaclar.push(dugumKur(orneklem, 0));
+    if ((a & 1) === 1) await beklet();                 // arayüz nefes alsın
+  }
+  return {
+    tip: 'orman', agaclar, K, onem,
+    tahminProba(x, cikti){
+      cikti.fill(0);
+      for (const kok of agaclar){
+        let dugum = kok;
+        while (!dugum.yaprak) dugum = x[dugum.j] <= dugum.esik ? dugum.sol : dugum.sag;
+        for (let c = 0; c < K; c++) cikti[c] += dugum.yaprak[c];
+      }
+      for (let c = 0; c < K; c++) cikti[c] /= agaclar.length;
+    }
+  };
+}
+
+/* --- ölçütler --- */
+function karisiklikOlc(gercek, tahmin, K){
+  const M = new Float64Array(K * K);
+  for (let i = 0; i < gercek.length; i++) M[gercek[i] * K + tahmin[i]]++;
+  return M;
+}
+function dogrulukVeF1(M, K){
+  let dogru = 0, toplam = 0;
+  for (let c = 0; c < K; c++)
+    for (let c2 = 0; c2 < K; c2++){ toplam += M[c * K + c2]; if (c === c2) dogru += M[c * K + c2]; }
+  let f1Top = 0;
+  for (let c = 0; c < K; c++){
+    let tp = M[c * K + c], fp = 0, fn = 0;
+    for (let c2 = 0; c2 < K; c2++){
+      if (c2 !== c){ fp += M[c2 * K + c]; fn += M[c * K + c2]; }
+    }
+    const p = tp + fp > 0 ? tp / (tp + fp) : 0;
+    const r = tp + fn > 0 ? tp / (tp + fn) : 0;
+    f1Top += p + r > 0 ? 2 * p * r / (p + r) : 0;
+  }
+  return { dogruluk: toplam ? dogru / toplam : 0, f1: f1Top / K };
+}
+
+function katmanliKatlar(y, n, katSayi, rng){
+  const gruplar = new Map();
+  for (let i = 0; i < n; i++){
+    if (!gruplar.has(y[i])) gruplar.set(y[i], []);
+    gruplar.get(y[i]).push(i);
+  }
+  const katlar = Array.from({ length: katSayi }, () => []);
+  for (const liste of gruplar.values()){
+    karistir(liste, rng);
+    liste.forEach((i, s) => katlar[s % katSayi].push(i));
+  }
+  return katlar;
+}
+
+function fisherSkorlari(X, y, n, d, K){
+  const sayim = new Float64Array(K);
+  const ort = new Float64Array(K * d), ortG = new Float64Array(d);
+  for (let i = 0; i < n; i++){
+    sayim[y[i]]++;
+    for (let j = 0; j < d; j++){ ort[y[i] * d + j] += X[i * d + j]; ortG[j] += X[i * d + j]; }
+  }
+  for (let c = 0; c < K; c++)
+    if (sayim[c]) for (let j = 0; j < d; j++) ort[c * d + j] /= sayim[c];
+  for (let j = 0; j < d; j++) ortG[j] /= Math.max(1, n);
+  const varyans = new Float64Array(K * d);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < d; j++){
+      const f = X[i * d + j] - ort[y[i] * d + j];
+      varyans[y[i] * d + j] += f * f;
+    }
+  const skorlar = new Array(d);
+  for (let j = 0; j < d; j++){
+    let pay = 0, payda = 0;
+    for (let c = 0; c < K; c++){
+      const f = ort[c * d + j] - ortG[j];
+      pay += sayim[c] * f * f;
+      payda += varyans[c * d + j];
+    }
+    skorlar[j] = payda > 1e-12 ? pay / payda : 0;
+  }
+  return skorlar;
+}
+
+/* --- Oto-AI ayar uzayı --- */
+function otoAyarListesi(){
+  const liste = [];
+  for (const kume of Object.keys(OZELLIK_KUMELERI)){
+    for (const kk of [3, 5, 7])
+      liste.push({ model: 'k-NN (k=' + kk + ')', kume, kur: (X, y, n, d, K, rng) => knnKur(X, y, n, d, K, kk) });
+    for (const [hiz, l2] of [[0.3, 1e-3], [0.1, 1e-4], [0.05, 1e-3]])
+      liste.push({ model: 'Softmaks (η=' + hiz + ')', kume,
+        kur: (X, y, n, d, K, rng) => softmaksEgit(X, y, n, d, K, { hiz, l2, devir: 150 }, rng) });
+    for (const gizli of [[24], [48], [32, 16]])
+      liste.push({ model: 'YSA [' + gizli.join('·') + ']', kume,
+        kur: (X, y, n, d, K, rng) => ysaEgit(X, y, n, d, K, { gizli, hiz: 0.01, devir: 90 }, rng) });
+    for (const [agac, derinlik] of [[30, 10], [60, 14]])
+      liste.push({ model: 'R.Orman (' + agac + ' ağaç)', kume,
+        kur: (X, y, n, d, K, rng) => ormanEgit(X, y, n, d, K, { agac, derinlik }, rng) });
+  }
+  return liste;
+}
+
+/*
+  otoEgit: tüm kombinasyonları katmanlı çapraz doğrulamada yarıştırır,
+  kazananı tüm veriyle yeniden eğitir.
+  → { liderlik, enIyi:{ad, kume, kolonlar, model, std, cv}, fisher }
+*/
+async function otoEgit(X24, y, n, K, secenek = {}){
+  const katSayi = Math.max(2, Math.min(secenek.katSayi || 5, n));
+  const bildir = secenek.onProgress || (() => {});
+  const sonucBildir = secenek.onSonuc || (() => {});
+  const ayarlar = otoAyarListesi();
+  const liderlik = [];
+  const rngKat = mulberry32(42);
+  const katlar = katmanliKatlar(y, n, katSayi, rngKat);
+  const onbellek = new Map();                          // öznitelik kümesi → alt matris
+
+  for (let a = 0; a < ayarlar.length; a++){
+    const ayar = ayarlar[a];
+    const kolonlar = OZELLIK_KUMELERI[ayar.kume];
+    if (!onbellek.has(ayar.kume)) onbellek.set(ayar.kume, kolonSec(X24, n, kolonlar));
+    const Xk = onbellek.get(ayar.kume);
+    const dk = kolonlar.length;
+    const M = new Float64Array(K * K);
+    for (let kat = 0; kat < katSayi; kat++){
+      const testIdx = katlar[kat];
+      if (!testIdx.length) continue;
+      const egitIdx = [];
+      for (let k2 = 0; k2 < katSayi; k2++) if (k2 !== kat) egitIdx.push(...katlar[k2]);
+      const nE = egitIdx.length, nT = testIdx.length;
+      const XE = new Float32Array(nE * dk), yE = new Int32Array(nE);
+      for (let i = 0; i < nE; i++){
+        yE[i] = y[egitIdx[i]];
+        XE.set(Xk.subarray(egitIdx[i] * dk, (egitIdx[i] + 1) * dk), i * dk);
+      }
+      const std = standartlastiriciKur(XE, nE, dk);
+      const XEs = std.donustur(XE, nE);
+      const rng = mulberry32(1000 + a * 17 + kat);
+      const model = await ayar.kur(XEs, yE, nE, dk, K, rng);
+      const xTek = new Float64Array(dk), pTek = new Float32Array(K);
+      const gercek = new Int32Array(nT), tahmin = new Int32Array(nT);
+      for (let i = 0; i < nT; i++){
+        const g = testIdx[i];
+        for (let j = 0; j < dk; j++) xTek[j] = Xk[g * dk + j];
+        std.tek(xTek, xTek);
+        model.tahminProba(xTek, pTek);
+        let enC = 0;
+        for (let c = 1; c < K; c++) if (pTek[c] > pTek[enC]) enC = c;
+        gercek[i] = y[g]; tahmin[i] = enC;
+      }
+      const Mk = karisiklikOlc(gercek, tahmin, K);
+      for (let i = 0; i < M.length; i++) M[i] += Mk[i];
+      bildir((a + (kat + 1) / katSayi) / ayarlar.length,
+        ayar.model + ' · ' + ayar.kume + ' (kat ' + (kat + 1) + '/' + katSayi + ')');
+      await beklet();
+    }
+    const olcum = dogrulukVeF1(M, K);
+    const kayit = { ad: ayar.model, kume: ayar.kume, dogruluk: olcum.dogruluk, f1: olcum.f1, indeks: a };
+    liderlik.push(kayit);
+    sonucBildir(kayit, liderlik.slice().sort((p, q) => q.f1 - p.f1 || q.dogruluk - p.dogruluk));
+  }
+  liderlik.sort((p, q) => q.f1 - p.f1 || q.dogruluk - p.dogruluk);
+  const kazanan = liderlik[0];
+  const ayar = ayarlar[kazanan.indeks];
+  const kolonlar = OZELLIK_KUMELERI[ayar.kume];
+  const Xk = onbellek.get(ayar.kume);
+  const dk = kolonlar.length;
+  bildir(0.99, 'kazanan tüm veriyle yeniden eğitiliyor: ' + ayar.model);
+  await beklet();
+  const std = standartlastiriciKur(Xk, n, dk);
+  const Xs = std.donustur(Xk, n);
+  const yI = y instanceof Int32Array ? y : Int32Array.from(y);
+  /* k-NN kazandıysa dayanak setini seyrelt: çıkarım maliyeti n ile doğru orantılı,
+     sınıf başına 400 tohumlu örnek doğruluğu korurken haritalamayı kat kat hızlandırır */
+  let sonX = Xs, sonY = yI, sonN = n;
+  if (ayar.model.indexOf('k-NN') === 0 && n > 800){
+    const rngAlt = mulberry32(77);
+    const kova = new Map();
+    for (let i = 0; i < n; i++){
+      const c = yI[i];
+      if (!kova.has(c)) kova.set(c, { say: 0, liste: [] });
+      const s = kova.get(c);
+      s.say++;
+      if (s.liste.length < 400) s.liste.push(i);
+      else { const j = (rngAlt() * s.say) | 0; if (j < 400) s.liste[j] = i; }
+    }
+    const secim = [];
+    for (const s of kova.values()) secim.push(...s.liste);
+    secim.sort((p, q) => p - q);
+    sonN = secim.length;
+    sonX = new Float32Array(sonN * dk);
+    sonY = new Int32Array(sonN);
+    for (let i = 0; i < sonN; i++){
+      sonY[i] = yI[secim[i]];
+      sonX.set(Xs.subarray(secim[i] * dk, (secim[i] + 1) * dk), i * dk);
+    }
+  }
+  const model = await ayar.kur(sonX, sonY, sonN, dk, K, mulberry32(42));
+  const fisher = fisherSkorlari(X24, y, n, OZELLIK_SAYISI, K)
+    .map((s, j) => ({ ad: OZELLIK_ADLARI[j], skor: s, indeks: j }))
+    .sort((p, q) => q.skor - p.skor);
+  return {
+    liderlik,
+    enIyi: { ad: ayar.model, kume: ayar.kume, kolonlar, model, std,
+             cv: { dogruluk: kazanan.dogruluk, f1: kazanan.f1, katSayi } },
+    fisher
+  };
+}
+
+/* =====================================================================
+   Model serileştirme (kaydet / yükle)
+   ===================================================================== */
+function modelPaketle(enIyi, siniflar, yama){
+  const m = enIyi.model;
+  const paket = {
+    bicim: 'cam-ai-model', surum: 2, tip: m.tip,
+    ad: enIyi.ad, kume: enIyi.kume, kolonlar: enIyi.kolonlar,
+    yama, siniflar: siniflar.map(s => ({ ad: s.ad, renk: s.renk })),
+    std: { ort: Array.from(enIyi.std.ort), std: Array.from(enIyi.std.std) },
+    cv: enIyi.cv
+  };
+  if (m.tip === 'knn'){
+    paket.k = m.k; paket.n = m.n; paket.d = m.d;
+    paket.X = Array.from(m.X); paket.y = Array.from(m.y);
+  } else if (m.tip === 'softmaks'){
+    paket.W = Array.from(m.W); paket.b = Array.from(m.b); paket.d = m.d;
+  } else if (m.tip === 'ysa'){
+    paket.boyut = m.boyut.slice();
+    paket.W = m.W.map(w => Array.from(w)); paket.b = m.b.map(bb => Array.from(bb));
+  } else if (m.tip === 'orman'){
+    const duzle = dugum => dugum.yaprak
+      ? { y: Array.from(dugum.yaprak) }
+      : { j: dugum.j, e: dugum.esik, s: duzle(dugum.sol), g: duzle(dugum.sag) };
+    paket.agaclar = m.agaclar.map(duzle);
+  }
+  return paket;
+}
+
+function modelAc(paket){
+  if (!paket || paket.bicim !== 'cam-ai-model') throw new Error('Bu dosya bir Çam-AI model dosyası değil.');
+  const K = paket.siniflar.length;
+  let model;
+  if (paket.tip === 'knn'){
+    model = knnKur(Float32Array.from(paket.X), Int32Array.from(paket.y), paket.n, paket.d, K, paket.k);
+  } else if (paket.tip === 'softmaks'){
+    const W = Float64Array.from(paket.W), b = Float64Array.from(paket.b), d = paket.d;
+    model = { tip: 'softmaks', W, b, d, K,
+      tahminProba(x, cikti){
+        let enB = -1e30;
+        for (let c = 0; c < K; c++){
+          let z = b[c];
+          for (let j = 0; j < d; j++) z += W[c * d + j] * x[j];
+          cikti[c] = z; if (z > enB) enB = z;
+        }
+        let top = 0;
+        for (let c = 0; c < K; c++){ cikti[c] = Math.exp(cikti[c] - enB); top += cikti[c]; }
+        for (let c = 0; c < K; c++) cikti[c] /= top;
+      } };
+  } else if (paket.tip === 'ysa'){
+    const boyut = paket.boyut, L = boyut.length - 1;
+    const W = paket.W.map(w => Float64Array.from(w)), b = paket.b.map(bb => Float64Array.from(bb));
+    const akt = boyut.map(s => new Float64Array(s));
+    model = { tip: 'ysa', W, b, boyut, K,
+      tahminProba(x, cikti){
+        for (let j = 0; j < boyut[0]; j++) akt[0][j] = x[j];
+        for (let l = 0; l < L; l++){
+          const nin = boyut[l], nout = boyut[l + 1], w = W[l], bb = b[l];
+          for (let o = 0; o < nout; o++){
+            let z = bb[o];
+            for (let j = 0; j < nin; j++) z += w[o * nin + j] * akt[l][j];
+            akt[l + 1][o] = (l === L - 1) ? z : (z > 0 ? z : 0);
+          }
+        }
+        const son = akt[L];
+        let enB = -1e30;
+        for (let c = 0; c < K; c++) if (son[c] > enB) enB = son[c];
+        let top = 0;
+        for (let c = 0; c < K; c++){ cikti[c] = Math.exp(son[c] - enB); top += cikti[c]; }
+        for (let c = 0; c < K; c++) cikti[c] /= top;
+      } };
+  } else if (paket.tip === 'orman'){
+    const ac = dugum => dugum.y
+      ? { yaprak: Float32Array.from(dugum.y) }
+      : { j: dugum.j, esik: dugum.e, sol: ac(dugum.s), sag: ac(dugum.g) };
+    const agaclar = paket.agaclar.map(ac);
+    model = { tip: 'orman', agaclar, K,
+      tahminProba(x, cikti){
+        cikti.fill(0);
+        for (const kok of agaclar){
+          let dugum = kok;
+          while (!dugum.yaprak) dugum = x[dugum.j] <= dugum.esik ? dugum.sol : dugum.sag;
+          for (let c = 0; c < K; c++) cikti[c] += dugum.yaprak[c];
+        }
+        for (let c = 0; c < K; c++) cikti[c] /= agaclar.length;
+      } };
+  } else throw new Error('Bilinmeyen model tipi: ' + paket.tip);
+  const std = {
+    ort: Float64Array.from(paket.std.ort), std: Float64Array.from(paket.std.std),
+    tek(x, cikti){ for (let j = 0; j < this.ort.length; j++) cikti[j] = (x[j] - this.ort[j]) / this.std[j]; }
+  };
+  return {
+    ad: paket.ad, kume: paket.kume, kolonlar: paket.kolonlar, model, std,
+    cv: paket.cv || null, yama: paket.yama, siniflar: paket.siniflar
+  };
+}
+
+/* =====================================================================
+   Görüntünün tamamını sınıflandırma
+   ===================================================================== */
+async function haritaSiniflandir(ayar){
+  const { rgba, gecerli, W, H, yama, adim, model, std, kolonlar, K, onProgress } = ayar;
+  const bildir = onProgress || (() => {});
+  const yari = yama >> 1;
+  const gw = Math.max(1, Math.floor((W - yama) / adim) + 1);
+  const gh = Math.max(1, Math.floor((H - yama) / adim) + 1);
+  const probs = new Float32Array(gw * gh * K);
+  const sinif = new Uint8Array(gw * gh).fill(255);     // 255 = veri yok
+  const cikar = ozellikCikarici(rgba, gecerli, W, H, yama);
+  const oz = new Float64Array(OZELLIK_SAYISI);
+  const xTek = new Float64Array(kolonlar.length);
+  const pTek = new Float32Array(K);
+  let islenen = 0;
+  for (let gy = 0; gy < gh; gy++){
+    const cy = yari + gy * adim;
+    for (let gx = 0; gx < gw; gx++){
+      const cx = yari + gx * adim;
+      if (cikar(cx, cy, oz)){
+        for (let j = 0; j < kolonlar.length; j++) xTek[j] = oz[kolonlar[j]];
+        std.tek(xTek, xTek);
+        model.tahminProba(xTek, pTek);
+        const taban = (gy * gw + gx) * K;
+        let enC = 0;
+        for (let c = 0; c < K; c++){ probs[taban + c] = pTek[c]; if (pTek[c] > pTek[enC]) enC = c; }
+        sinif[gy * gw + gx] = enC;
+      }
+      if ((++islenen & 511) === 0){ bildir(islenen / (gw * gh)); await beklet(); }
+    }
+  }
+  bildir(1);
+  return { gw, gh, adim, yari, probs, sinif };
+}
+
+function probYumusat(probs, gw, gh, K){
+  const yeni = new Float32Array(probs.length);
+  for (let y = 0; y < gh; y++){
+    for (let x = 0; x < gw; x++){
+      let n = 0;
+      const taban = (y * gw + x) * K;
+      for (let dy = -1; dy <= 1; dy++){
+        for (let dx = -1; dx <= 1; dx++){
+          const yy = y + dy, xx = x + dx;
+          if (yy < 0 || yy >= gh || xx < 0 || xx >= gw) continue;
+          const kTaban = (yy * gw + xx) * K;
+          let bos = true;
+          for (let c = 0; c < K; c++) if (probs[kTaban + c] > 0){ bos = false; break; }
+          if (bos) continue;
+          for (let c = 0; c < K; c++) yeni[taban + c] += probs[kTaban + c];
+          n++;
+        }
+      }
+      if (n > 0) for (let c = 0; c < K; c++) yeni[taban + c] /= n;
+    }
+  }
+  return yeni;
+}
+
+function bagliBilesenSay(maske, gw, gh){
+  const gezildi = new Uint8Array(gw * gh);
+  const yigin = new Int32Array(gw * gh);
+  let adet = 0;
+  for (let i = 0; i < gw * gh; i++){
+    if (!maske[i] || gezildi[i]) continue;
+    adet++;
+    let ust = 0;
+    yigin[ust++] = i; gezildi[i] = 1;
+    while (ust > 0){
+      const p = yigin[--ust];
+      const px = p % gw, py = (p / gw) | 0;
+      if (px > 0 && maske[p - 1] && !gezildi[p - 1]){ gezildi[p - 1] = 1; yigin[ust++] = p - 1; }
+      if (px < gw - 1 && maske[p + 1] && !gezildi[p + 1]){ gezildi[p + 1] = 1; yigin[ust++] = p + 1; }
+      if (py > 0 && maske[p - gw] && !gezildi[p - gw]){ gezildi[p - gw] = 1; yigin[ust++] = p - gw; }
+      if (py < gh - 1 && maske[p + gw] && !gezildi[p + gw]){ gezildi[p + gw] = 1; yigin[ust++] = p + gw; }
+    }
+  }
+  return adet;
+}
+/*__CEKIRDEK_BITIR__*/
+</script>
+<script>
+/* =====================================================================
+   ÇAM-AI UYGULAMA KATMANI — arayüz, tuval, akış yönetimi
+   ===================================================================== */
+'use strict';
+
+const $ = id => document.getElementById(id);
+const SINIF_RENKLERI = ['#2fa84f', '#e2574c', '#3b7dd8', '#e0a52e', '#9b59b6', '#17a2b8', '#e67e22', '#7f8c8d'];
+
+const D = {
+  gorsel: null,            // tiffCoz çıktısı + {dosyaAd, dosyaMB, tur}
+  tabanKnv: null,          // outW×outH taban görüntü
+  etiketKnv: null,         // outW×outH etiket katmanı
+  etiketMaske: null,       // Uint8Array: 0=boş, 1..K=sınıf
+  siniflar: [
+    { ad: '🌲 Çam', renk: SINIF_RENKLERI[0] },
+    { ad: 'Çam değil', renk: SINIF_RENKLERI[1] }
+  ],
+  seciliSinif: 0,
+  vuruslar: [],            // geri alma için: {sinif(-1=silgi), boy, noktalar:[x,y,...]}
+  arac: 'kalem',
+  fircaBoy: 14,
+  etiketGoster: true,
+  gorunum: { s: 1, ox: 0, oy: 0 },
+  egitim: null,            // {enIyi, liderlik, fisher, yama, sayimlar, sure}
+  sonuc: null,             // haritaSiniflandir çıktısı + probsYumusak
+  sonucKnv: null,
+  gizliSiniflar: new Set(),
+  mesgul: false,
+  imlec: null              // {ekranX, ekranY, imgX, imgY}
+};
+
+/* ---------- genel yardımcılar ---------- */
+function goster(el, evet){ el.classList.toggle('gizli', !evet); }
+function durumYaz(no, metin, tamam){
+  const el = $('durum' + no);
+  el.textContent = metin;
+  el.classList.toggle('tamam', !!tamam);
+}
+function ilerlemeKur(kutu, cubuk, yazi, oran, metin){
+  goster(kutu, true);
+  cubuk.style.width = Math.round(oran * 100) + '%';
+  if (metin !== undefined) yazi.textContent = metin;
+}
+function indir(ad, icerik, tip){
+  const blob = icerik instanceof Blob ? icerik : new Blob([icerik], { type: tip || 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = ad;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function sayiTR(x, hane){ return x.toLocaleString('tr-TR', { maximumFractionDigits: hane ?? 0, minimumFractionDigits: 0 }); }
+function yuzde(x){ return (x * 100).toFixed(1).replace('.', ',') + '%'; }
+
+/* prompt/confirm/alert yerine yerleşik diyalog (katı CSP/sandbox ortamlarında da çalışır) */
+function diyalog({ baslik, metin, girdi, varsayilan, iptalYok }){
+  return new Promise(coz => {
+    const kip = $('kipSoru');
+    $('soruBaslik').textContent = baslik || 'Çam-AI';
+    $('soruMetin').textContent = metin || '';
+    const g = $('soruGirdi');
+    goster(g, !!girdi);
+    g.value = varsayilan || '';
+    goster($('soruIptal'), !iptalYok);
+    let sonuc = girdi ? null : false;
+    const bitir = deger => { sonuc = deger; kip.close(); };
+    $('soruTamam').onclick = () => bitir(girdi ? g.value : true);
+    $('soruIptal').onclick = () => bitir(girdi ? null : false);
+    g.onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); bitir(g.value); } };
+    kip.onclose = () => coz(sonuc);
+    kip.showModal();
+    if (girdi) g.select();
+  });
+}
+const sor = (metin, varsayilan) => diyalog({ baslik: 'Girdi', metin, girdi: true, varsayilan });
+const onayla = metin => diyalog({ baslik: 'Onay', metin });
+const bilgi = metin => diyalog({ baslik: 'Bilgi', metin, iptalYok: true });
+document.querySelectorAll('dialog .kapat').forEach(b =>
+  b.addEventListener('click', () => b.closest('dialog').close()));
+
+/* =====================================================================
+   1) VERİ YÜKLEME
+   ===================================================================== */
+const birak = $('birakAlani');
+birak.addEventListener('click', () => $('dosyaGirdi').click());
+birak.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') $('dosyaGirdi').click(); });
+birak.addEventListener('dragover', e => { e.preventDefault(); birak.classList.add('ustunde'); });
+birak.addEventListener('dragleave', () => birak.classList.remove('ustunde'));
+birak.addEventListener('drop', e => {
+  e.preventDefault(); birak.classList.remove('ustunde');
+  if (e.dataTransfer.files.length) dosyaYukle(e.dataTransfer.files[0]);
+});
+$('dosyaGirdi').addEventListener('change', e => {
+  if (e.target.files.length) dosyaYukle(e.target.files[0]);
+  e.target.value = '';
+});
+
+async function dosyaYukle(dosya){
+  if (D.mesgul) return;
+  const hataEl = $('yukleHata');
+  goster(hataEl, false);
+  const ad = dosya.name || 'görüntü';
+  const uzanti = ad.toLowerCase().split('.').pop();
+  const tiffMi = uzanti === 'tif' || uzanti === 'tiff';
+  if (!tiffMi && !['jpg', 'jpeg', 'png'].includes(uzanti)){
+    hataEl.textContent = 'Desteklenmeyen dosya türü: .' + uzanti + '\nGeoTIFF (.tif), JPG veya PNG yükleyin.';
+    goster(hataEl, true);
+    return;
+  }
+  if (dosya.size > 1610612736){
+    hataEl.textContent = 'Dosya 1,5 GB sınırını aşıyor (' + (dosya.size / 1048576 / 1024).toFixed(2) +
+      ' GB). Pix4D\'den LZW sıkıştırmalı GeoTIFF ya da daha küçük bir bölge dışa aktarın.';
+    goster(hataEl, true);
+    return;
+  }
+  D.mesgul = true;
+  const kutu = $('yukleIlerlemeKutu'), cubuk = $('yukleIlerleme'), yazi = $('yukleIlerlemeYazi');
+  ilerlemeKur(kutu, cubuk, yazi, 0.02, 'dosya okunuyor…');
+  try{
+    const maxDim = parseInt($('secCozunurluk').value, 10);
+    const safNodata = $('chkSafNodata').checked;
+    let g;
+    if (tiffMi){
+      const buf = await dosya.arrayBuffer();
+      ilerlemeKur(kutu, cubuk, yazi, 0.05, 'TIFF çözülüyor…');
+      g = await tiffCoz(buf, {
+        maxDim, safNodata,
+        onProgress: (oran, mesaj) => ilerlemeKur(kutu, cubuk, yazi, 0.05 + oran * 0.9,
+          mesaj + '… %' + Math.round(oran * 100))
+      });
+    } else {
+      g = await resimYukle(dosya, maxDim, safNodata);
+    }
+    g.dosyaAd = ad;
+    g.dosyaMB = dosya.size / 1048576;
+    g.tur = tiffMi ? 'GeoTIFF/TIFF' : uzanti.toUpperCase();
+    ilerlemeKur(kutu, cubuk, yazi, 0.97, 'tuval hazırlanıyor…');
+    await beklet();
+    gorselKur(g);
+    goster(kutu, false);
+  }catch(hata){
+    console.error(hata);
+    goster(kutu, false);
+    hataEl.textContent = '⚠️ Yükleme başarısız: ' + (hata && hata.message ? hata.message : hata) +
+      '\n\nÇözüm önerileri:\n• Pix4D\'den "GeoTIFF (LZW)" veya JPG olarak yeniden dışa aktarın.\n' +
+      '• Çok büyükse işleme çözünürlüğünü 2048\'e düşürün.';
+    goster(hataEl, true);
+  }finally{
+    D.mesgul = false;
+  }
+}
+
+async function resimYukle(dosya, maxDim, safNodata){
+  let bmp;
+  try{
+    bmp = await createImageBitmap(dosya, { imageOrientation: 'from-image' });
+  }catch(_e){
+    bmp = await createImageBitmap(dosya);
+  }
+  const w = bmp.width, h = bmp.height;
+  const k = Math.max(1, Math.ceil(Math.max(w, h) / maxDim));
+  const outW = Math.ceil(w / k), outH = Math.ceil(h / k);
+  const knv = document.createElement('canvas');
+  knv.width = outW; knv.height = outH;
+  const ctx = knv.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, 0, 0, outW, outH);
+  bmp.close && bmp.close();
+  const gd = ctx.getImageData(0, 0, outW, outH);
+  const N = outW * outH;
+  const gecerli = new Uint8Array(N);
+  const rgba = new Uint8ClampedArray(gd.data.buffer.slice(0));
+  for (let i = 0; i < N; i++){
+    const p = i * 4;
+    let tamam = rgba[p + 3] > 16;
+    if (tamam && safNodata){
+      const r = rgba[p], gg = rgba[p + 1], b = rgba[p + 2];
+      if ((r === 0 && gg === 0 && b === 0) || (r === 255 && gg === 255 && b === 255)) tamam = false;
+    }
+    if (!tamam) rgba[p + 3] = 0;
+    gecerli[i] = tamam ? 1 : 0;
+  }
+  return { w, h, outW, outH, olcek: k, rgba, gecerli, geo: null,
+    meta: { sikAd: '—', bit: 8, bantSayi: 4, gri: false } };
+}
+
+function gorselKur(g){
+  D.gorsel = g;
+  D.vuruslar = [];
+  const aktarilan = (D.egitim && D.egitim.iceAktarilan) ? D.egitim : null;   // içe aktarılan model korunur
+  D.egitim = aktarilan;
+  D.sonuc = null;
+  D.sonucKnv = null;
+  D.gizliSiniflar.clear();
+  D.etiketMaske = new Uint8Array(g.outW * g.outH);
+
+  D.tabanKnv = document.createElement('canvas');
+  D.tabanKnv.width = g.outW; D.tabanKnv.height = g.outH;
+  D.tabanKnv.getContext('2d').putImageData(new ImageData(g.rgba, g.outW, g.outH), 0, 0);
+  D.etiketKnv = document.createElement('canvas');
+  D.etiketKnv.width = g.outW; D.etiketKnv.height = g.outH;
+
+  /* bilgi tablosu */
+  const tb = $('tabloBilgi');
+  const satirlar = [
+    ['Dosya', g.dosyaAd + ' (' + g.dosyaMB.toFixed(1) + ' MB, ' + g.tur + ')'],
+    ['Özgün boyut', sayiTR(g.w) + ' × ' + sayiTR(g.h) + ' px'],
+    ['Çalışma boyutu', sayiTR(g.outW) + ' × ' + sayiTR(g.outH) + ' px (1/' + g.olcek + ')']
+  ];
+  if (g.meta && g.meta.sikAd !== '—')
+    satirlar.push(['TIFF', g.meta.bantSayi + ' bant · ' + g.meta.bit + ' bit · ' + g.meta.sikAd +
+      (g.meta.big ? ' · BigTIFF' : '') + (g.meta.karoMu ? ' · karolu' : '')]);
+  if (g.geo){
+    const birim = g.geo.cografi ? '°' : 'm';
+    const gsdYazi = g.geo.cografi
+      ? g.geo.sx.toExponential(2) + '°/px'
+      : (g.geo.sx * 100).toFixed(2).replace('.', ',') + ' cm/px';
+    satirlar.push(['GSD (yer örnekleme aralığı)', gsdYazi + (g.olcek > 1 ? ' → çalışma: ' +
+      (g.geo.cografi ? (g.geo.sx * g.olcek).toExponential(2) + '°/px'
+                     : (g.geo.sx * g.olcek * 100).toFixed(2).replace('.', ',') + ' cm/px') : '')]);
+    satirlar.push(['Koordinat sistemi', (g.geo.epsg ? 'EPSG:' + g.geo.epsg : 'tanımsız') +
+      (g.geo.ad ? ' — ' + g.geo.ad : '') + (g.geo.donuk ? ' (dönüklü — yaklaşık)' : '')]);
+    satirlar.push(['Sol üst köşe', 'E ' + sayiTR(g.geo.ox, 2) + ' ' + birim + ', N ' + sayiTR(g.geo.oy, 2) + ' ' + birim]);
+    if (!g.geo.cografi)
+      satirlar.push(['Kapsam', sayiTR(g.w * g.geo.sx, 1) + ' × ' + sayiTR(g.h * g.geo.sy, 1) + ' m']);
+  } else {
+    satirlar.push(['Coğrafi bilgi', 'yok (JPG/PNG) — alanlar piksel cinsinden hesaplanır']);
+  }
+  tb.innerHTML = satirlar.map(s => '<tr><td>' + s[0] + '</td><td>' + s[1] + '</td></tr>').join('');
+  goster(tb, true);
+
+  durumYaz(1, '✓ yüklendi', true);
+  durumYaz(2, 'etiket bekleniyor');
+  durumYaz(3, aktarilan ? '✓ model yüklendi' : 'bekliyor', !!aktarilan);
+  durumYaz(4, aktarilan ? 'hazır' : 'bekliyor');
+  durumYaz(5, 'bekliyor');
+  $('adim1').open = false;
+  $('adim2').open = true;
+  if (aktarilan) $('adim4').open = true;
+  $('btnEgit').disabled = true;
+  $('btnSiniflandir').disabled = !aktarilan;
+  ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar'].forEach(b => $(b).disabled = true);
+  $('btnModelAktar').disabled = !aktarilan;
+  $('btnRapor').disabled = !aktarilan;
+  $('btnProjeAktar').disabled = false;
+  goster($('kanvasBos'), false);
+  goster($('esikSatir'), false); goster($('opaklikSatir'), false); goster($('yumusatSatir'), false);
+  goster($('tabloIstat'), false); goster($('istatNot'), false);
+  goster($('liderKutu'), false); goster($('kazananKart'), !!aktarilan); goster($('ozellikKutu'), false);
+  $('durumBilgi').textContent = g.dosyaAd + ' · ' + sayiTR(g.w) + '×' + sayiTR(g.h) + ' px' +
+    (g.geo && g.geo.epsg ? ' · EPSG:' + g.geo.epsg : '');
+  sinifListesiCiz();
+  lejantCiz();
+  sigdir();
+}
+
+/* =====================================================================
+   2) SINIFLAR ve ETİKETLEME
+   ===================================================================== */
+function sinifSayimlari(){
+  const sayim = new Array(D.siniflar.length).fill(0);
+  if (D.etiketMaske){
+    const m = D.etiketMaske;
+    for (let i = 0; i < m.length; i++) if (m[i]) sayim[m[i] - 1]++;
+  }
+  return sayim;
+}
+function sinifListesiCiz(){
+  const kap = $('sinifListe');
+  const sayim = sinifSayimlari();
+  kap.innerHTML = '';
+  D.siniflar.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'sinif' + (i === D.seciliSinif ? ' secili' : '');
+    el.innerHTML = '<span class="renk" style="background:' + s.renk + '"></span>' +
+      '<span class="ad"></span><span class="adet">' + sayiTR(sayim[i]) + ' px</span>' +
+      (D.siniflar.length > 2 ? '<button class="sil" title="Sınıfı sil">✕</button>' : '');
+    el.querySelector('.ad').textContent = s.ad;
+    el.addEventListener('click', e => {
+      if (e.target.classList.contains('sil')) return;
+      D.seciliSinif = i;
+      aracSec('kalem');
+      sinifListesiCiz();
+    });
+    const sil = el.querySelector('.sil');
+    if (sil) sil.addEventListener('click', () => sinifSil(i));
+    el.addEventListener('dblclick', async () => {
+      const yeni = await sor('Sınıf adı:', s.ad);
+      if (yeni && yeni.trim()){ s.ad = yeni.trim(); sinifListesiCiz(); lejantCiz(); }
+    });
+    kap.appendChild(el);
+  });
+}
+function sonucuGecersizKil(){
+  D.sonuc = null;
+  D.sonucKnv = null;
+  D.gizliSiniflar.clear();
+  ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar'].forEach(b => $(b).disabled = true);
+  goster($('tabloIstat'), false); goster($('istatNot'), false);
+  goster($('esikSatir'), false); goster($('opaklikSatir'), false); goster($('yumusatSatir'), false);
+  if (D.gorsel) durumYaz(4, D.egitim ? 'hazır' : 'bekliyor');
+}
+function egitimiSifirla(neden){
+  D.egitim = null;
+  $('btnSiniflandir').disabled = true;
+  $('btnModelAktar').disabled = true;
+  $('btnRapor').disabled = true;
+  goster($('kazananKart'), false); goster($('ozellikKutu'), false); goster($('liderKutu'), false);
+  durumYaz(3, neden || 'bekliyor');
+  sonucuGecersizKil();
+}
+$('btnSinifEkle').addEventListener('click', async () => {
+  if (D.mesgul || D.siniflar.length >= 8) return;
+  const ad = await sor('Yeni sınıf adı (ör. Yapraklı ağaç, Gölge):', 'Sınıf ' + (D.siniflar.length + 1));
+  if (!ad || !ad.trim()) return;
+  D.siniflar.push({ ad: ad.trim(), renk: SINIF_RENKLERI[D.siniflar.length % SINIF_RENKLERI.length] });
+  D.seciliSinif = D.siniflar.length - 1;
+  if (D.egitim || D.sonuc) egitimiSifirla('sınıflar değişti — yeniden eğitin');
+  sinifListesiCiz();
+  lejantCiz();
+  etiketDurumGuncelle();
+  ciz();
+});
+async function sinifSil(i){
+  if (D.mesgul || D.siniflar.length <= 2) return;
+  if (!(await onayla('"' + D.siniflar[i].ad + '" sınıfı ve etiketleri silinsin mi?'))) return;
+  if (D.mesgul || i >= D.siniflar.length) return;
+  D.siniflar.splice(i, 1);
+  if (D.etiketMaske){
+    const m = D.etiketMaske;
+    for (let p = 0; p < m.length; p++){
+      if (m[p] === i + 1) m[p] = 0;
+      else if (m[p] > i + 1) m[p]--;
+    }
+  }
+  D.vuruslar = D.vuruslar.filter(v => v.sinif !== i);
+  D.vuruslar.forEach(v => { if (v.sinif > i) v.sinif--; });
+  if (D.seciliSinif >= D.siniflar.length) D.seciliSinif = 0;
+  etiketKnvYenile();
+  if (D.egitim || D.sonuc) egitimiSifirla('sınıflar değişti — yeniden eğitin');
+  sinifListesiCiz();
+  lejantCiz();
+  etiketDurumGuncelle();
+  ciz();
+}
+
+function aracSec(ad){
+  D.arac = ad;
+  document.querySelectorAll('.arac').forEach(b => b.classList.toggle('aktif', b.dataset.arac === ad));
+  const im = { kalem: 'crosshair', silgi: 'crosshair', tasi: 'grab', incele: 'help' }[ad];
+  $('ana').style.cursor = im || 'default';
+}
+document.querySelectorAll('.arac').forEach(b => b.addEventListener('click', () => aracSec(b.dataset.arac)));
+aracSec('kalem');
+
+$('fircaBoyu').addEventListener('input', e => {
+  D.fircaBoy = parseInt(e.target.value, 10);
+  $('fircaBoyuYazi').textContent = D.fircaBoy + ' px';
+  ciz();
+});
+$('btnGeriAl').addEventListener('click', geriAl);
+$('btnEtiketTemizle').addEventListener('click', async () => {
+  if (!D.gorsel || !D.vuruslar.length) return;
+  if (!(await onayla('Tüm etiketler silinsin mi?'))) return;
+  D.vuruslar = [];
+  D.etiketMaske.fill(0);
+  etiketKnvYenile();
+  sinifListesiCiz();
+  etiketDurumGuncelle();
+  egitimGecersizKil();
+  ciz();
+});
+$('btnEtiketGoster').addEventListener('click', () => {
+  D.etiketGoster = !D.etiketGoster;
+  $('btnEtiketGoster').textContent = D.etiketGoster ? '👁️ Etiketleri gizle' : '👁️ Etiketleri göster';
+  ciz();
+});
+
+function geriAl(){
+  if (!D.vuruslar.length) return;
+  D.vuruslar.pop();
+  maskeyiYenidenKur();
+  sinifListesiCiz();
+  etiketDurumGuncelle();
+  egitimGecersizKil();
+  ciz();
+}
+function maskeyiYenidenKur(){
+  D.etiketMaske.fill(0);
+  for (const v of D.vuruslar) vurusUygula(v, false);
+  etiketKnvYenile();
+}
+function vurusUygula(v, kaydet){
+  const m = D.etiketMaske, W = D.gorsel.outW, H = D.gorsel.outH;
+  const r = v.boy, deger = v.sinif < 0 ? 0 : v.sinif + 1;
+  const n = v.noktalar.length / 2;
+  for (let p = 0; p < n; p++){
+    const cx = v.noktalar[p * 2], cy = v.noktalar[p * 2 + 1];
+    const x0 = Math.max(0, Math.round(cx - r)), x1 = Math.min(W - 1, Math.round(cx + r));
+    const y0 = Math.max(0, Math.round(cy - r)), y1 = Math.min(H - 1, Math.round(cy + r));
+    for (let y = y0; y <= y1; y++){
+      for (let x = x0; x <= x1; x++){
+        const dx = x - cx, dy = y - cy;
+        if (dx * dx + dy * dy <= r * r) m[y * W + x] = deger;
+      }
+    }
+  }
+  if (kaydet) D.vuruslar.push(v);
+}
+function etiketKnvYenile(){
+  const W = D.gorsel.outW, H = D.gorsel.outH;
+  const ctx = D.etiketKnv.getContext('2d');
+  const gd = ctx.createImageData(W, H);
+  const veri = gd.data, m = D.etiketMaske;
+  const renkler = D.siniflar.map(s => {
+    const n = parseInt(s.renk.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  });
+  for (let i = 0; i < m.length; i++){
+    if (!m[i]) continue;
+    const rk = renkler[m[i] - 1];
+    if (!rk) continue;
+    const p = i * 4;
+    veri[p] = rk[0]; veri[p + 1] = rk[1]; veri[p + 2] = rk[2]; veri[p + 3] = 165;
+  }
+  ctx.putImageData(gd, 0, 0);
+}
+function egitimGecersizKil(){
+  if (D.egitim && !D.egitim.iceAktarilan) durumYaz(3, 'etiketler değişti — yeniden eğitin');
+}
+function etiketDurumGuncelle(){
+  const sayim = sinifSayimlari();
+  const doluSinif = sayim.filter(s => s >= 30).length;
+  const onceKapali = $('btnEgit').disabled;
+  $('btnEgit').disabled = !(D.gorsel && doluSinif >= 2) || D.mesgul;
+  if (onceKapali && !$('btnEgit').disabled && !D.egitim) $('adim3').open = true;
+  if (doluSinif >= 2) durumYaz(2, '✓ ' + sayiTR(sayim.reduce((a, b) => a + b, 0)) + ' px', true);
+  else if (sayim.some(s => s > 0)) durumYaz(2, 'her sınıfa ≥30 px verin');
+  else durumYaz(2, 'etiket bekleniyor');
+}
+
+/* =====================================================================
+   TUVAL — çizim, yakınlaştırma, kaydırma, boyama
+   ===================================================================== */
+const kanvas = $('ana');
+const kanvasKap = $('kanvasKap');
+const ctxAna = kanvas.getContext('2d');
+let dpr = window.devicePixelRatio || 1;
+
+function kanvasBoyutla(){
+  dpr = window.devicePixelRatio || 1;
+  const r = kanvasKap.getBoundingClientRect();
+  kanvas.width = Math.max(1, Math.round(r.width * dpr));
+  kanvas.height = Math.max(1, Math.round(r.height * dpr));
+  ciz();
+}
+new ResizeObserver(kanvasBoyutla).observe(kanvasKap);
+
+function sigdir(){
+  if (!D.gorsel) return;
+  const r = kanvasKap.getBoundingClientRect();
+  const s = Math.min(r.width / D.gorsel.outW, r.height / D.gorsel.outH) * 0.97;
+  D.gorunum.s = s;
+  D.gorunum.ox = (r.width - D.gorsel.outW * s) / 2;
+  D.gorunum.oy = (r.height - D.gorsel.outH * s) / 2;
+  ciz();
+}
+$('btnSigdir').addEventListener('click', sigdir);
+$('btnYaklas').addEventListener('click', () => merkezdenYakinlastir(1.4));
+$('btnUzaklas').addEventListener('click', () => merkezdenYakinlastir(1 / 1.4));
+function merkezdenYakinlastir(katsayi){
+  const r = kanvasKap.getBoundingClientRect();
+  noktadanYakinlastir(r.width / 2, r.height / 2, katsayi);
+}
+function noktadanYakinlastir(ekranX, ekranY, katsayi){
+  const g = D.gorunum;
+  const yeniS = Math.max(0.02, Math.min(40, g.s * katsayi));
+  const gercek = yeniS / g.s;
+  g.ox = ekranX - (ekranX - g.ox) * gercek;
+  g.oy = ekranY - (ekranY - g.oy) * gercek;
+  g.s = yeniS;
+  ciz();
+}
+function imgKoordinat(ekranX, ekranY){
+  return {
+    x: (ekranX - D.gorunum.ox) / D.gorunum.s,
+    y: (ekranY - D.gorunum.oy) / D.gorunum.s
+  };
+}
+
+function ciz(){
+  const g = D.gorunum;
+  ctxAna.setTransform(1, 0, 0, 1, 0, 0);
+  ctxAna.clearRect(0, 0, kanvas.width, kanvas.height);
+  if (!D.gorsel) return;
+  ctxAna.setTransform(dpr * g.s, 0, 0, dpr * g.s, dpr * g.ox, dpr * g.oy);
+  ctxAna.imageSmoothingEnabled = g.s < 1;
+  ctxAna.drawImage(D.tabanKnv, 0, 0);
+  if (D.etiketGoster && D.etiketKnv) ctxAna.drawImage(D.etiketKnv, 0, 0);
+  if (D.sonucKnv && D.sonuc){
+    const eskiAlfa = ctxAna.globalAlpha;
+    ctxAna.globalAlpha = parseInt($('opaklik').value, 10) / 100;
+    ctxAna.imageSmoothingEnabled = false;
+    const ken = D.sonuc.adim;
+    ctxAna.drawImage(D.sonucKnv,
+      D.sonuc.yari - ken / 2, D.sonuc.yari - ken / 2,
+      D.sonuc.gw * ken, D.sonuc.gh * ken);
+    ctxAna.globalAlpha = eskiAlfa;
+  }
+  /* fırça ön izlemesi */
+  if (D.imlec && (D.arac === 'kalem' || D.arac === 'silgi')){
+    ctxAna.beginPath();
+    ctxAna.arc(D.imlec.imgX, D.imlec.imgY, D.fircaBoy, 0, Math.PI * 2);
+    ctxAna.lineWidth = 1.4 / g.s;
+    ctxAna.strokeStyle = D.arac === 'silgi' ? '#ffffff' : D.siniflar[D.seciliSinif].renk;
+    ctxAna.setLineDash([4 / g.s, 3 / g.s]);
+    ctxAna.stroke();
+    ctxAna.setLineDash([]);
+  }
+  $('yakinlikYazi').textContent = '%' + Math.round(g.s * 100);
+}
+
+/* --- işaretçi olayları --- */
+const isaretciler = new Map();
+let boyuyor = false, kaydiriyor = false, sonNokta = null, boslukBasili = false;
+let aktifVurus = null, pinchBaslangic = null;
+
+kanvas.addEventListener('pointerdown', e => {
+  if (e.button === 1) e.preventDefault();             // tarayıcı otomatik kaydırmasını engelle
+  kanvas.setPointerCapture(e.pointerId);
+  isaretciler.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (isaretciler.size === 2){
+    if (boyuyor && aktifVurus){                       // yarım vuruşu kayıt altına al
+      D.vuruslar.push(aktifVurus);
+      sinifListesiCiz(); etiketDurumGuncelle(); egitimGecersizKil();
+    }
+    boyuyor = false; aktifVurus = null;
+    const p = [...isaretciler.values()];
+    pinchBaslangic = {
+      mesafe: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y),
+      s: D.gorunum.s,
+      merkez: { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }
+    };
+    return;
+  }
+  if (!D.gorsel) return;
+  const tasiMi = D.arac === 'tasi' || boslukBasili || e.button === 1;
+  if (tasiMi){
+    kaydiriyor = true;
+    sonNokta = { x: e.offsetX, y: e.offsetY };
+    kanvas.style.cursor = 'grabbing';
+    return;
+  }
+  if (e.button !== 0) return;
+  if (D.arac === 'incele'){ incele(e.offsetX, e.offsetY); return; }
+  if (D.arac === 'kalem' || D.arac === 'silgi'){
+    boyuyor = true;
+    const k = imgKoordinat(e.offsetX, e.offsetY);
+    aktifVurus = {
+      sinif: D.arac === 'silgi' ? -1 : D.seciliSinif,
+      boy: D.fircaBoy,
+      noktalar: [k.x, k.y]
+    };
+    vurusUygula({ ...aktifVurus, noktalar: [k.x, k.y] }, false);
+    etiketKnvVurusCiz(k.x, k.y, k.x, k.y, aktifVurus);
+    ciz();
+  }
+});
+kanvas.addEventListener('pointermove', e => {
+  const k = imgKoordinat(e.offsetX, e.offsetY);
+  D.imlec = { ekranX: e.offsetX, ekranY: e.offsetY, imgX: k.x, imgY: k.y };
+  koordinatYaz(k.x, k.y);
+  if (isaretciler.has(e.pointerId)) isaretciler.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (isaretciler.size === 2 && pinchBaslangic){
+    const p = [...isaretciler.values()];
+    const mesafe = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    if (pinchBaslangic.mesafe > 0){
+      const hedefS = pinchBaslangic.s * mesafe / pinchBaslangic.mesafe;
+      noktadanYakinlastir(pinchBaslangic.merkez.x, pinchBaslangic.merkez.y, hedefS / D.gorunum.s);
+    }
+    return;
+  }
+  if (kaydiriyor && sonNokta){
+    D.gorunum.ox += e.offsetX - sonNokta.x;
+    D.gorunum.oy += e.offsetY - sonNokta.y;
+    sonNokta = { x: e.offsetX, y: e.offsetY };
+    ciz();
+    return;
+  }
+  if (boyuyor && aktifVurus){
+    const onceki = {
+      x: aktifVurus.noktalar[aktifVurus.noktalar.length - 2],
+      y: aktifVurus.noktalar[aktifVurus.noktalar.length - 1]
+    };
+    const mesafe = Math.hypot(k.x - onceki.x, k.y - onceki.y);
+    const adimSayi = Math.max(1, Math.ceil(mesafe / Math.max(1, aktifVurus.boy * 0.4)));
+    for (let s = 1; s <= adimSayi; s++){
+      const ax = onceki.x + (k.x - onceki.x) * s / adimSayi;
+      const ay = onceki.y + (k.y - onceki.y) * s / adimSayi;
+      aktifVurus.noktalar.push(ax, ay);
+      vurusUygula({ ...aktifVurus, noktalar: [ax, ay] }, false);
+    }
+    etiketKnvVurusCiz(onceki.x, onceki.y, k.x, k.y, aktifVurus);
+  }
+  ciz();
+});
+function isaretciBirak(e){
+  isaretciler.delete(e.pointerId);
+  if (isaretciler.size < 2) pinchBaslangic = null;
+  if (boyuyor && aktifVurus){
+    D.vuruslar.push(aktifVurus);
+    aktifVurus = null;
+    boyuyor = false;
+    sinifListesiCiz();
+    etiketDurumGuncelle();
+    egitimGecersizKil();
+  }
+  if (kaydiriyor){
+    kaydiriyor = false;
+    kanvas.style.cursor = '';
+    aracSec(D.arac);
+  }
+}
+kanvas.addEventListener('pointerup', isaretciBirak);
+kanvas.addEventListener('pointercancel', isaretciBirak);
+kanvas.addEventListener('pointerleave', () => { D.imlec = null; ciz(); });
+kanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (!D.gorsel) return;
+  noktadanYakinlastir(e.offsetX, e.offsetY, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+}, { passive: false });
+
+/* silgi/fırça hızlı görsel çizim (maske zaten güncel; tuvale yansıt) */
+function etiketKnvVurusCiz(x0, y0, x1, y1, vurus){
+  const ctx = D.etiketKnv.getContext('2d');
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = vurus.boy * 2;
+  if (vurus.sinif < 0){
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    const s = D.siniflar[vurus.sinif];
+    ctx.strokeStyle = s.renk + 'a5';
+  }
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1 === x0 && y1 === y0 ? x1 + 0.01 : x1, y1);
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function koordinatYaz(x, y){
+  if (!D.gorsel){ $('durumPiksel').textContent = '—'; return; }
+  const ix = Math.floor(x), iy = Math.floor(y);
+  if (ix < 0 || iy < 0 || ix >= D.gorsel.outW || iy >= D.gorsel.outH){
+    $('durumPiksel').textContent = '—';
+    $('durumGeo').textContent = '';
+    return;
+  }
+  const ozX = ix * D.gorsel.olcek, ozY = iy * D.gorsel.olcek;
+  $('durumPiksel').textContent = 'px: ' + sayiTR(ozX) + ', ' + sayiTR(ozY);
+  const geo = D.gorsel.geo;
+  if (geo){
+    const E = geo.ox + (ozX + 0.5 * D.gorsel.olcek) * geo.sx;
+    const N = geo.oy - (ozY + 0.5 * D.gorsel.olcek) * geo.sy;
+    const hane = geo.cografi ? 6 : 2;
+    $('durumGeo').textContent = (geo.epsg ? 'EPSG:' + geo.epsg + ' → ' : '') +
+      'E ' + sayiTR(E, hane) + ', N ' + sayiTR(N, hane);
+  } else $('durumGeo').textContent = '';
+}
+
+function incele(ekranX, ekranY){
+  if (!D.sonuc){ $('durumBilgi').textContent = 'İncelemek için önce sınıflandırma yapın.'; return; }
+  const k = imgKoordinat(ekranX, ekranY);
+  const s = D.sonuc;
+  const gx = Math.round((k.x - s.yari) / s.adim), gy = Math.round((k.y - s.yari) / s.adim);
+  if (gx < 0 || gy < 0 || gx >= s.gw || gy >= s.gh) return;
+  const K = D.siniflar.length;
+  const probs = aktifProbs();
+  const taban = (gy * s.gw + gx) * K;
+  if (s.sinif[gy * s.gw + gx] === 255){ $('durumBilgi').textContent = 'Bu blokta veri yok.'; return; }
+  let enC = 0;
+  for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+  $('durumBilgi').textContent = '🔍 ' + D.siniflar[enC].ad + ' — güven ' + yuzde(probs[taban + enC]) +
+    '  (' + D.siniflar.map((sn, c) => sn.ad + ' ' + yuzde(probs[taban + c])).join(' · ') + ')';
+}
+
+/* klavye */
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === ' '){ boslukBasili = true; e.preventDefault(); kanvas.style.cursor = 'grab'; }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); geriAl(); }
+  else if (e.ctrlKey || e.metaKey) return;            // diğer Ctrl/Cmd kısayollarına karışma
+  else if (e.key === 'f' || e.key === 'F') aracSec('kalem');
+  else if (e.key === 's' || e.key === 'S') aracSec('silgi');
+  else if (e.key === 't' || e.key === 'T') aracSec('tasi');
+  else if (e.key === '+') merkezdenYakinlastir(1.3);
+  else if (e.key === '-') merkezdenYakinlastir(1 / 1.3);
+});
+window.addEventListener('keyup', e => {
+  if (e.key === ' '){ boslukBasili = false; kanvas.style.cursor = ''; aracSec(D.arac); }
+});
+
+/* =====================================================================
+   3) EĞİTİM (Oto-AI)
+   ===================================================================== */
+function ornekleriTopla(yama, sinifBasina){
+  const g = D.gorsel, m = D.etiketMaske, K = D.siniflar.length;
+  const rng = mulberry32(42);
+  /* rezervuar örneklemesi ile sınıf başına en çok N piksel */
+  const secilen = Array.from({ length: K }, () => []);
+  const gorulen = new Array(K).fill(0);
+  /* merkezleri seyrelt: komşu piksellerin ~%90 örtüşen yamaları CV katlarına
+     sızıp F1'i yapay şişirmesin (örtüşme ≤ %50'ye iner) */
+  const seyrek = Math.max(2, yama >> 1);
+  for (let i = 0; i < m.length; i++){
+    const c = m[i] - 1;
+    if (c < 0) continue;
+    if ((i % g.outW) % seyrek !== 0 || (((i / g.outW) | 0) % seyrek) !== 0) continue;
+    gorulen[c]++;
+    if (secilen[c].length < sinifBasina) secilen[c].push(i);
+    else {
+      const j = (rng() * gorulen[c]) | 0;
+      if (j < sinifBasina) secilen[c][j] = i;
+    }
+  }
+  const cikar = ozellikCikarici(g.rgba, g.gecerli, g.outW, g.outH, yama);
+  const oz = new Float64Array(OZELLIK_SAYISI);
+  const X = [], y = [];
+  const sayimlar = new Array(K).fill(0);
+  for (let c = 0; c < K; c++){
+    for (const i of secilen[c]){
+      const cx = i % g.outW, cy = (i / g.outW) | 0;
+      if (!cikar(cx, cy, oz)) continue;
+      for (let j = 0; j < OZELLIK_SAYISI; j++) X.push(oz[j]);
+      y.push(c);
+      sayimlar[c]++;
+    }
+  }
+  return { X24: Float32Array.from(X), y: Int32Array.from(y), n: y.length, sayimlar };
+}
+
+$('btnEgit').addEventListener('click', async () => {
+  if (D.mesgul || !D.gorsel) return;
+  const K = D.siniflar.length;
+  const hataEl = $('egitHata');
+  goster(hataEl, false);
+  const yama = parseInt($('secYama').value, 10);
+  const sinifBasina = parseInt($('secOrnekSiniri').value, 10);
+  D.mesgul = true;
+  $('btnEgit').disabled = true;
+  $('btnSiniflandir').disabled = true;
+  const kutu = $('egitIlerlemeKutu'), cubuk = $('egitIlerleme'), yazi = $('egitIlerlemeYazi');
+  ilerlemeKur(kutu, cubuk, yazi, 0.01, 'örnekler toplanıyor…');
+  await beklet();
+  try{
+    const baslangic = performance.now();
+    const veri = ornekleriTopla(yama, sinifBasina);
+    const azSinif = veri.sayimlar.findIndex(s => s < 10);
+    if (azSinif >= 0)
+      throw new Error('"' + D.siniflar[azSinif].ad + '" sınıfında yeterli örnek yok (' +
+        veri.sayimlar[azSinif] + ' yama). Bu sınıfa daha fazla alan boyayın.');
+    const govde = $('liderGovde');
+    govde.innerHTML = '';
+    goster($('liderKutu'), true);
+    goster($('kazananKart'), false);
+    const sonuc = await otoEgit(veri.X24, veri.y, veri.n, K, {
+      katSayi: Math.min(5, Math.min(...veri.sayimlar)),
+      onProgress: (oran, mesaj) => ilerlemeKur(kutu, cubuk, yazi, oran, mesaj),
+      onSonuc: (kayit, sirali) => {
+        govde.innerHTML = sirali.map((r, i) =>
+          '<tr' + (i === 0 ? ' class="kazanan"' : '') + '><td>' + (i + 1) + '</td><td>' + r.ad +
+          '</td><td>' + r.kume + '</td><td>' + yuzde(r.dogruluk) + '</td><td>' + yuzde(r.f1) + '</td></tr>'
+        ).join('');
+      }
+    });
+    const sure = (performance.now() - baslangic) / 1000;
+    D.egitim = { ...sonuc, yama, sayimlar: veri.sayimlar, n: veri.n, sure };
+    goster(kutu, false);
+    const e = sonuc.enIyi;
+    $('kazananKart').innerHTML =
+      '🏆 <b>' + e.ad + '</b> · ' + e.kume +
+      '<br>Çapraz doğrulama (' + e.cv.katSayi + ' kat): doğruluk <b>' + yuzde(e.cv.dogruluk) +
+      '</b>, makro-F1 <b>' + yuzde(e.cv.f1) + '</b>' +
+      '<br>' + sayiTR(veri.n) + ' örnek yama · ' + D.siniflar.map((s, c) => s.ad + ': ' + veri.sayimlar[c]).join(' · ') +
+      '<br><small>Oto-AI ' + otoAyarListesi().length + ' kombinasyonu ' + sure.toFixed(1).replace('.', ',') +
+      ' saniyede denedi ve en iyi öğrenme şeklini seçti.</small>';
+    goster($('kazananKart'), true);
+    const enYuksek = sonuc.fisher[0] ? Math.max(sonuc.fisher[0].skor, 1e-9) : 1;
+    $('ozellikListe').innerHTML = sonuc.fisher.slice(0, 8).map(f =>
+      '<div class="ozellik-cubuk"><span class="ad">' + f.ad + '</span>' +
+      '<span class="cubuk"><div style="width:' + Math.max(3, Math.round(f.skor / enYuksek * 100)) + '%"></div></span>' +
+      '<span class="deger">' + f.skor.toFixed(2).replace('.', ',') + '</span></div>'
+    ).join('');
+    goster($('ozellikKutu'), true);
+    durumYaz(3, '✓ F1 ' + yuzde(e.cv.f1), true);
+    durumYaz(4, 'hazır');
+    $('btnSiniflandir').disabled = false;
+    $('btnModelAktar').disabled = false;
+    $('btnRapor').disabled = false;
+    $('adim4').open = true;
+  }catch(hata){
+    console.error(hata);
+    goster(kutu, false);
+    hataEl.textContent = '⚠️ ' + (hata && hata.message ? hata.message : hata);
+    goster(hataEl, true);
+  }finally{
+    D.mesgul = false;
+    etiketDurumGuncelle();
+    if (D.egitim) $('btnSiniflandir').disabled = false;
+  }
+});
+
+/* =====================================================================
+   4) SINIFLANDIRMA
+   ===================================================================== */
+$('btnSiniflandir').addEventListener('click', async () => {
+  if (D.mesgul || !D.egitim || !D.gorsel) return;
+  const g = D.gorsel, e = D.egitim.enIyi, K = D.siniflar.length;
+  const yama = D.egitim.yama;
+  const sikca = parseInt($('secAdimlama').value, 10);
+  const adim = Math.max(3, Math.round(yama * [0, 0.25, 0.5, 1][sikca]));
+  D.mesgul = true;
+  $('btnSiniflandir').disabled = true;
+  $('btnEgit').disabled = true;
+  const kutu = $('sinifIlerlemeKutu'), cubuk = $('sinifIlerleme'), yazi = $('sinifIlerlemeYazi');
+  try{
+    const sonuc = await haritaSiniflandir({
+      rgba: g.rgba, gecerli: g.gecerli, W: g.outW, H: g.outH,
+      yama, adim, model: e.model, std: e.std, kolonlar: e.kolonlar, K,
+      onProgress: oran => ilerlemeKur(kutu, cubuk, yazi, oran,
+        'bloklar sınıflandırılıyor… %' + Math.round(oran * 100))
+    });
+    sonuc.probsYumusak = probYumusat(sonuc.probs, sonuc.gw, sonuc.gh, K);
+    D.sonuc = sonuc;
+    goster(kutu, false);
+    goster($('esikSatir'), true);
+    goster($('opaklikSatir'), true);
+    goster($('yumusatSatir'), true);
+    sonucKatmaniGuncelle();
+    durumYaz(4, '✓ ' + sayiTR(sonuc.gw * sonuc.gh) + ' blok', true);
+    durumYaz(5, 'hazır', true);
+    ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar'].forEach(b => $(b).disabled = false);
+    $('adim5').open = true;
+  }catch(hata){
+    console.error(hata);
+    goster(kutu, false);
+    await bilgi('Sınıflandırma hatası: ' + (hata && hata.message ? hata.message : hata));
+  }finally{
+    D.mesgul = false;
+    $('btnSiniflandir').disabled = false;
+    etiketDurumGuncelle();
+  }
+});
+
+function aktifProbs(){
+  return $('chkYumusat').checked ? D.sonuc.probsYumusak : D.sonuc.probs;
+}
+
+function sonucKatmaniGuncelle(){
+  if (!D.sonuc) return;
+  const s = D.sonuc, K = D.siniflar.length;
+  const esik = parseInt($('esik').value, 10) / 100;
+  $('esikYazi').textContent = '%' + $('esik').value;
+  const probs = aktifProbs();
+  if (!D.sonucKnv){ D.sonucKnv = document.createElement('canvas'); }
+  D.sonucKnv.width = s.gw; D.sonucKnv.height = s.gh;
+  const ctx = D.sonucKnv.getContext('2d');
+  const gd = ctx.createImageData(s.gw, s.gh);
+  const veri = gd.data;
+  const renkler = D.siniflar.map(sn => {
+    const n = parseInt(sn.renk.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  });
+  const sayimlar = new Array(K).fill(0);
+  let gecerliBlok = 0, kararsiz = 0;
+  const sinifMaskeleri = Array.from({ length: K }, () => new Uint8Array(s.gw * s.gh));
+  for (let i = 0; i < s.gw * s.gh; i++){
+    if (s.sinif[i] === 255) continue;
+    gecerliBlok++;
+    const taban = i * K;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+    if (probs[taban + enC] < esik){ kararsiz++; continue; }
+    sayimlar[enC]++;
+    sinifMaskeleri[enC][i] = 1;
+    if (D.gizliSiniflar.has(enC)) continue;
+    const p = i * 4, rk = renkler[enC];
+    veri[p] = rk[0]; veri[p + 1] = rk[1]; veri[p + 2] = rk[2]; veri[p + 3] = 255;
+  }
+  ctx.putImageData(gd, 0, 0);
+
+  /* istatistik tablosu */
+  const g = D.gorsel;
+  const geoVar = g.geo && !g.geo.cografi;
+  const blokKenarOz = s.adim * g.olcek;                     // özgün çözünürlükte blok kenarı (px)
+  const blokAlanM2 = geoVar ? blokKenarOz * blokKenarOz * g.geo.sx * g.geo.sy : 0;
+  const tb = $('tabloIstat');
+  let html = '<tr><th>Sınıf</th><th>Blok</th><th>Oran</th><th>' + (geoVar ? 'Alan (m²)' : 'Alan (px²)') +
+    '</th><th>Bölge</th></tr>';
+  for (let c = 0; c < K; c++){
+    const alan = geoVar ? sayimlar[c] * blokAlanM2 : sayimlar[c] * blokKenarOz * blokKenarOz;
+    const bolge = sayimlar[c] ? bagliBilesenSay(sinifMaskeleri[c], s.gw, s.gh) : 0;
+    html += '<tr><td><span class="renk-kare" style="background:' + D.siniflar[c].renk + '"></span>' +
+      D.siniflar[c].ad + '</td><td>' + sayiTR(sayimlar[c]) + '</td><td>' +
+      (gecerliBlok ? yuzde(sayimlar[c] / gecerliBlok) : '—') + '</td><td>' +
+      sayiTR(alan, geoVar ? 1 : 0) + '</td><td>' + sayiTR(bolge) + '</td></tr>';
+  }
+  tb.innerHTML = html;
+  goster(tb, true);
+  $('istatNot').textContent = sayiTR(gecerliBlok) + ' geçerli blok · ' + sayiTR(kararsiz) +
+    ' blok eşik altında (kararsız) · blok kenarı ' + sayiTR(blokKenarOz) + ' px' +
+    (geoVar ? ' ≈ ' + (blokKenarOz * g.geo.sx).toFixed(2).replace('.', ',') + ' m' : '') +
+    (g.geo && g.geo.cografi ? ' · CRS derece cinsinden olduğu için m² hesaplanamadı' : '');
+  goster($('istatNot'), true);
+  lejantCiz();
+  ciz();
+}
+let sonucPlanli = false;
+function sonucKatmaniPlanla(){
+  if (sonucPlanli) return;
+  sonucPlanli = true;
+  requestAnimationFrame(() => { sonucPlanli = false; sonucKatmaniGuncelle(); });
+}
+$('esik').addEventListener('input', sonucKatmaniPlanla);
+$('opaklik').addEventListener('input', ciz);
+$('chkYumusat').addEventListener('change', sonucKatmaniGuncelle);
+
+function lejantCiz(){
+  const lej = $('lejant');
+  if (!D.gorsel){ goster(lej, false); return; }
+  goster(lej, true);
+  lej.innerHTML = '<b style="font-size:11px">Sınıflar</b>' + D.siniflar.map((s, i) =>
+    '<div class="oge' + (D.gizliSiniflar.has(i) ? ' kapali' : '') + '" data-i="' + i + '">' +
+    '<span class="renk-kare" style="background:' + s.renk + '"></span><span></span></div>').join('');
+  [...lej.querySelectorAll('.oge')].forEach((el, i) => {
+    el.querySelector('span:last-child').textContent = D.siniflar[i].ad;
+    el.addEventListener('click', () => {
+      if (D.gizliSiniflar.has(i)) D.gizliSiniflar.delete(i);
+      else D.gizliSiniflar.add(i);
+      if (D.sonuc) sonucKatmaniGuncelle(); else lejantCiz();
+    });
+  });
+}
+
+/* =====================================================================
+   5) DIŞA / İÇE AKTARMA
+   ===================================================================== */
+function dosyaKok(){
+  const ad = (D.gorsel && D.gorsel.dosyaAd || 'cam_ai').replace(/\.[^.]+$/, '');
+  return ad.replace(/[^\wçğıöşüÇĞİÖŞÜ-]+/g, '_');
+}
+
+$('btnPngAktar').addEventListener('click', () => {
+  if (!D.gorsel) return;
+  const g = D.gorsel;
+  const knv = document.createElement('canvas');
+  knv.width = g.outW; knv.height = g.outH;
+  const ctx = knv.getContext('2d');
+  ctx.drawImage(D.tabanKnv, 0, 0);
+  if (D.sonucKnv && D.sonuc){
+    ctx.globalAlpha = parseInt($('opaklik').value, 10) / 100;
+    ctx.imageSmoothingEnabled = false;
+    const ken = D.sonuc.adim;
+    ctx.drawImage(D.sonucKnv, D.sonuc.yari - ken / 2, D.sonuc.yari - ken / 2,
+      D.sonuc.gw * ken, D.sonuc.gh * ken);
+    ctx.globalAlpha = 1;
+  }
+  knv.toBlob(b => indir(dosyaKok() + '_siniflandirma.png', b), 'image/png');
+});
+
+function blokVerileri(){
+  const s = D.sonuc, g = D.gorsel, K = D.siniflar.length;
+  const probs = aktifProbs();
+  const esik = parseInt($('esik').value, 10) / 100;
+  const satirlar = [];
+  for (let gy = 0; gy < s.gh; gy++){
+    for (let gx = 0; gx < s.gw; gx++){
+      const i = gy * s.gw + gx;
+      if (s.sinif[i] === 255) continue;
+      const taban = i * K;
+      let enC = 0;
+      for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+      const cx = (s.yari + gx * s.adim) * g.olcek;          // özgün görüntü pikseli
+      const cy = (s.yari + gy * s.adim) * g.olcek;
+      let E = null, N = null;
+      if (g.geo){
+        E = g.geo.ox + (cx + 0.5 * g.olcek) * g.geo.sx;
+        N = g.geo.oy - (cy + 0.5 * g.olcek) * g.geo.sy;
+      }
+      satirlar.push({ gx, gy, cx, cy, E, N, sinif: enC, p: probs[taban + enC], esikUstu: probs[taban + enC] >= esik, taban, probs });
+    }
+  }
+  return satirlar;
+}
+
+$('btnCsvAktar').addEventListener('click', () => {
+  if (!D.sonuc) return;
+  const K = D.siniflar.length;
+  const bas = ['blok_x_px', 'blok_y_px', 'dogu_E', 'kuzey_N', 'sinif', 'sinif_adi', 'guven', 'esik_ustu']
+    .concat(D.siniflar.map((s, c) => 'p_sinif' + c));
+  const satirlar = [bas.join(',')];
+  for (const b of blokVerileri()){
+    const p = [];
+    for (let c = 0; c < K; c++) p.push(b.probs[b.taban + c].toFixed(4));
+    satirlar.push([b.cx, b.cy,
+      b.E === null ? '' : b.E.toFixed(3), b.N === null ? '' : b.N.toFixed(3),
+      b.sinif, '"' + D.siniflar[b.sinif].ad.replace(/"/g, '""') + '"',
+      b.p.toFixed(4), b.esikUstu ? 1 : 0].concat(p).join(','));
+  }
+  indir(dosyaKok() + '_bloklar.csv', '﻿' + satirlar.join('\n'), 'text/csv;charset=utf-8');
+});
+
+$('btnGeojsonAktar').addEventListener('click', () => {
+  if (!D.sonuc) return;
+  const g = D.gorsel;
+  const geoVar = !!g.geo;
+  const ozellikler = [];
+  for (const b of blokVerileri()){
+    if (!b.esikUstu) continue;
+    ozellikler.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: geoVar ? [b.E, b.N] : [b.cx, -b.cy] },
+      properties: {
+        sinif: b.sinif, sinif_adi: D.siniflar[b.sinif].ad,
+        guven: +b.p.toFixed(4), blok_x_px: b.cx, blok_y_px: b.cy
+      }
+    });
+  }
+  const fc = { type: 'FeatureCollection', features: ozellikler };
+  if (geoVar && g.geo.epsg)
+    fc.crs = { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::' + g.geo.epsg } };
+  const not = geoVar
+    ? 'QGIS\'te açarken CRS olarak EPSG:' + (g.geo.epsg || '(ortomozaikle aynı)') + ' seçin.'
+    : 'Görüntüde coğrafi bilgi yok: koordinatlar piksel cinsindendir.';
+  indir(dosyaKok() + '_siniflar.geojson', JSON.stringify(fc), 'application/geo+json');
+  $('durumBilgi').textContent = '🌍 GeoJSON indirildi. ' + not;
+});
+
+$('btnModelAktar').addEventListener('click', () => {
+  if (!D.egitim) return;
+  const paket = modelPaketle(D.egitim.enIyi, D.siniflar, D.egitim.yama);
+  indir(dosyaKok() + '_model.json', JSON.stringify(paket), 'application/json');
+});
+
+$('btnProjeAktar').addEventListener('click', () => {
+  if (!D.gorsel) return;
+  const proje = {
+    bicim: 'cam-ai-proje', surum: 2,
+    siniflar: D.siniflar.map(s => ({ ad: s.ad, renk: s.renk })),
+    vuruslar: D.vuruslar.map(v => ({ sinif: v.sinif, boy: v.boy,
+      noktalar: v.noktalar.map(n => Math.round(n * 10) / 10) })),
+    ayarlar: {
+      yama: parseInt($('secYama').value, 10),
+      ornekSiniri: parseInt($('secOrnekSiniri').value, 10),
+      cozunurluk: parseInt($('secCozunurluk').value, 10)
+    },
+    gorselOzet: { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
+      outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek },
+    model: D.egitim ? modelPaketle(D.egitim.enIyi, D.siniflar, D.egitim.yama) : null
+  };
+  indir(dosyaKok() + '_proje.json', JSON.stringify(proje), 'application/json');
+});
+
+$('btnIceAktar').addEventListener('click', () => $('iceAktarGirdi').click());
+$('iceAktarGirdi').addEventListener('change', async e => {
+  if (!e.target.files.length) return;
+  const dosya = e.target.files[0];
+  e.target.value = '';
+  try{
+    const veri = JSON.parse(await dosya.text());
+    if (veri.bicim === 'cam-ai-model') await modelIceAktar(veri);
+    else if (veri.bicim === 'cam-ai-proje') await projeIceAktar(veri);
+    else throw new Error('Tanınmayan dosya biçimi. Çam-AI model veya proje .json dosyası seçin.');
+  }catch(hata){
+    await bilgi('İçe aktarma hatası: ' + (hata && hata.message ? hata.message : hata));
+  }
+});
+async function modelIceAktar(paket, sessiz){
+  const acilan = modelAc(paket);
+  D.siniflar = acilan.siniflar.map((s, i) => ({ ad: s.ad, renk: s.renk || SINIF_RENKLERI[i % SINIF_RENKLERI.length] }));
+  D.seciliSinif = 0;
+  sonucuGecersizKil();
+  etiketleriSiniflaraUydur();
+  D.egitim = {
+    enIyi: acilan, yama: acilan.yama || 24,
+    liderlik: [], fisher: [], sayimlar: [], n: 0, sure: 0, iceAktarilan: true
+  };
+  $('secYama').value = String(acilan.yama || 24);
+  sinifListesiCiz();
+  lejantCiz();
+  durumYaz(3, '✓ model yüklendi', true);
+  const cvYazi = acilan.cv ? ' (CV F1 ' + yuzde(acilan.cv.f1) + ')' : '';
+  $('kazananKart').innerHTML = '📥 <b>' + acilan.ad + '</b> · ' + acilan.kume + cvYazi +
+    '<br><small>Kayıtlı model içe aktarıldı. Görüntü yükleyip doğrudan Adım 4 ile sınıflandırabilirsiniz.</small>';
+  goster($('kazananKart'), true);
+  if (D.gorsel){ $('btnSiniflandir').disabled = false; $('adim4').open = true; }
+  $('btnModelAktar').disabled = false;
+  $('btnRapor').disabled = false;
+  if (!sessiz)
+    await bilgi('Model yüklendi: ' + acilan.ad + (D.gorsel ? '\nAdım 4 ile sınıflandırma yapabilirsiniz.'
+      : '\nÖnce Adım 1\'den görüntü yükleyin.'));
+}
+function etiketleriSiniflaraUydur(){
+  if (D.gorsel && D.vuruslar.some(v => v.sinif >= D.siniflar.length)){
+    D.vuruslar = D.vuruslar.filter(v => v.sinif < D.siniflar.length);
+    maskeyiYenidenKur();
+    etiketDurumGuncelle();
+    ciz();
+  }
+}
+async function projeIceAktar(proje){
+  D.siniflar = proje.siniflar.map((s, i) => ({ ad: s.ad, renk: s.renk || SINIF_RENKLERI[i % SINIF_RENKLERI.length] }));
+  D.seciliSinif = 0;
+  sonucuGecersizKil();
+  etiketleriSiniflaraUydur();
+  if (proje.ayarlar){
+    if (proje.ayarlar.yama) $('secYama').value = String(proje.ayarlar.yama);
+    if (proje.ayarlar.ornekSiniri) $('secOrnekSiniri').value = String(proje.ayarlar.ornekSiniri);
+  }
+  let mesaj = 'Proje yüklendi.';
+  if (D.gorsel && proje.gorselOzet &&
+      D.gorsel.outW === proje.gorselOzet.outW && D.gorsel.outH === proje.gorselOzet.outH){
+    D.vuruslar = (proje.vuruslar || []).map(v => ({ sinif: v.sinif, boy: v.boy, noktalar: v.noktalar.slice() }));
+    maskeyiYenidenKur();
+    mesaj += ' ' + D.vuruslar.length + ' fırça vuruşu geri getirildi.';
+  } else if (proje.vuruslar && proje.vuruslar.length){
+    mesaj += '\nEtiketler için önce aynı görüntüyü (' + (proje.gorselOzet ? proje.gorselOzet.ad : '?') +
+      ') aynı işleme çözünürlüğüyle yükleyin, sonra projeyi tekrar açın.';
+  }
+  if (proje.model){
+    try{ await modelIceAktar(proje.model, true); mesaj += '\nKayıtlı model de yüklendi.'; }
+    catch(_e){ /* model açılamadıysa etiketlerle devam */ }
+  }
+  sinifListesiCiz();
+  lejantCiz();
+  etiketDurumGuncelle();
+  if (D.gorsel) ciz();
+  await bilgi(mesaj);
+}
+
+/* =====================================================================
+   RAPOR
+   ===================================================================== */
+$('btnRapor').addEventListener('click', () => {
+  const g = D.gorsel, e = D.egitim;
+  if (!e) return;
+  const m = [];
+  m.push('ÇAM-AI YÖNTEM RAPORU (otomatik üretildi)');
+  m.push('==========================================');
+  m.push('');
+  if (g){
+    m.push('VERİ');
+    m.push('  Dosya            : ' + g.dosyaAd + ' (' + g.tur + ', ' + g.dosyaMB.toFixed(1) + ' MB)');
+    m.push('  Özgün boyut      : ' + g.w + ' × ' + g.h + ' px');
+    m.push('  Çalışma boyutu   : ' + g.outW + ' × ' + g.outH + ' px (1/' + g.olcek + ' örnekleme)');
+    if (g.geo){
+      m.push('  GSD              : ' + (g.geo.cografi ? g.geo.sx + '°/px' : (g.geo.sx * 100).toFixed(3) + ' cm/px') +
+        (g.olcek > 1 ? ' (çalışma: ' + (g.geo.cografi ? '' : (g.geo.sx * g.olcek * 100).toFixed(3) + ' cm/px') + ')' : ''));
+      m.push('  CRS              : ' + (g.geo.epsg ? 'EPSG:' + g.geo.epsg : 'tanımsız') + (g.geo.ad ? ' — ' + g.geo.ad : ''));
+    }
+    m.push('');
+  }
+  m.push('YÖNTEM');
+  m.push('  Örnekleme        : Etiketli piksellerden sınıf başına en çok ' + $('secOrnekSiniri').value +
+    ' yama, rezervuar örneklemesi (mulberry32, tohum=42).');
+  m.push('  Yama boyu        : ' + e.yama + ' × ' + e.yama + ' px');
+  m.push('  Öznitelikler     : 24 adet — RGB/parlaklık/HSV istatistikleri, ExG, GLI, VARI, NGRDI,');
+  m.push('                     gradyan, değer aralığı ve histogram entropisi (yama bazında).');
+  m.push('  Aday modeller    : k-NN (k=3/5/7) · Softmaks regresyon (3 ayar) · YSA (3 mimari, Adam) ·');
+  m.push('                     Rastgele Orman (2 ayar); her biri 3 öznitelik kümesiyle → ' +
+    otoAyarListesi().length + ' kombinasyon.');
+  if (e.enIyi && e.enIyi.cv)
+    m.push('  Model seçimi     : Katmanlı ' + e.enIyi.cv.katSayi + '-kat çapraz doğrulama, ölçüt makro-F1.');
+  m.push('  Standartlaştırma : z-skor (eğitim katmanı istatistikleriyle).');
+  m.push('');
+  if (e.n){
+    m.push('EĞİTİM VERİSİ');
+    m.push('  Toplam yama      : ' + e.n);
+    D.siniflar.forEach((s, c) => m.push('  ' + (s.ad + ' '.repeat(17)).slice(0, 17) + ': ' + (e.sayimlar[c] || 0) + ' yama'));
+    m.push('');
+  }
+  m.push('SONUÇ — SEÇİLEN MODEL');
+  m.push('  Model            : ' + e.enIyi.ad + ' (öznitelik kümesi: ' + e.enIyi.kume + ')');
+  if (e.enIyi.cv){
+    m.push('  CV doğruluğu     : ' + (e.enIyi.cv.dogruluk * 100).toFixed(2) + '%');
+    m.push('  CV makro-F1      : ' + (e.enIyi.cv.f1 * 100).toFixed(2) + '%');
+  }
+  if (e.liderlik && e.liderlik.length){
+    m.push('');
+    m.push('LİDER TABLOSU (ilk 5)');
+    e.liderlik.slice(0, 5).forEach((r, i) =>
+      m.push('  ' + (i + 1) + '. ' + r.ad + ' · ' + r.kume + ' — doğruluk ' +
+        (r.dogruluk * 100).toFixed(2) + '%, F1 ' + (r.f1 * 100).toFixed(2) + '%'));
+  }
+  if (e.fisher && e.fisher.length){
+    m.push('');
+    m.push('EN AYIRT EDİCİ ÖZNİTELİKLER (Fisher skoru)');
+    e.fisher.slice(0, 5).forEach(f => m.push('  ' + (f.ad + ' '.repeat(16)).slice(0, 16) + ': ' + f.skor.toFixed(3)));
+  }
+  if (D.sonuc){
+    const s = D.sonuc;
+    m.push('');
+    m.push('SINIFLANDIRMA');
+    m.push('  Kayan pencere    : ' + e.yama + ' px yama, ' + s.adim + ' px adım → ' + s.gw + ' × ' + s.gh + ' blok');
+    m.push('  Yumuşatma        : ' + ($('chkYumusat').checked ? '3×3 komşuluk ortalaması' : 'kapalı'));
+    m.push('  Güven eşiği      : %' + $('esik').value);
+    const rows = $('tabloIstat').querySelectorAll('tr');
+    rows.forEach((tr, i) => {
+      if (i === 0) return;
+      const h = [...tr.children].map(td => td.textContent.trim());
+      if (h.length >= 5) m.push('  ' + (h[0] + ' '.repeat(17)).slice(0, 17) + ': ' + h[1] + ' blok, ' + h[2] + ', alan ' + h[3] + ', ' + h[4] + ' bölge');
+    });
+  }
+  m.push('');
+  m.push('NOT: Bu hızlı sınıflandırma, tez ana iş akışındaki (YOLOv8-seg) ağaç bazlı tespitin');
+  m.push('ön etüdü/karşılaştırması olarak kullanılabilir. Ağaç bazlı doğruluk değerlendirmesi için');
+  m.push('depodaki accuracy_assessment.js hattını kullanın.');
+  $('raporMetni').value = m.join('\n');
+  $('kipRapor').showModal();
+});
+$('btnRaporKopyala').addEventListener('click', async () => {
+  try{
+    await navigator.clipboard.writeText($('raporMetni').value);
+    $('btnRaporKopyala').textContent = '✓ Kopyalandı';
+    setTimeout(() => $('btnRaporKopyala').textContent = '📋 Kopyala', 1500);
+  }catch(_e){
+    $('raporMetni').select();
+    document.execCommand('copy');
+  }
+});
+$('btnYardim').addEventListener('click', () => $('kipYardim').showModal());
+
+/* başlangıç */
+sinifListesiCiz();
+kanvasBoyutla();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "test": "node test/cekirdek_test.mjs",
     "inference": "node inference_orthomosaic.js",
     "export": "node export_results.js",
     "grid": "node make_reference_grid.js",

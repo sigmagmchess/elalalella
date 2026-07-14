@@ -16,6 +16,43 @@ doğruluk değerlendirmesi yapar.
 
 ---
 
+## 🧠 Çam-AI — Tarayıcıda Çalışan Mini Öğrenen Sınıflandırıcı (`mini_ai.html`)
+
+**Kurulum gerektirmez:** `mini_ai.html` dosyasına çift tıklayın (Chrome/Edge/Firefox/Safari).
+Tamamen HTML+JavaScript'tir, hiçbir veri internete gönderilmez.
+
+Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
+
+| Desteklenen girdi | Ayrıntı |
+|---|---|
+| GeoTIFF ortomozaik (`.tif`) | sıkıştırmasız · LZW (+öngörücü) · Deflate/ZIP · PackBits · JPEG-in-TIFF · şeritli/karolu · 8/16 bit · BigTIFF; GSD, EPSG ve UTM koordinatları otomatik okunur |
+| DSM/DTM (`.tif`) | 32-bit float + GDAL_NODATA maskesi |
+| `.jpg` / `.png` | coğrafi bilgi olmadan (alanlar piksel cinsinden) |
+
+**Nasıl çalışır?** (5 adım, uygulama içinde yönlendirmeli)
+
+1. **Veri Yükle** — büyük dosyalar seçilen işleme çözünürlüğüne akıllıca küçültülür
+   (şerit/karo bazında örnekleme; tüm görüntü belleğe alınmaz).
+2. **Etiketle** — fırçayla örnek boyayın: 🌲 Çam / Çam değil (+ isteğe bağlı ek sınıflar).
+3. **Eğit (Oto-AI)** — 24 öznitelik (RGB/HSV istatistikleri, ExG, GLI, VARI, NGRDI,
+   doku) çıkarılır; **k-NN, Softmaks Regresyon, Yapay Sinir Ağı ve Rastgele Orman**
+   aileleri 3 öznitelik kümesiyle birlikte **33 kombinasyon** halinde katmanlı çapraz
+   doğrulamada yarıştırılır ve **en iyi öğrenme şekli otomatik seçilir** (ölçüt: makro-F1;
+   tohum=42 ile tekrarlanabilir). Verinizdeki en ayırt edici ortak özellikler Fisher
+   skoruyla raporlanır.
+4. **Sınıflandır** — kayan pencere tüm görüntüyü tarar; güven eşiği ve saydamlık
+   kaydırıcılarıyla katmanı ayarlayın; sınıf başına blok/%, **m² alan** (GeoTIFF ise)
+   ve bölge sayısı hesaplanır.
+5. **Dışa aktar** — PNG, CSV, **GeoJSON (QGIS'te açılır)**, model `.json`
+   (başka uçuşta yeniden eğitmeden kullanın), proje `.json` (etiketler dahil) ve
+   tez için otomatik **yöntem raporu**.
+
+Çekirdek (TIFF çözücü + ML motoru) `node test/cekirdek_test.mjs` ile test edilir (46 test).
+Bu araç, ana YOLOv8-seg hattının **ön etüdü/karşılaştırması** olarak tasarlanmıştır;
+ağaç bazlı doğruluk için aşağıdaki pipeline'ı kullanın.
+
+---
+
 ## 📦 Kurulum (Windows 11, Node.js 18+)
 
 1. [Node.js LTS](https://nodejs.org) kurun (18 veya üzeri).
