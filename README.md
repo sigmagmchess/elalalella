@@ -40,6 +40,9 @@ Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
    doğrulamada yarıştırılır ve **en iyi öğrenme şekli otomatik seçilir** (ölçüt: makro-F1;
    tohum=42 ile tekrarlanabilir). Verinizdeki en ayırt edici ortak özellikler Fisher
    skoruyla raporlanır.
+   **🔎 Analiz Et:** model hazırken bu bölüme **yeni bir harita/görüntü** bırakın —
+   eğitilmiş model korunur, görüntü otomatik sınıflandırılır, karar verilir ve ağaçlar
+   nokta atışı işaretlenir (tepe konumları olasılık ağırlıklı merkezle inceltilir).
 4. **Sınıflandır** — kayan pencere tüm görüntüyü tarar; güven eşiği ve saydamlık
    kaydırıcılarıyla katmanı ayarlayın; sınıf başına blok/%, **m² alan** (GeoTIFF ise)
    ve bölge sayısı hesaplanır. Üstte **görüntü kararı** verilir: *"çam VAR — %X kaplama"*

@@ -365,6 +365,23 @@ textarea.rapor{
     </div>
   </details>
 
+  <!-- ============ ANALİZ: EĞİTİM SONRASI YENİ GÖRÜNTÜ ============ -->
+  <details class="adim" id="adimAnaliz">
+    <summary><span class="no">🔎</span> Analiz Et — Yeni Harita/Görüntü <span class="durum" id="durumAnaliz"></span></summary>
+    <div class="icerik">
+      <div class="ipucu">Model hazır olduktan sonra (Adım 3'te eğitin ya da kayıtlı model yükleyin) buraya
+        <b>yeni bir harita, ortomozaik veya fotoğraf</b> bırakın: uygulama <b>otomatik olarak</b> sınıflandırır,
+        görüntü kararını verir ve her çam ağacını <b>nokta atışı</b> tek tek işaretler.</div>
+      <div class="birak" id="birakAnaliz" tabindex="0" role="button" aria-label="Analiz görüntüsü seç veya sürükleyip bırak">
+        <span class="buyuk">🗺️</span>
+        <b>Analiz görüntüsünü buraya bırakın</b> ya da tıklayıp seçin<br>
+        <small>GeoTIFF (<code>.tif</code>), JPG, PNG — eğitimden bağımsız yeni görüntü</small>
+      </div>
+      <input type="file" id="dosyaGirdiAnaliz" accept=".tif,.tiff,.jpg,.jpeg,.png,image/tiff,image/jpeg,image/png" class="gizli">
+      <div id="analizHata" class="hata gizli"></div>
+    </div>
+  </details>
+
   <!-- ============ ADIM 4: SINIFLANDIR ============ -->
   <details class="adim" id="adim4">
     <summary><span class="no">4</span> Sınıflandır <span class="durum" id="durum4">bekliyor</span></summary>
@@ -490,6 +507,10 @@ textarea.rapor{
         sınıflar (ör. yapraklı ağaç) tanımlayın.</li>
       <li><b>Eğit:</b> “Eğitimi Başlat”a basın. Oto-AI tüm model+ayar kombinasyonlarını çapraz doğrulamayla
         dener ve en iyisini seçer; sıralamayı canlı görürsünüz.</li>
+      <li><b>Analiz Et (yeni görüntü):</b> Model hazırken 🔎 <b>Analiz Et</b> bölümüne yeni bir harita,
+        ortomozaik ya da fotoğraf bırakın — uygulama <b>otomatik olarak</b> sınıflandırır, görüntü kararını
+        verir ve ağaçları nokta atışı işaretler. Eğitilmiş model yeni görüntü yüklense de <b>korunur</b>;
+        modeli dosya olarak kaydetmenize gerek kalmadan istediğiniz kadar görüntü analiz edebilirsiniz.</li>
       <li><b>Sınıflandır:</b> Model tüm görüntüyü tarar; renkli katman ve alan istatistikleri üretilir.
         Güven eşiğini kaydırarak sonucu ayarlayın. Üstte <b>görüntü kararı</b> görünür
         (“çam VAR — %X kaplama” ya da “çam tespit edilmedi”).</li>
@@ -1973,6 +1994,27 @@ function agacIsaretle(ayar){
     sepet.get(anahtar).push(kayit);
     if (kabul.length >= 50000) break;                  // emniyet sınırı
   }
+  /* nokta atışı: tepe konumunu taç penceresi içindeki olasılık ağırlıklı merkeze incelt */
+  const yariP = Math.max(1, Math.round(d / 2));
+  for (const k of kabul){
+    let tx = 0, ty = 0, tw = 0;
+    const x0 = Math.max(0, k.x - yariP), x1 = Math.min(gw - 1, k.x + yariP);
+    const y0 = Math.max(0, k.y - yariP), y1 = Math.min(gh - 1, k.y + yariP);
+    for (let y = y0; y <= y1; y++){
+      for (let x = x0; x <= x1; x++){
+        const i = y * gw + x;
+        if (sinif[i] === 255) continue;
+        const taban = i * K;
+        const p = probs[taban + camIdx];
+        if (p < esik) continue;
+        let enC = 0;
+        for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+        if (enC !== camIdx) continue;
+        tx += x * p; ty += y * p; tw += p;
+      }
+    }
+    if (tw > 0){ k.x = tx / tw; k.y = ty / tw; }
+  }
   return kabul;
 }
 
@@ -2130,7 +2172,7 @@ $('dosyaGirdi').addEventListener('change', e => {
 });
 
 async function dosyaYukle(dosya){
-  if (D.mesgul) return;
+  if (D.mesgul) return false;
   const hataEl = $('yukleHata');
   goster(hataEl, false);
   const ad = dosya.name || 'görüntü';
@@ -2139,13 +2181,13 @@ async function dosyaYukle(dosya){
   if (!tiffMi && !['jpg', 'jpeg', 'png'].includes(uzanti)){
     hataEl.textContent = 'Desteklenmeyen dosya türü: .' + uzanti + '\nGeoTIFF (.tif), JPG veya PNG yükleyin.';
     goster(hataEl, true);
-    return;
+    return false;
   }
   if (dosya.size > 1610612736){
     hataEl.textContent = 'Dosya 1,5 GB sınırını aşıyor (' + (dosya.size / 1048576 / 1024).toFixed(2) +
       ' GB). Pix4D\'den LZW sıkıştırmalı GeoTIFF ya da daha küçük bir bölge dışa aktarın.';
     goster(hataEl, true);
-    return;
+    return false;
   }
   D.mesgul = true;
   const kutu = $('yukleIlerlemeKutu'), cubuk = $('yukleIlerleme'), yazi = $('yukleIlerlemeYazi');
@@ -2172,6 +2214,7 @@ async function dosyaYukle(dosya){
     await beklet();
     gorselKur(g);
     goster(kutu, false);
+    return true;
   }catch(hata){
     console.error(hata);
     goster(kutu, false);
@@ -2179,8 +2222,65 @@ async function dosyaYukle(dosya){
       '\n\nÇözüm önerileri:\n• Pix4D\'den "GeoTIFF (LZW)" veya JPG olarak yeniden dışa aktarın.\n' +
       '• Çok büyükse işleme çözünürlüğünü 2048\'e düşürün.';
     goster(hataEl, true);
+    return false;
   }finally{
     D.mesgul = false;
+  }
+}
+
+/* --- Analiz alanı: eğitim sonrası yeni harita/görüntü → otomatik sınıflandır + nokta atışı --- */
+const birakA = $('birakAnaliz');
+birakA.addEventListener('click', () => $('dosyaGirdiAnaliz').click());
+birakA.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') $('dosyaGirdiAnaliz').click(); });
+birakA.addEventListener('dragover', e => { e.preventDefault(); birakA.classList.add('ustunde'); });
+birakA.addEventListener('dragleave', () => birakA.classList.remove('ustunde'));
+birakA.addEventListener('drop', e => {
+  e.preventDefault(); birakA.classList.remove('ustunde');
+  if (e.dataTransfer.files.length) analizEt(e.dataTransfer.files[0]);
+});
+$('dosyaGirdiAnaliz').addEventListener('change', e => {
+  if (e.target.files.length) analizEt(e.target.files[0]);
+  e.target.value = '';
+});
+
+async function analizEt(dosya){
+  const hataEl = $('analizHata');
+  goster(hataEl, false);
+  if (D.mesgul) return;
+  if (!D.egitim){
+    hataEl.textContent = 'Önce bir model hazırlayın: Adım 3\'te eğitin ya da Adım 5\'ten kayıtlı model yükleyin.';
+    goster(hataEl, true);
+    return;
+  }
+  $('durumAnaliz').classList.remove('tamam');
+  $('durumAnaliz').textContent = 'yükleniyor…';
+  const tamam = await dosyaYukle(dosya);
+  if (!tamam){
+    $('durumAnaliz').textContent = '';
+    hataEl.textContent = $('yukleHata').textContent || 'Görüntü yüklenemedi.';
+    goster(hataEl, true);
+    return;
+  }
+  /* GSD uyumu: analiz görüntüsünün çözünürlüğü eğitimdekinden çok farklıysa uyar */
+  const g = D.gorsel;
+  const suanki = g.geo && !g.geo.cografi ? g.geo.sx * g.olcek : null;
+  if (D.egitim.gsdCalisma && suanki &&
+      (suanki / D.egitim.gsdCalisma > 1.6 || D.egitim.gsdCalisma / suanki > 1.6))
+    await bilgi('Uyarı: bu görüntünün çözünürlüğü eğitim görüntüsünden belirgin farklı.\n' +
+      'Eğitim: ' + (D.egitim.gsdCalisma * 100).toFixed(1) + ' cm/px · Bu görüntü: ' +
+      (suanki * 100).toFixed(1) + ' cm/px.\nDoğruluk düşebilir; gerekirse bu görüntüde de birkaç örnek etiketleyip yeniden eğitin.');
+  $('durumAnaliz').textContent = 'sınıflandırılıyor…';
+  await siniflandir();
+  if (D.sonuc){
+    $('durumAnaliz').textContent = 'ağaçlar işaretleniyor…';
+    agaclariHesapla(false);
+    const adet = D.agaclar ? D.agaclar.length : 0;
+    $('durumAnaliz').textContent = '✓ ' + sayiTR(adet) + ' çam işaretlendi';
+    $('durumAnaliz').classList.add('tamam');
+    $('adimAnaliz').open = false;
+    $('adim4').open = true;
+  } else {
+    $('durumAnaliz').textContent = '';
   }
 }
 
@@ -2222,8 +2322,7 @@ async function resimYukle(dosya, maxDim, safNodata){
 function gorselKur(g){
   D.gorsel = g;
   D.vuruslar = [];
-  const aktarilan = (D.egitim && D.egitim.iceAktarilan) ? D.egitim : null;   // içe aktarılan model korunur
-  D.egitim = aktarilan;
+  const aktarilan = D.egitim || null;   // eğitilmiş/içe aktarılmış model yeni görüntüde korunur
   D.sonuc = null;
   D.sonucKnv = null;
   D.gizliSiniflar.clear();
@@ -2266,7 +2365,7 @@ function gorselKur(g){
 
   durumYaz(1, '✓ yüklendi', true);
   durumYaz(2, 'etiket bekleniyor');
-  durumYaz(3, aktarilan ? '✓ model yüklendi' : 'bekliyor', !!aktarilan);
+  durumYaz(3, aktarilan ? '✓ model hazır' : 'bekliyor', !!aktarilan);
   durumYaz(4, aktarilan ? 'hazır' : 'bekliyor');
   durumYaz(5, 'bekliyor');
   $('adim1').open = false;
@@ -2288,7 +2387,9 @@ function gorselKur(g){
   const geoM = g.geo && !g.geo.cografi;
   $('tacBirim').textContent = geoM ? 'm' : 'px (özgün)';
   if (!$('tacCapi').dataset.elleDegisti) $('tacCapi').value = geoM ? '3' : '60';
-  goster($('liderKutu'), false); goster($('kazananKart'), !!aktarilan); goster($('ozellikKutu'), false);
+  goster($('liderKutu'), false);
+  goster($('kazananKart'), !!aktarilan);
+  goster($('ozellikKutu'), !!(aktarilan && aktarilan.fisher && aktarilan.fisher.length));
   $('durumBilgi').textContent = g.dosyaAd + ' · ' + sayiTR(g.w) + '×' + sayiTR(g.h) + ' px' +
     (g.geo && g.geo.epsg ? ' · EPSG:' + g.geo.epsg : '');
   sinifListesiCiz();
@@ -2833,7 +2934,9 @@ $('btnEgit').addEventListener('click', async () => {
       }
     });
     const sure = (performance.now() - baslangic) / 1000;
-    D.egitim = { ...sonuc, yama, sayimlar: veri.sayimlar, n: veri.n, sure };
+    D.egitim = { ...sonuc, yama, sayimlar: veri.sayimlar, n: veri.n, sure,
+      gsdCalisma: (D.gorsel.geo && !D.gorsel.geo.cografi)
+        ? D.gorsel.geo.sx * D.gorsel.olcek : null };
     goster(kutu, false);
     const e = sonuc.enIyi;
     $('kazananKart').innerHTML =
@@ -2842,7 +2945,8 @@ $('btnEgit').addEventListener('click', async () => {
       '</b>, makro-F1 <b>' + yuzde(e.cv.f1) + '</b>' +
       '<br>' + sayiTR(veri.n) + ' örnek yama · ' + D.siniflar.map((s, c) => s.ad + ': ' + veri.sayimlar[c]).join(' · ') +
       '<br><small>Oto-AI ' + otoAyarListesi().length + ' kombinasyonu ' + sure.toFixed(1).replace('.', ',') +
-      ' saniyede denedi ve en iyi öğrenme şeklini seçti.</small>';
+      ' saniyede denedi ve en iyi öğrenme şeklini seçti. Yeni bir haritayı 🔎 <b>Analiz Et</b> bölümüne ' +
+      'bırakarak otomatik nokta atışı işaretleme yapabilirsiniz.</small>';
     goster($('kazananKart'), true);
     const enYuksek = sonuc.fisher[0] ? Math.max(sonuc.fisher[0].skor, 1e-9) : 1;
     $('ozellikListe').innerHTML = sonuc.fisher.slice(0, 8).map(f =>
@@ -2872,7 +2976,7 @@ $('btnEgit').addEventListener('click', async () => {
 /* =====================================================================
    4) SINIFLANDIRMA
    ===================================================================== */
-$('btnSiniflandir').addEventListener('click', async () => {
+async function siniflandir(){
   if (D.mesgul || !D.egitim || !D.gorsel) return;
   const g = D.gorsel, e = D.egitim.enIyi, K = D.siniflar.length;
   const yama = D.egitim.yama;
@@ -2913,7 +3017,8 @@ $('btnSiniflandir').addEventListener('click', async () => {
     $('btnSiniflandir').disabled = false;
     etiketDurumGuncelle();
   }
-});
+}
+$('btnSiniflandir').addEventListener('click', siniflandir);
 
 function aktifProbs(){
   return $('chkYumusat').checked ? D.sonuc.probsYumusak : D.sonuc.probs;
@@ -3081,6 +3186,11 @@ function isaretKnvOlustur(){
     ctx.lineWidth = kalin;
     ctx.strokeStyle = '#137a2f';
     ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+    /* nokta atışı merkez işareti */
+    ctx.fillStyle = 'rgba(255,255,255,.95)';
+    ctx.beginPath(); ctx.arc(x, y, Math.max(2, kalin * 1.3), 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = '#137a2f';
+    ctx.beginPath(); ctx.arc(x, y, Math.max(1, kalin * 0.7), 0, 2 * Math.PI); ctx.fill();
   }
   if (D.enYogun){
     const x = s.yari + D.enYogun.gx * s.adim, y = s.yari + D.enYogun.gy * s.adim;
