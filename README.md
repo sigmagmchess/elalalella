@@ -59,9 +59,16 @@ Pix4D çıktınızı **doğrudan** yükleyebilirsiniz:
 5. **Çamları işaretle** — ortalama taç çapını girin; çam olasılık yüzeyindeki
    **yerel maksimumlar** NMS ile seyreltilerek **her çam ağacı tek tek işaretlenir ve
    sayılır**; çamların **en yoğun olduğu bölge** ⭐ ile (UTM koordinatıyla) gösterilir.
-6. **Dışa aktar** — PNG, CSV, **GeoJSON (QGIS'te açılır)**, **ağaç noktaları GeoJSON**
-   (her ağacın UTM koordinatı), model `.json` (başka uçuşta yeniden eğitmeden kullanın),
-   proje `.json` (etiketler dahil) ve tez için otomatik **yöntem raporu**.
+   **🌿 Taç poligonları:** ağaç noktalarını tohum alan **watershed** + kontur takibiyle
+   her tacın sınır poligonu çıkarılır (id, alan m², eşdeğer çap, UTM merkez, güven);
+   haritada çizilir, tıklayınca öznitelik baloncuğu açılır.
+6. **🎯 Doğruluk Analizi** — QGIS'te çizilmiş referans poligonları (GeoJSON) yükleyin;
+   **IoU tabanlı eşleştirme** ile TP/FP/FN, Precision/Recall/F1 ve eşleşen taçlar için
+   alan saçılım grafiği + R² üretilir — YOLOv8-seg karşılaştırma tablosuna hazır.
+7. **Dışa aktar** — PNG, CSV (+ poligon öznitelik tablosu), blok GeoJSON,
+   **ağaç noktaları GeoJSON**, **taç poligonları GeoJSON**, doğruluk raporu TXT,
+   model `.json`, proje `.json` ve tarih damgalı **🎓 Tez Raporu (TXT)** — görüntü/GSD/EPSG,
+   tam Oto-AI yarış tablosu, etiket/tespit istatistikleri ve doğruluk metrikleriyle.
 
 Çekirdek (TIFF çözücü + ML motoru) `node test/cekirdek_test.mjs` ile test edilir (46 test).
 Bu araç, ana YOLOv8-seg hattının **ön etüdü/karşılaştırması** olarak tasarlanmıştır;

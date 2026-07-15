@@ -186,6 +186,21 @@ table.lider tr.kazanan td{background:var(--accent-soft); font-weight:650}
 .ozellik-cubuk .cubuk > div{height:100%; background:var(--accent); border-radius:5px}
 .ozellik-cubuk .deger{width:40px; flex:0 0 40px; color:var(--ink2)}
 
+.stat-kart{
+  border:1px solid var(--line); border-radius:9px; padding:8px 6px; text-align:center;
+  background:var(--surface2);
+}
+.stat-kart .deger{font-size:19px; font-weight:700; line-height:1.2}
+.stat-kart .ad{font-size:10.5px; color:var(--ink2); margin-top:2px; letter-spacing:.3px}
+.stat-kart.iyi .deger{color:var(--ok)}
+.stat-kart.kotu .deger{color:var(--err)}
+
+#poligonBaloncuk{
+  position:absolute; pointer-events:none; background:var(--surface); border:1px solid var(--accent);
+  border-radius:8px; padding:6px 9px; font-size:11.5px; line-height:1.45; box-shadow:var(--shadow);
+  max-width:220px; z-index:5;
+}
+
 /* ---------- istatistik ---------- */
 table.istat{width:100%; border-collapse:collapse; font-size:12px}
 table.istat th{text-align:left; padding:3px 5px; border-bottom:2px solid var(--line); color:var(--ink2); font-weight:600}
@@ -465,6 +480,45 @@ textarea.rapor{
         </label>
       </div>
       <div id="agacSonucKutu" class="basari gizli" style="font-size:12.5px;line-height:1.5"></div>
+      <div class="satir gizli" id="poligonSatir">
+        <button class="btn kucuk birincil" id="btnPoligonCikar">🌿 Taç Poligonlarını Çıkar</button>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="chkPoligonGoster" checked> Göster
+        </label>
+      </div>
+      <div id="poligonIlerlemeKutu" class="gizli">
+        <div class="ilerleme"><div id="poligonIlerleme"></div></div>
+        <div class="ilerleme-yazi" id="poligonIlerlemeYazi"></div>
+      </div>
+      <div id="poligonKutu" class="basari gizli" style="font-size:12.5px;line-height:1.5"></div>
+    </div>
+  </details>
+
+  <!-- ============ DOĞRULUK ANALİZİ ============ -->
+  <details class="adim" id="adimDogruluk">
+    <summary><span class="no">🎯</span> Doğruluk Analizi <span class="durum" id="durumDogruluk">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="ipucu">QGIS'te elle çizdiğiniz <b>referans çam taç poligonlarını</b> (GeoJSON,
+        ortomozaikle aynı CRS — ör. EPSG:32635) yükleyin; uygulama kendi taç poligonlarıyla
+        <b>IoU tabanlı</b> eşleştirir. Sonuçlar YOLOv8-seg karşılaştırma tablonuza doğrudan girer.
+        Not: IoU, sınıflandırma bloğu çözünürlüğünde hesaplanır.</div>
+      <div class="arac-grup">
+        <button class="btn kucuk" id="btnReferansYukle">📥 Referans GeoJSON yükle…</button>
+        <input type="file" id="referansGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
+      </div>
+      <div id="referansBilgi" class="ipucu gizli"></div>
+      <div class="satir">
+        <label for="iouEsik">IoU eşiği:</label>
+        <input type="range" id="iouEsik" min="30" max="80" value="50" style="flex:1">
+        <span id="iouEsikYazi" style="font-size:11.5px;color:var(--ink2)">0,50</span>
+      </div>
+      <button class="btn birincil" id="btnDogrulukHesapla" disabled>🎯 Değerlendir</button>
+      <div id="dogrulukHata" class="hata gizli"></div>
+      <div id="dogrulukKartlar" class="gizli" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+      <canvas id="sacilimKnv" class="gizli" width="320" height="250"
+        style="width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface)"></canvas>
+      <div id="sacilimNot" class="ipucu gizli"></div>
+      <button class="btn kucuk gizli" id="btnDogrulukRapor">📄 Doğruluk raporu (TXT)</button>
     </div>
   </details>
 
@@ -477,6 +531,7 @@ textarea.rapor{
         <button class="btn kucuk" id="btnCsvAktar" disabled>📄 CSV (bloklar)</button>
         <button class="btn kucuk" id="btnGeojsonAktar" disabled>🌍 GeoJSON (QGIS)</button>
         <button class="btn kucuk" id="btnAgacGeojson" disabled>📍 Ağaç noktaları (GeoJSON)</button>
+        <button class="btn kucuk" id="btnPoligonGeojson" disabled>🌿 Taç poligonları (GeoJSON)</button>
       </div>
       <div class="arac-grup">
         <button class="btn kucuk" id="btnModelAktar" disabled>🧠 Modeli kaydet (.json)</button>
@@ -486,7 +541,7 @@ textarea.rapor{
         <button class="btn kucuk" id="btnIceAktar">📥 Model / proje yükle…</button>
         <input type="file" id="iceAktarGirdi" accept=".json,application/json" class="gizli">
       </div>
-      <button class="btn" id="btnRapor" disabled>📑 Tez için yöntem raporu üret</button>
+      <button class="btn" id="btnRapor" disabled>🎓 Tez Raporu (TXT)</button>
       <div class="ipucu">Model dosyasını kaydedip <b>başka bir uçuşun ortomozaiğinde</b> yeniden eğitmeden kullanabilirsiniz
         (yükle → Adım 4). Proje dosyası etiketlerinizi de saklar.</div>
     </div>
@@ -506,6 +561,7 @@ textarea.rapor{
   </div>
   <div class="kanvas-kap" id="kanvasKap">
     <canvas id="ana" role="img" aria-label="Ortomozaik görüntüsü ve etiketleme tuvali"></canvas>
+    <div id="poligonBaloncuk" class="gizli"></div>
     <div class="kanvas-bos" id="kanvasBos">
       <span class="dev">🛩️</span>
       <b>Henüz görüntü yok</b>
@@ -558,6 +614,13 @@ textarea.rapor{
         her çam ağacı haritada tek tek daire ile işaretlenir ve sayılır; çamların
         <b>en yoğun olduğu bölge</b> ⭐ ile gösterilir. İşaretler UTM koordinatlı GeoJSON
         olarak QGIS'e aktarılabilir.</li>
+      <li><b>Taç poligonları:</b> “🌿 Taç Poligonlarını Çıkar” — çam maskesi, ağaç noktalarını
+        tohum alan <b>watershed</b> ile taçlara bölünür ve her tacın sınır poligonu çıkarılır
+        (id, alan m², eşdeğer çap, UTM merkez, güven). 🔍 İncele ile poligona tıklayınca
+        öznitelik baloncuğu açılır; katman GeoJSON olarak QGIS'e aktarılabilir.</li>
+      <li><b>Doğruluk Analizi:</b> QGIS'te elle çizdiğiniz referans poligonları (GeoJSON) yükleyin —
+        IoU tabanlı eşleştirmeyle <b>TP/FP/FN, Precision, Recall, F1</b> ve eşleşen taçlar için
+        alan karşılaştırma saçılımı + R² üretilir; YOLOv8-seg karşılaştırma tablonuza doğrudan girer.</li>
       <li><b>Dışa aktar:</b> PNG, CSV, GeoJSON (QGIS'te açılır), model ve proje dosyaları.</li>
     </ol>
     <h3>Yöntem (tezinizin “Materyal ve Yöntem” bölümü için)</h3>
@@ -607,8 +670,9 @@ textarea.rapor{
 
 <!-- ============ RAPOR ============ -->
 <dialog id="kipRapor">
-  <div class="kip-baslik">📑 Tez İçin Yöntem Raporu
+  <div class="kip-baslik">🎓 Tez Raporu
     <button class="btn kucuk" id="btnRaporKopyala">📋 Kopyala</button>
+    <button class="btn kucuk" id="btnRaporIndir">💾 TXT indir</button>
     <button class="btn kucuk kapat">✕ Kapat</button>
   </div>
   <div class="kip-icerik">
@@ -2288,6 +2352,302 @@ function bagliBilesenSay(maske, gw, gh){
   }
   return adet;
 }
+/* =====================================================================
+   TAÇ POLİGONLARI — tohumlu watershed + kontur takibi + sadeleştirme
+   ===================================================================== */
+
+/* Douglas-Peucker (açık zincir) */
+function dpSadelestir(noktalar, eps){
+  const n = noktalar.length >> 1;
+  if (n <= 2) return noktalar.slice();
+  const tut = new Uint8Array(n);
+  tut[0] = tut[n - 1] = 1;
+  const yigin = [[0, n - 1]];
+  while (yigin.length){
+    const [a, b] = yigin.pop();
+    const ax = noktalar[a * 2], ay = noktalar[a * 2 + 1];
+    const bx = noktalar[b * 2], by = noktalar[b * 2 + 1];
+    const dx = bx - ax, dy = by - ay;
+    const boy2 = dx * dx + dy * dy;
+    let enUzak = -1, enMesafe = eps;
+    for (let i = a + 1; i < b; i++){
+      const px = noktalar[i * 2] - ax, py = noktalar[i * 2 + 1] - ay;
+      let d;
+      if (boy2 < 1e-12) d = Math.sqrt(px * px + py * py);
+      else d = Math.abs(px * dy - py * dx) / Math.sqrt(boy2);
+      if (d > enMesafe){ enMesafe = d; enUzak = i; }
+    }
+    if (enUzak >= 0){ tut[enUzak] = 1; yigin.push([a, enUzak], [enUzak, b]); }
+  }
+  const cikti = [];
+  for (let i = 0; i < n; i++) if (tut[i]) cikti.push(noktalar[i * 2], noktalar[i * 2 + 1]);
+  return cikti;
+}
+
+/* Kapalı halkayı iki zincire bölüp DP uygular */
+function halkaSadelestir(halka, eps){
+  const n = halka.length >> 1;
+  if (n <= 4) return halka.slice();
+  const yarim = n >> 1;
+  const z1 = halka.slice(0, (yarim + 1) * 2);
+  const z2 = halka.slice(yarim * 2).concat([halka[0], halka[1]]);
+  const s1 = dpSadelestir(z1, eps);
+  const s2 = dpSadelestir(z2, eps);
+  return s1.slice(0, s1.length - 2).concat(s2.slice(0, s2.length - 2));
+}
+
+function halkaAlani(halka){                             // shoelace (y-aşağı düzlemde işaretli)
+  let a = 0;
+  const n = halka.length >> 1;
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    a += halka[i * 2] * halka[j * 2 + 1] - halka[j * 2] * halka[i * 2 + 1];
+  }
+  return a / 2;
+}
+
+/* Etiket ızgarasında verilen etiketin DIŞ konturunu köşe koordinatlarıyla çıkarır.
+   Kenar parçaları iç bölge solda kalacak şekilde üretilip zincirlenir;
+   birden çok halka çıkarsa en büyük |alan| dış halkadır (delikler atılır). */
+function konturZincirle(etiket, gw, gh, hedef, x0, y0, x1, y1){
+  const baslangic = new Map();                          // "x_y" → bitiş [x,y]
+  const ekle = (ax, ay, bx, by) => baslangic.set(ax + '_' + ay, bx + '_' + by);
+  for (let y = y0; y <= y1; y++){
+    for (let x = x0; x <= x1; x++){
+      if (etiket[y * gw + x] !== hedef) continue;
+      if (y === 0 || etiket[(y - 1) * gw + x] !== hedef) ekle(x, y, x + 1, y);
+      if (x === gw - 1 || etiket[y * gw + x + 1] !== hedef) ekle(x + 1, y, x + 1, y + 1);
+      if (y === gh - 1 || etiket[(y + 1) * gw + x] !== hedef) ekle(x + 1, y + 1, x, y + 1);
+      if (x === 0 || etiket[y * gw + x - 1] !== hedef) ekle(x, y + 1, x, y);
+    }
+  }
+  let enHalka = null, enAlan = 0;
+  while (baslangic.size){
+    const bas = baslangic.keys().next().value;
+    const halka = [];
+    let simdiki = bas;
+    let bekci = baslangic.size + 4;
+    while (bekci-- > 0){
+      const son = baslangic.get(simdiki);
+      if (son === undefined) break;
+      baslangic.delete(simdiki);
+      const [hx, hy] = simdiki.split('_');
+      halka.push(+hx, +hy);
+      if (son === bas) break;
+      simdiki = son;
+    }
+    const alan = Math.abs(halkaAlani(halka));
+    if (alan > enAlan){ enAlan = alan; enHalka = halka; }
+  }
+  return enHalka;
+}
+
+/*
+  Tohumlu watershed + kontur: çam maskesini ağaç tohumlarına göre taçlara böler,
+  her tacın dış poligonunu üretir. Deterministiktir (olasılık azalan, eşitlikte
+  indeks artan sırayla taşma).
+  ayar: { probs, sinif, gw, gh, K, camIdx, esik, tohumlar:[{x,y}], onProgress }
+  → { poligonlar:[{id, halkaBlok:[x,y,...](köşe koordinatı), alanBlok, guven,
+       merkezX, merkezY (blok), tohumlu}], etiket: Int32Array(gw*gh) }
+*/
+async function tacPoligonlariCikar(ayar){
+  const { probs, sinif, gw, gh, K, camIdx, esik, tohumlar, onProgress } = ayar;
+  const bildir = onProgress || (() => {});
+  const N = gw * gh;
+  const maske = new Uint8Array(N);
+  const p = new Float32Array(N);
+  for (let i = 0; i < N; i++){
+    if (sinif[i] === 255) continue;
+    const taban = i * K;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+    if (enC === camIdx && probs[taban + camIdx] >= esik){
+      maske[i] = 1;
+      p[i] = probs[taban + camIdx];
+    }
+  }
+  const etiket = new Int32Array(N);
+  /* öncelik kuyruğu: yüksek olasılık önce, eşitlikte küçük indeks önce */
+  const hK = [], hI = [], hL = [];
+  const once = (a, b) => hK[a] > hK[b] || (hK[a] === hK[b] && hI[a] < hI[b]);
+  function it(a, b){
+    let t = hK[a]; hK[a] = hK[b]; hK[b] = t;
+    t = hI[a]; hI[a] = hI[b]; hI[b] = t;
+    t = hL[a]; hL[a] = hL[b]; hL[b] = t;
+  }
+  function pushH(k, i, l){
+    hK.push(k); hI.push(i); hL.push(l);
+    let c = hK.length - 1;
+    while (c > 0){
+      const e = (c - 1) >> 1;
+      if (once(e, c)) break;
+      it(e, c); c = e;
+    }
+  }
+  function popH(){
+    const son = hK.length - 1;
+    it(0, son);
+    const kayit = [hK.pop(), hI.pop(), hL.pop()];
+    let c = 0;
+    for (;;){
+      const s1 = c * 2 + 1, s2 = c * 2 + 2;
+      let en = c;
+      if (s1 < hK.length && once(s1, en)) en = s1;
+      if (s2 < hK.length && once(s2, en)) en = s2;
+      if (en === c) break;
+      it(c, en); c = en;
+    }
+    return kayit;
+  }
+  let sonEtiket = 0;
+  for (const t of tohumlar){
+    const tx = Math.max(0, Math.min(gw - 1, Math.round(t.x)));
+    const ty = Math.max(0, Math.min(gh - 1, Math.round(t.y)));
+    const i = ty * gw + tx;
+    if (!maske[i] || etiket[i]) continue;              // maske dışı/çakışan tohum atlanır
+    etiket[i] = ++sonEtiket;
+    pushH(p[i], i, sonEtiket);
+  }
+  let sayac = 0;
+  while (hK.length){
+    const [, i, l] = popH();
+    const x = i % gw;
+    const komsular = [
+      x > 0 ? i - 1 : -1, x < gw - 1 ? i + 1 : -1,
+      i >= gw ? i - gw : -1, i < N - gw ? i + gw : -1
+    ];
+    for (const j of komsular){
+      if (j < 0 || !maske[j] || etiket[j]) continue;
+      etiket[j] = l;
+      pushH(p[j], j, l);
+    }
+    if ((++sayac & 8191) === 0){ bildir(0.1 + 0.5 * sayac / N, 'taçlar ayrıştırılıyor'); await beklet(); }
+  }
+  /* tohumsuz kalan maske bileşenleri: kendi başına taç */
+  const kuyruk = new Int32Array(N);
+  for (let i = 0; i < N; i++){
+    if (!maske[i] || etiket[i]) continue;
+    const l = ++sonEtiket;
+    let bas = 0, uc = 0;
+    kuyruk[uc++] = i; etiket[i] = l;
+    while (bas < uc){
+      const q = kuyruk[bas++];
+      const x = q % gw;
+      const komsular = [
+        x > 0 ? q - 1 : -1, x < gw - 1 ? q + 1 : -1,
+        q >= gw ? q - gw : -1, q < N - gw ? q + gw : -1
+      ];
+      for (const j of komsular){
+        if (j < 0 || !maske[j] || etiket[j]) continue;
+        etiket[j] = l; kuyruk[uc++] = j;
+      }
+    }
+  }
+  /* etiket istatistikleri */
+  const alan = new Int32Array(sonEtiket + 1);
+  const pTop = new Float64Array(sonEtiket + 1);
+  const sx = new Float64Array(sonEtiket + 1), sy = new Float64Array(sonEtiket + 1);
+  const bb = new Int32Array((sonEtiket + 1) * 4);
+  for (let l = 1; l <= sonEtiket; l++){
+    bb[l * 4] = gw; bb[l * 4 + 1] = gh; bb[l * 4 + 2] = -1; bb[l * 4 + 3] = -1;
+  }
+  for (let i = 0; i < N; i++){
+    const l = etiket[i];
+    if (!l) continue;
+    const x = i % gw, y = (i / gw) | 0;
+    alan[l]++; pTop[l] += p[i]; sx[l] += x; sy[l] += y;
+    if (x < bb[l * 4]) bb[l * 4] = x;
+    if (y < bb[l * 4 + 1]) bb[l * 4 + 1] = y;
+    if (x > bb[l * 4 + 2]) bb[l * 4 + 2] = x;
+    if (y > bb[l * 4 + 3]) bb[l * 4 + 3] = y;
+  }
+  const poligonlar = [];
+  for (let l = 1; l <= sonEtiket; l++){
+    if (!alan[l]) continue;
+    const halka = konturZincirle(etiket, gw, gh, l, bb[l * 4], bb[l * 4 + 1], bb[l * 4 + 2], bb[l * 4 + 3]);
+    if (!halka || halka.length < 6) continue;
+    const sade = halkaSadelestir(halka, 0.35);
+    poligonlar.push({
+      id: poligonlar.length + 1,
+      halkaBlok: sade.length >= 6 ? sade : halka,
+      alanBlok: alan[l],
+      guven: pTop[l] / alan[l],
+      merkezX: sx[l] / alan[l],
+      merkezY: sy[l] / alan[l],
+      tohumlu: l <= tohumlar.length,
+      etiketNo: l
+    });
+    if ((l & 255) === 0){ bildir(0.6 + 0.35 * l / sonEtiket, 'konturlar çiziliyor'); await beklet(); }
+  }
+  bildir(1, 'bitti');
+  return { poligonlar, etiket };
+}
+
+/* =====================================================================
+   DOĞRULUK: IoU tabanlı açgözlü eşleştirme + Pearson R²
+   ===================================================================== */
+function pearsonKare(xs, ys){
+  const n = xs.length;
+  if (n < 2) return 0;
+  let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+  for (let i = 0; i < n; i++){
+    sx += xs[i]; sy += ys[i];
+    sxx += xs[i] * xs[i]; syy += ys[i] * ys[i]; sxy += xs[i] * ys[i];
+  }
+  const pay = n * sxy - sx * sy;
+  const payda = (n * sxx - sx * sx) * (n * syy - sy * sy);
+  if (payda <= 1e-12) return 0;
+  return (pay * pay) / payda;
+}
+
+/*
+  Tahmin etiket ızgarası ile referans maskelerini blok çözünürlüğünde IoU ile eşleştirir.
+  tahminler: tacPoligonlariCikar çıktısındaki poligon listesi (etiketNo + alanBlok + bbox türetilir)
+  referanslar: [{maske:Uint8Array(bw*bh), x0, y0, bw, bh, alanBlok}]
+  → { tp, fp, fn, precision, recall, f1, ciftler:[{tahminIdx, refIdx, iou}] }
+*/
+function iouEslestir(etiket, gw, gh, tahminler, referanslar, esik){
+  const adaylar = [];
+  for (let ri = 0; ri < referanslar.length; ri++){
+    const r = referanslar[ri];
+    const kesisim = new Map();                          // etiketNo → kesişen blok sayısı
+    for (let y = 0; y < r.bh; y++){
+      const gy = r.y0 + y;
+      if (gy < 0 || gy >= gh) continue;
+      for (let x = 0; x < r.bw; x++){
+        if (!r.maske[y * r.bw + x]) continue;
+        const gx = r.x0 + x;
+        if (gx < 0 || gx >= gw) continue;
+        const l = etiket[gy * gw + gx];
+        if (l) kesisim.set(l, (kesisim.get(l) || 0) + 1);
+      }
+    }
+    for (const [l, kes] of kesisim){
+      const t = tahminler.find(tp2 => tp2.etiketNo === l);
+      if (!t) continue;
+      const iou = kes / (t.alanBlok + r.alanBlok - kes);
+      adaylar.push({ tahminIdx: tahminler.indexOf(t), refIdx: ri, iou });
+    }
+  }
+  adaylar.sort((a, b) => b.iou - a.iou || a.refIdx - b.refIdx || a.tahminIdx - b.tahminIdx);
+  const tKullanildi = new Uint8Array(tahminler.length);
+  const rKullanildi = new Uint8Array(referanslar.length);
+  const ciftler = [];
+  for (const a of adaylar){
+    if (a.iou < esik) break;
+    if (tKullanildi[a.tahminIdx] || rKullanildi[a.refIdx]) continue;
+    tKullanildi[a.tahminIdx] = 1;
+    rKullanildi[a.refIdx] = 1;
+    ciftler.push(a);
+  }
+  const tp = ciftler.length;
+  const fp = tahminler.length - tp;
+  const fn = referanslar.length - tp;
+  const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+  const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
+  return { tp, fp, fn, precision, recall, f1, ciftler };
+}
 /*__CEKIRDEK_BITIR__*/
 </script>
 <script>
@@ -2322,6 +2682,10 @@ const D = {
   agaclar: null,           // [{x, y (blok), p}] — işaretlenen çam tepe noktaları
   enYogun: null,           // {gx, gy, deger} — çamların en yoğun olduğu blok
   isaretKnv: null,
+  poligonlar: null,        // {liste, etiket, gw, gh, adim, yari, geoVar}
+  poligonKnv: null,
+  referans: null,          // {ad, halkalarPx:[[x,y,...]], sayi}
+  dogruluk: null,          // {tp,fp,fn,precision,recall,f1,r2,ciftler,esik,zaman}
   tacCalisPx: 12,
   gizliSiniflar: new Set(),
   havuz: [],               // çoklu eğitim: {ad, yama, n, sayimlar, X24, y, gsd}
@@ -2617,6 +2981,7 @@ function gorselKur(g){
   goster($('agacGosterSatir'), false); goster($('agacSonucKutu'), false);
   $('btnAgacGeojson').disabled = true;
   D.agaclar = null; D.enYogun = null; D.isaretKnv = null;
+  poligonlariGecersizKil();
   const geoM = g.geo && !g.geo.cografi;
   $('tacBirim').textContent = geoM ? 'm' : 'px (özgün)';
   if (!$('tacCapi').dataset.elleDegisti) $('tacCapi').value = geoM ? '3' : '60';
@@ -2667,6 +3032,19 @@ function sinifListesiCiz(){
     kap.appendChild(el);
   });
 }
+function poligonlariGecersizKil(){
+  D.poligonlar = null;
+  D.poligonKnv = null;
+  D.dogruluk = null;
+  $('btnPoligonGeojson').disabled = true;
+  $('btnDogrulukHesapla').disabled = true;
+  goster($('poligonSatir'), false); goster($('poligonKutu'), false);
+  goster($('poligonIlerlemeKutu'), false);
+  goster($('dogrulukKartlar'), false); goster($('sacilimKnv'), false);
+  goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
+  goster($('poligonBaloncuk'), false);
+  durumYaz('Dogruluk', D.referans ? 'referans hazır' : 'bekliyor');
+}
 function sonucuGecersizKil(){
   D.sonuc = null;
   D.sonucKnv = null;
@@ -2674,6 +3052,7 @@ function sonucuGecersizKil(){
   D.enYogun = null;
   D.isaretKnv = null;
   D.gizliSiniflar.clear();
+  poligonlariGecersizKil();
   ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar', 'btnAgacGeojson'].forEach(b => $(b).disabled = true);
   goster($('tabloIstat'), false); goster($('istatNot'), false);
   goster($('kararKutu'), false); goster($('agacSatir'), false);
@@ -3058,6 +3437,10 @@ function ciz(){
       D.sonuc.gw * ken, D.sonuc.gh * ken);
     ctxAna.globalAlpha = eskiAlfa;
   }
+  if (D.poligonKnv && D.poligonlar && $('chkPoligonGoster').checked){
+    ctxAna.imageSmoothingEnabled = true;
+    ctxAna.drawImage(D.poligonKnv, 0, 0);
+  }
   if (D.isaretKnv && D.agaclar && $('chkIsaretGoster').checked){
     ctxAna.imageSmoothingEnabled = true;
     ctxAna.drawImage(D.isaretKnv, 0, 0);
@@ -3290,6 +3673,8 @@ function koordinatYaz(x, y){
 function incele(ekranX, ekranY){
   if (!D.sonuc){ $('durumBilgi').textContent = 'İncelemek için önce sınıflandırma yapın.'; return; }
   const k = imgKoordinat(ekranX, ekranY);
+  if (D.poligonlar && $('chkPoligonGoster').checked &&
+      poligonBaloncukGoster(ekranX, ekranY, k.x, k.y)) return;
   const s = D.sonuc;
   const gx = Math.round((k.x - s.yari) / s.adim), gy = Math.round((k.y - s.yari) / s.adim);
   if (gx < 0 || gy < 0 || gx >= s.gw || gy >= s.gh) return;
@@ -3641,11 +4026,156 @@ function agaclariHesapla(sessiz){
   kutu.innerHTML = metin;
   goster(kutu, true);
   goster($('agacGosterSatir'), true);
+  goster($('poligonSatir'), agaclar.length > 0);
+  poligonKutuTemizle();
   $('btnAgacGeojson').disabled = !agaclar.length;
   if (!sessiz) $('adim5').open = true;
   ciz();
 }
+function poligonKutuTemizle(){
+  D.poligonlar = null;
+  D.poligonKnv = null;
+  D.dogruluk = null;
+  $('btnPoligonGeojson').disabled = true;
+  $('btnDogrulukHesapla').disabled = true;
+  goster($('poligonKutu'), false);
+  goster($('dogrulukKartlar'), false); goster($('sacilimKnv'), false);
+  goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
+  durumYaz('Dogruluk', D.referans ? 'referans hazır' : 'bekliyor');
+}
 $('btnAgacIsaretle').addEventListener('click', () => agaclariHesapla(false));
+
+/* =====================================================================
+   4c) TAÇ POLİGONLARI — tohumlu watershed sonuçlarının arayüzü
+   ===================================================================== */
+function blokKoseToPx(cx, cy){
+  const s = D.sonuc;
+  return [s.yari + (cx - 0.5) * s.adim, s.yari + (cy - 0.5) * s.adim];
+}
+async function poligonlariCikarUI(){
+  if (D.mesgul || !D.sonuc || !D.gorsel) return;
+  if (!D.agaclar) agaclariHesapla(true);
+  if (!D.agaclar || !D.agaclar.length) return;
+  const s = D.sonuc, g = D.gorsel, K = D.siniflar.length;
+  const geoVar = g.geo && !g.geo.cografi;
+  D.mesgul = true;
+  $('btnPoligonCikar').disabled = true;
+  const kutu = $('poligonIlerlemeKutu'), cubuk = $('poligonIlerleme'), yazi = $('poligonIlerlemeYazi');
+  try{
+    const sonuc = await tacPoligonlariCikar({
+      probs: aktifProbs(), sinif: s.sinif, gw: s.gw, gh: s.gh, K,
+      camIdx: camSinifIdx(), esik: parseInt($('esik').value, 10) / 100,
+      tohumlar: D.agaclar,
+      onProgress: (oran, mesaj) => ilerlemeKur(kutu, cubuk, yazi, oran, mesaj + '…')
+    });
+    goster(kutu, false);
+    const blokKenarOz = s.adim * g.olcek;               // özgün px / blok
+    const alanKatsayi = geoVar
+      ? blokKenarOz * blokKenarOz * g.geo.sx * g.geo.sy  // m² / blok
+      : blokKenarOz * blokKenarOz;                       // px² / blok
+    for (const p of sonuc.poligonlar){
+      const halkaPx = new Float32Array(p.halkaBlok.length);
+      for (let i = 0; i < p.halkaBlok.length; i += 2){
+        const [px, py] = blokKoseToPx(p.halkaBlok[i], p.halkaBlok[i + 1]);
+        halkaPx[i] = px; halkaPx[i + 1] = py;
+      }
+      p.halkaPx = halkaPx;
+      p.alan = p.alanBlok * alanKatsayi;                 // m² (geo varsa) ya da özgün px²
+      p.cap = 2 * Math.sqrt(p.alan / Math.PI);
+      const mx = (s.yari + p.merkezX * s.adim) * g.olcek;
+      const my = (s.yari + p.merkezY * s.adim) * g.olcek;
+      if (geoVar){
+        p.merkezE = g.geo.ox + (mx + 0.5 * g.olcek) * g.geo.sx;
+        p.merkezN = g.geo.oy - (my + 0.5 * g.olcek) * g.geo.sy;
+      } else { p.merkezE = mx; p.merkezN = my; }
+    }
+    D.poligonlar = { liste: sonuc.poligonlar, etiket: sonuc.etiket,
+      gw: s.gw, gh: s.gh, adim: s.adim, yari: s.yari, geoVar };
+    poligonKnvOlustur();
+    const n = sonuc.poligonlar.length;
+    const topAlan = sonuc.poligonlar.reduce((a, p) => a + p.alan, 0);
+    const ortCap = n ? sonuc.poligonlar.reduce((a, p) => a + p.cap, 0) / n : 0;
+    const birim = geoVar ? 'm²' : 'px²';
+    const capBirim = geoVar ? 'm' : 'px';
+    $('poligonKutu').className = n ? 'basari' : 'uyari';
+    $('poligonKutu').innerHTML = n
+      ? '🌿 <b>' + sayiTR(n) + ' taç poligonu</b> çıkarıldı.' +
+        '<br>Toplam taç alanı: <b>' + sayiTR(topAlan, 1) + ' ' + birim + '</b> · ' +
+        'ortalama taç: ' + sayiTR(topAlan / n, 2) + ' ' + birim +
+        ' · ortalama çap: ' + sayiTR(ortCap, 2) + ' ' + capBirim +
+        (geoVar ? '' : '<br>⚠️ Coğrafi bilgi olmadığından alanlar piksel² cinsindendir.') +
+        '<br><small>🔍 İncele aracıyla bir poligona tıklayıp özniteliklerini görebilirsiniz.</small>'
+      : '🚫 Poligon çıkarılamadı — eşik üstünde çam alanı yok.';
+    goster($('poligonKutu'), true);
+    $('btnPoligonGeojson').disabled = !n;
+    $('btnDogrulukHesapla').disabled = !(n && D.referans);
+    if (n && D.referans) durumYaz('Dogruluk', 'değerlendirmeye hazır');
+    $('adimDogruluk').open = !!(n && D.referans);
+    ciz();
+  }catch(hata){
+    console.error(hata);
+    goster(kutu, false);
+    await bilgi('Poligon çıkarımı hatası: ' + (hata && hata.message ? hata.message : hata));
+  }finally{
+    D.mesgul = false;
+    $('btnPoligonCikar').disabled = false;
+    etiketDurumGuncelle();
+  }
+}
+$('btnPoligonCikar').addEventListener('click', () => poligonlariCikarUI());
+$('chkPoligonGoster').addEventListener('change', ciz);
+
+function poligonKnvOlustur(){
+  const g = D.gorsel;
+  if (!D.poligonKnv) D.poligonKnv = document.createElement('canvas');
+  D.poligonKnv.width = g.outW;
+  D.poligonKnv.height = g.outH;
+  if (!D.poligonlar) return;
+  const ctx = D.poligonKnv.getContext('2d');
+  const renk = D.siniflar[camSinifIdx()].renk;
+  ctx.lineJoin = 'round';
+  for (const p of D.poligonlar.liste){
+    ctx.beginPath();
+    ctx.moveTo(p.halkaPx[0], p.halkaPx[1]);
+    for (let i = 2; i < p.halkaPx.length; i += 2) ctx.lineTo(p.halkaPx[i], p.halkaPx[i + 1]);
+    ctx.closePath();
+    ctx.fillStyle = renk + '2e';
+    ctx.fill();
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.stroke();
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = renk;
+    ctx.stroke();
+  }
+}
+
+/* İncele: poligon baloncuğu */
+function poligonBaloncukGoster(ekranX, ekranY, imgX, imgY){
+  if (!D.poligonlar) return false;
+  const P = D.poligonlar;
+  const gx = Math.round((imgX - P.yari) / P.adim);
+  const gy = Math.round((imgY - P.yari) / P.adim);
+  if (gx < 0 || gy < 0 || gx >= P.gw || gy >= P.gh) return false;
+  const l = P.etiket[gy * P.gw + gx];
+  if (!l) return false;
+  const p = P.liste.find(q => q.etiketNo === l);
+  if (!p) return false;
+  const b = $('poligonBaloncuk');
+  const birim = P.geoVar ? 'm²' : 'px²';
+  const capB = P.geoVar ? 'm' : 'px';
+  b.innerHTML = '<b>🌿 Taç #' + p.id + '</b><br>' +
+    'Alan: ' + sayiTR(p.alan, 2) + ' ' + birim + '<br>' +
+    'Çap: ' + sayiTR(p.cap, 2) + ' ' + capB + '<br>' +
+    (P.geoVar ? 'Merkez: E ' + sayiTR(p.merkezE, 2) + ', N ' + sayiTR(p.merkezN, 2) + '<br>' : '') +
+    'Güven: ' + yuzde(p.guven);
+  b.style.left = Math.min(ekranX + 14, kanvasKap.clientWidth - 230) + 'px';
+  b.style.top = Math.max(6, ekranY - 10) + 'px';
+  goster(b, true);
+  clearTimeout(poligonBaloncukGoster._z);
+  poligonBaloncukGoster._z = setTimeout(() => goster(b, false), 5000);
+  return true;
+}
 $('tacCapi').addEventListener('input', e => { e.target.dataset.elleDegisti = '1'; });
 $('tacCapi').addEventListener('change', () => { if (D.agaclar) agaclariHesapla(true); });
 $('chkIsaretGoster').addEventListener('change', ciz);
@@ -3737,8 +4267,53 @@ $('btnPngAktar').addEventListener('click', () => {
       D.sonuc.gw * ken, D.sonuc.gh * ken);
     ctx.globalAlpha = 1;
   }
+  if (D.poligonKnv && D.poligonlar && $('chkPoligonGoster').checked) ctx.drawImage(D.poligonKnv, 0, 0);
   if (D.isaretKnv && D.agaclar && $('chkIsaretGoster').checked) ctx.drawImage(D.isaretKnv, 0, 0);
   knv.toBlob(b => indir(dosyaKok() + '_siniflandirma.png', b), 'image/png');
+});
+
+/* --- taç poligonları GeoJSON --- */
+function poligonHalkaUTM(halkaPx){
+  const g = D.gorsel;
+  const geoVar = !!g.geo;
+  const halka = [];
+  for (let i = 0; i < halkaPx.length; i += 2){
+    const ox = halkaPx[i] * g.olcek, oy = halkaPx[i + 1] * g.olcek;
+    halka.push(geoVar
+      ? [g.geo.ox + ox * g.geo.sx, g.geo.oy - oy * g.geo.sy]
+      : [ox, -oy]);
+  }
+  if (halka.length && (halka[0][0] !== halka[halka.length - 1][0] ||
+      halka[0][1] !== halka[halka.length - 1][1]))
+    halka.push([halka[0][0], halka[0][1]]);
+  /* GeoJSON dış halkası saat yönünün tersine (E-N düzleminde pozitif alan) olmalı */
+  let a = 0;
+  for (let i = 0; i < halka.length - 1; i++)
+    a += halka[i][0] * halka[i + 1][1] - halka[i + 1][0] * halka[i][1];
+  if (a < 0) halka.reverse();
+  return halka;
+}
+$('btnPoligonGeojson').addEventListener('click', () => {
+  if (!D.poligonlar) return;
+  const g = D.gorsel;
+  const geoVar = D.poligonlar.geoVar;
+  const ozellikler = D.poligonlar.liste.map(p => ({
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [poligonHalkaUTM(p.halkaPx)] },
+    properties: {
+      id: p.id,
+      [geoVar ? 'alan_m2' : 'alan_px2']: +p.alan.toFixed(3),
+      [geoVar ? 'cap_m' : 'cap_px']: +p.cap.toFixed(3),
+      merkez_x: +p.merkezE.toFixed(3), merkez_y: +p.merkezN.toFixed(3),
+      guven: +p.guven.toFixed(4), tohumlu: p.tohumlu ? 1 : 0
+    }
+  }));
+  const fc = { type: 'FeatureCollection', features: ozellikler };
+  if (g.geo && g.geo.epsg)
+    fc.crs = { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::' + g.geo.epsg } };
+  indir(dosyaKok() + '_tac_poligonlari.geojson', JSON.stringify(fc), 'application/geo+json');
+  $('durumBilgi').textContent = '🌿 ' + ozellikler.length + ' taç poligonu GeoJSON olarak indirildi' +
+    (geoVar ? ' (QGIS: EPSG:' + (g.geo.epsg || 'ortomozaikle aynı') + ').' : ' (piksel koordinatlı).');
 });
 
 $('btnAgacGeojson').addEventListener('click', () => {
@@ -3808,6 +4383,16 @@ $('btnCsvAktar').addEventListener('click', () => {
       b.E === null ? '' : b.E.toFixed(3), b.N === null ? '' : b.N.toFixed(3),
       b.sinif, '"' + D.siniflar[b.sinif].ad.replace(/"/g, '""') + '"',
       b.p.toFixed(4), b.esikUstu ? 1 : 0].concat(p).join(','));
+  }
+  if (D.poligonlar && D.poligonlar.liste.length){
+    const geoVar = D.poligonlar.geoVar;
+    satirlar.push('');
+    satirlar.push('# TAC POLIGONLARI');
+    satirlar.push(['id', geoVar ? 'alan_m2' : 'alan_px2', geoVar ? 'cap_m' : 'cap_px',
+      'merkez_x', 'merkez_y', 'guven', 'blok_sayisi'].join(','));
+    for (const pol of D.poligonlar.liste)
+      satirlar.push([pol.id, pol.alan.toFixed(3), pol.cap.toFixed(3),
+        pol.merkezE.toFixed(3), pol.merkezN.toFixed(3), pol.guven.toFixed(4), pol.alanBlok].join(','));
   }
   indir(dosyaKok() + '_bloklar.csv', '﻿' + satirlar.join('\n'), 'text/csv;charset=utf-8');
 });
@@ -3969,13 +4554,238 @@ async function projeIceAktar(proje){
 }
 
 /* =====================================================================
+   DOĞRULUK ANALİZİ — referans GeoJSON, IoU eşleştirme, saçılım
+   ===================================================================== */
+$('btnReferansYukle').addEventListener('click', () => $('referansGirdi').click());
+$('referansGirdi').addEventListener('change', async e => {
+  if (!e.target.files.length) return;
+  const dosya = e.target.files[0];
+  e.target.value = '';
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
+  try{
+    if (!D.gorsel) throw new Error('Önce görüntüyü yükleyin (koordinat dönüşümü için gerekli).');
+    const gj = JSON.parse(await dosya.text());
+    const halkalar = [];
+    const halkaEkle = koordinatlar => {
+      if (!Array.isArray(koordinatlar) || !koordinatlar.length) return;
+      const g = D.gorsel;
+      const geoVar = !!g.geo;
+      const px = [];
+      for (const nokta of koordinatlar){
+        if (!Array.isArray(nokta) || nokta.length < 2) return;
+        if (geoVar){
+          px.push((nokta[0] - g.geo.ox) / (g.geo.sx * g.olcek),
+                  (g.geo.oy - nokta[1]) / (g.geo.sy * g.olcek));
+        } else {
+          px.push(nokta[0] / g.olcek, -nokta[1] / g.olcek);
+        }
+      }
+      if (px.length >= 6) halkalar.push(px);
+    };
+    const geometriler = gj.type === 'FeatureCollection'
+      ? gj.features.map(f => f && f.geometry).filter(Boolean)
+      : (gj.type === 'Feature' ? [gj.geometry] : [gj]);
+    for (const geom of geometriler){
+      if (!geom) continue;
+      if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0]);
+      else if (geom.type === 'MultiPolygon')
+        for (const poli of geom.coordinates) halkaEkle(poli[0]);
+    }
+    if (!halkalar.length)
+      throw new Error('Dosyada Polygon/MultiPolygon bulunamadı. QGIS\'ten poligon katmanını GeoJSON olarak dışa aktarın.');
+    /* görüntü kapsamı denetimi: halkaların ağırlık merkezi görüntü içinde mi? */
+    let icerde = 0;
+    for (const h of halkalar){
+      let mx = 0, my = 0;
+      const n = h.length >> 1;
+      for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; }
+      mx /= n; my /= n;
+      if (mx >= 0 && my >= 0 && mx < D.gorsel.outW && my < D.gorsel.outH) icerde++;
+    }
+    D.referans = { ad: dosya.name, halkalarPx: halkalar, sayi: halkalar.length };
+    D.dogruluk = null;
+    goster($('dogrulukKartlar'), false); goster($('sacilimKnv'), false);
+    goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
+    $('referansBilgi').innerHTML = '📥 <b>' + dosya.name + '</b> — ' + halkalar.length +
+      ' referans poligon yüklendi' +
+      (icerde < halkalar.length
+        ? '<br>⚠️ ' + (halkalar.length - icerde) + ' poligonun merkezi görüntü dışında: CRS uyumunu (EPSG:' +
+          (D.gorsel.geo && D.gorsel.geo.epsg ? D.gorsel.geo.epsg : '?') + ') kontrol edin.'
+        : '');
+    goster($('referansBilgi'), true);
+    $('btnDogrulukHesapla').disabled = !(D.poligonlar && D.poligonlar.liste.length);
+    durumYaz('Dogruluk', D.poligonlar ? 'değerlendirmeye hazır' : 'önce poligon çıkarın');
+    if (D.poligonlar) $('adimDogruluk').open = true;
+  }catch(hata){
+    hataEl.textContent = '⚠️ ' + (hata && hata.message ? hata.message : hata);
+    goster(hataEl, true);
+  }
+});
+$('iouEsik').addEventListener('input', () => {
+  $('iouEsikYazi').textContent = (parseInt($('iouEsik').value, 10) / 100).toFixed(2).replace('.', ',');
+});
+$('iouEsik').addEventListener('change', () => { if (D.dogruluk) dogrulukHesapla(); });
+$('btnDogrulukHesapla').addEventListener('click', () => dogrulukHesapla());
+
+function dogrulukHesapla(){
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
+  if (!D.poligonlar || !D.referans) return;
+  const P = D.poligonlar;
+  try{
+    /* referansları blok çözünürlüğünde rasterize et */
+    const refMaskeler = [];
+    for (const halkaPx of D.referans.halkalarPx){
+      const blok = new Array(halkaPx.length);
+      for (let i = 0; i < halkaPx.length; i += 2){
+        blok[i] = (halkaPx[i] - P.yari) / P.adim + 0.5;
+        blok[i + 1] = (halkaPx[i + 1] - P.yari) / P.adim + 0.5;
+      }
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let i = 0; i < blok.length; i += 2){
+        if (blok[i] < x0) x0 = blok[i];
+        if (blok[i] > x1) x1 = blok[i];
+        if (blok[i + 1] < y0) y0 = blok[i + 1];
+        if (blok[i + 1] > y1) y1 = blok[i + 1];
+      }
+      x0 = Math.floor(x0) - 1; y0 = Math.floor(y0) - 1;
+      const bw = Math.max(1, Math.ceil(x1) - x0 + 2), bh = Math.max(1, Math.ceil(y1) - y0 + 2);
+      if (bw * bh > 4e6) continue;                     // aşırı büyük/bozuk halka
+      const yerel = blok.slice();
+      for (let i = 0; i < yerel.length; i += 2){ yerel[i] -= x0; yerel[i + 1] -= y0; }
+      const maske = new Uint8Array(bw * bh);
+      const alanBlok = cokgenDoldur(maske, bw, bh, yerel, 1);
+      if (alanBlok > 0) refMaskeler.push({ maske, x0, y0, bw, bh, alanBlok });
+    }
+    if (!refMaskeler.length) throw new Error('Referans poligonlar görüntü kapsamıyla kesişmiyor (CRS uyumunu kontrol edin).');
+    const esik = parseInt($('iouEsik').value, 10) / 100;
+    const sonuc = iouEslestir(P.etiket, P.gw, P.gh, P.liste, refMaskeler, esik);
+    /* eşleşen çiftlerin alanları (m² ya da px²) */
+    const blokKenarOz = P.adim * D.gorsel.olcek;
+    const alanKatsayi = P.geoVar
+      ? blokKenarOz * blokKenarOz * D.gorsel.geo.sx * D.gorsel.geo.sy
+      : blokKenarOz * blokKenarOz;
+    const refAlan = [], tahAlan = [];
+    const ciftDokum = sonuc.ciftler.map(c => {
+      const t = P.liste[c.tahminIdx];
+      const rA = refMaskeler[c.refIdx].alanBlok * alanKatsayi;
+      refAlan.push(rA); tahAlan.push(t.alan);
+      return { tahminId: t.id, refNo: c.refIdx + 1, iou: c.iou, alanTahmin: t.alan, alanRef: rA };
+    });
+    const r2 = pearsonKare(refAlan, tahAlan);
+    D.dogruluk = { ...sonuc, r2, ciftDokum, esik, refAd: D.referans.ad,
+      refSayi: refMaskeler.length, zaman: new Date().toLocaleString('tr-TR') };
+    /* kartlar */
+    const kartlar = [
+      ['TP', sonuc.tp, 'iyi'], ['FP', sonuc.fp, sonuc.fp ? 'kotu' : 'iyi'], ['FN', sonuc.fn, sonuc.fn ? 'kotu' : 'iyi'],
+      ['Precision', yuzde(sonuc.precision), ''], ['Recall', yuzde(sonuc.recall), ''], ['F1', yuzde(sonuc.f1), 'iyi']
+    ];
+    $('dogrulukKartlar').innerHTML = kartlar.map(k =>
+      '<div class="stat-kart ' + k[2] + '"><div class="deger">' + k[1] + '</div><div class="ad">' + k[0] + '</div></div>'
+    ).join('');
+    goster($('dogrulukKartlar'), true);
+    sacilimCiz(refAlan, tahAlan, r2);
+    $('sacilimNot').textContent = 'Eşleşen ' + sonuc.tp + ' çift için taç alanı karşılaştırması — R² = ' +
+      r2.toFixed(3).replace('.', ',') + ' (IoU ≥ ' + esik.toFixed(2).replace('.', ',') +
+      ', blok çözünürlüğünde). Referans: ' + D.referans.ad;
+    goster($('sacilimNot'), true);
+    goster($('btnDogrulukRapor'), true);
+    durumYaz('Dogruluk', '✓ F1 ' + yuzde(sonuc.f1), true);
+  }catch(hata){
+    hataEl.textContent = '⚠️ ' + (hata && hata.message ? hata.message : hata);
+    goster(hataEl, true);
+  }
+}
+
+function sacilimCiz(xs, ys, r2){
+  const knv = $('sacilimKnv');
+  goster(knv, true);
+  const ctx = knv.getContext('2d');
+  const W2 = knv.width, H2 = knv.height;
+  const stil = getComputedStyle(document.documentElement);
+  const ink = stil.getPropertyValue('--ink').trim() || '#20261f';
+  const ink2 = stil.getPropertyValue('--ink2').trim() || '#5a6656';
+  const cizgi = stil.getPropertyValue('--line').trim() || '#dde3d8';
+  const vurgu = stil.getPropertyValue('--accent').trim() || '#2e6b3f';
+  ctx.clearRect(0, 0, W2, H2);
+  const kb = { sol: 44, alt: 30, ust: 12, sag: 12 };
+  const enCok = Math.max(1e-9, ...xs, ...ys) * 1.08;
+  const ex = x => kb.sol + (x / enCok) * (W2 - kb.sol - kb.sag);
+  const ey = y => H2 - kb.alt - (y / enCok) * (H2 - kb.alt - kb.ust);
+  ctx.strokeStyle = cizgi;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(kb.sol, kb.ust); ctx.lineTo(kb.sol, H2 - kb.alt); ctx.lineTo(W2 - kb.sag, H2 - kb.alt);
+  ctx.stroke();
+  ctx.fillStyle = ink2;
+  ctx.font = '10px sans-serif';
+  for (let t = 0; t <= 4; t++){
+    const deger = enCok * t / 4;
+    ctx.textAlign = 'right';
+    ctx.fillText(deger.toFixed(deger < 10 ? 1 : 0), kb.sol - 4, ey(deger) + 3);
+    ctx.textAlign = 'center';
+    ctx.fillText(deger.toFixed(deger < 10 ? 1 : 0), ex(deger), H2 - kb.alt + 12);
+  }
+  ctx.textAlign = 'center';
+  ctx.fillText('Referans alan', (kb.sol + W2 - kb.sag) / 2, H2 - 4);
+  ctx.save();
+  ctx.translate(10, (kb.ust + H2 - kb.alt) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Tahmin alan', 0, 0);
+  ctx.restore();
+  ctx.strokeStyle = ink2;                              // 1:1 çizgisi
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.moveTo(ex(0), ey(0)); ctx.lineTo(ex(enCok), ey(enCok));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = vurgu;
+  for (let i = 0; i < xs.length; i++){
+    ctx.beginPath();
+    ctx.arc(ex(xs[i]), ey(ys[i]), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = ink;
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('R² = ' + r2.toFixed(3).replace('.', ','), kb.sol + 8, kb.ust + 14);
+}
+
+$('btnDogrulukRapor').addEventListener('click', () => {
+  const d = D.dogruluk;
+  if (!d) return;
+  const birim = D.poligonlar && D.poligonlar.geoVar ? 'm²' : 'px²';
+  const m = [];
+  m.push('ÇAM-AI DOĞRULUK RAPORU — ' + d.zaman);
+  m.push('='.repeat(50));
+  m.push('Referans dosyası : ' + d.refAd + ' (' + d.refSayi + ' poligon)');
+  m.push('Tahmin poligonu  : ' + (D.poligonlar ? D.poligonlar.liste.length : 0));
+  m.push('IoU eşiği        : ' + d.esik.toFixed(2) + ' (blok çözünürlüğünde)');
+  m.push('');
+  m.push('TP = ' + d.tp + '   FP = ' + d.fp + '   FN = ' + d.fn);
+  m.push('Precision = ' + (d.precision * 100).toFixed(2) + '%');
+  m.push('Recall    = ' + (d.recall * 100).toFixed(2) + '%');
+  m.push('F1        = ' + (d.f1 * 100).toFixed(2) + '%');
+  m.push('Alan R²   = ' + d.r2.toFixed(4) + ' (eşleşen ' + d.tp + ' çift)');
+  m.push('');
+  m.push('EŞLEŞEN ÇİFTLER (tahmin id, referans no, IoU, tahmin alan, referans alan [' + birim + '])');
+  for (const c of d.ciftDokum)
+    m.push('  #' + String(c.tahminId).padStart(4) + '  ref ' + String(c.refNo).padStart(4) +
+      '  IoU ' + c.iou.toFixed(3) + '  ' + c.alanTahmin.toFixed(2).padStart(10) +
+      '  ' + c.alanRef.toFixed(2).padStart(10));
+  indir(dosyaKok() + '_dogruluk_raporu.txt', m.join('\n'), 'text/plain;charset=utf-8');
+});
+
+/* =====================================================================
    RAPOR
    ===================================================================== */
 $('btnRapor').addEventListener('click', () => {
   const g = D.gorsel, e = D.egitim;
   if (!e) return;
   const m = [];
-  m.push('ÇAM-AI YÖNTEM RAPORU (otomatik üretildi)');
+  m.push('ÇAM-AI TEZ RAPORU (otomatik üretildi)');
+  m.push('Tarih: ' + new Date().toLocaleString('tr-TR'));
   m.push('==========================================');
   m.push('');
   if (g){
@@ -4024,10 +4834,14 @@ $('btnRapor').addEventListener('click', () => {
   }
   if (e.liderlik && e.liderlik.length){
     m.push('');
-    m.push('LİDER TABLOSU (ilk 5)');
-    e.liderlik.slice(0, 5).forEach((r, i) =>
-      m.push('  ' + (i + 1) + '. ' + r.ad + ' · ' + r.kume + ' — doğruluk ' +
-        (r.dogruluk * 100).toFixed(2) + '%, F1 ' + (r.f1 * 100).toFixed(2) + '%'));
+    m.push('OTO-AI YARIŞ TABLOSU — TÜM KOMBİNASYONLAR (CV sonuçları)');
+    m.push('  ' + 'Sıra'.padEnd(5) + 'Model'.padEnd(22) + 'Öznitelik kümesi'.padEnd(20) +
+      'Doğruluk'.padStart(9) + 'Makro-F1'.padStart(10));
+    m.push('  ' + '-'.repeat(64));
+    e.liderlik.forEach((r, i) =>
+      m.push('  ' + String(i + 1).padEnd(5) + r.ad.padEnd(22) + r.kume.padEnd(20) +
+        ((r.dogruluk * 100).toFixed(2) + '%').padStart(9) +
+        ((r.f1 * 100).toFixed(2) + '%').padStart(10)));
   }
   if (e.fisher && e.fisher.length){
     m.push('');
@@ -4070,12 +4884,42 @@ $('btnRapor').addEventListener('click', () => {
       }
     }
   }
+  if (D.poligonlar && D.poligonlar.liste.length){
+    const L = D.poligonlar.liste;
+    const birim = D.poligonlar.geoVar ? 'm²' : 'px²';
+    const capBirim = D.poligonlar.geoVar ? 'm' : 'px';
+    const topAlan = L.reduce((a, p) => a + p.alan, 0);
+    m.push('');
+    m.push('TAÇ POLİGONLARI (tohumlu watershed + kontur takibi)');
+    m.push('  Poligon sayısı   : ' + L.length);
+    m.push('  Toplam taç alanı : ' + topAlan.toFixed(2) + ' ' + birim);
+    m.push('  Ortalama taç     : ' + (topAlan / L.length).toFixed(2) + ' ' + birim);
+    m.push('  Ortalama çap     : ' + (L.reduce((a, p) => a + p.cap, 0) / L.length).toFixed(2) + ' ' + capBirim +
+      ' (eşdeğer daire)');
+    if (!D.poligonlar.geoVar)
+      m.push('  UYARI            : coğrafi bilgi yok — alanlar piksel² cinsinden.');
+  }
+  if (D.dogruluk){
+    const d = D.dogruluk;
+    m.push('');
+    m.push('DOĞRULUK ANALİZİ (IoU eşleştirme, referans: ' + d.refAd + ')');
+    m.push('  IoU eşiği        : ' + d.esik.toFixed(2) + ' (blok çözünürlüğünde)');
+    m.push('  TP / FP / FN     : ' + d.tp + ' / ' + d.fp + ' / ' + d.fn);
+    m.push('  Precision        : ' + (d.precision * 100).toFixed(2) + '%');
+    m.push('  Recall           : ' + (d.recall * 100).toFixed(2) + '%');
+    m.push('  F1               : ' + (d.f1 * 100).toFixed(2) + '%');
+    m.push('  Taç alanı R²     : ' + d.r2.toFixed(4) + ' (eşleşen ' + d.tp + ' çift)');
+  }
   m.push('');
   m.push('NOT: Bu hızlı sınıflandırma, tez ana iş akışındaki (YOLOv8-seg) ağaç bazlı tespitin');
   m.push('ön etüdü/karşılaştırması olarak kullanılabilir. Ağaç bazlı doğruluk değerlendirmesi için');
   m.push('depodaki accuracy_assessment.js hattını kullanın.');
   $('raporMetni').value = m.join('\n');
   $('kipRapor').showModal();
+});
+$('btnRaporIndir').addEventListener('click', () => {
+  if (!$('raporMetni').value) return;
+  indir(dosyaKok() + '_tez_raporu.txt', $('raporMetni').value, 'text/plain;charset=utf-8');
 });
 $('btnRaporKopyala').addEventListener('click', async () => {
   try{

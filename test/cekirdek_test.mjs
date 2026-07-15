@@ -22,7 +22,8 @@ const cekirdek = new Function(es[1] + `;
     karisiklikOlc, dogrulukVeF1, katmanliKatlar, fisherSkorlari,
     otoAyarListesi, otoEgit, modelPaketle, modelAc,
     haritaSiniflandir, probYumusat, bagliBilesenSay, agacIsaretle, yogunlukHaritasi,
-    cokgenDoldur, tasmaDoldur };`)();
+    cokgenDoldur, tasmaDoldur,
+    dpSadelestir, halkaAlani, konturZincirle, tacPoligonlariCikar, iouEslestir, pearsonKare };`)();
 const C = cekirdek;
 
 let gecti = 0, kaldi = 0;
@@ -749,6 +750,87 @@ bolum('Etiketleme araçları: çokgen dolgusu ve sihirli değnek');
   gecerli[20 * W + 10] = 0;
   dogrula(C.tasmaDoldur(rgba, gecerli, W, H, 10, 20, 25, new Uint8Array(W * H), 1, 1e6) === 0,
     '"veri yok" tohumdan doldurma yapılmaz');
+}
+
+/* ================= 8. Taç poligonları ve doğruluk ================= */
+bolum('Taç poligonları: kontur, sadeleştirme, watershed');
+{
+  /* dikdörtgen bölge: kontur alanı blok sayısına eşit olmalı */
+  const gw = 30, gh = 20;
+  const etiket = new Int32Array(gw * gh);
+  for (let y = 5; y < 11; y++)
+    for (let x = 4; x < 14; x++) etiket[y * gw + x] = 1;      // 10×6 = 60 blok
+  const halka = C.konturZincirle(etiket, gw, gh, 1, 4, 5, 13, 10);
+  dogrula(!!halka && Math.abs(Math.abs(C.halkaAlani(halka)) - 60) < 0.01,
+    'dikdörtgen kontur alanı 60 blok (' + (halka ? Math.abs(C.halkaAlani(halka)).toFixed(1) : '-') + ')');
+  const sade = C.dpSadelestir([0, 0, 2, 0.01, 4, 0, 6, -0.01, 8, 0], 0.3);
+  dogrula(sade.length === 4, 'DP: doğrusala yakın zincir 2 noktaya iner');
+}
+{
+  /* watershed: tek maske lekesi + 2 tohum → 2 taç; ayrık lekecik → +1 tohumsuz taç */
+  const gw = 44, gh = 24, K = 2;
+  const probs = new Float32Array(gw * gh * K);
+  const sinif = new Uint8Array(gw * gh).fill(255);
+  let maskeBlok = 0;
+  for (let y = 0; y < gh; y++){
+    for (let x = 0; x < gw; x++){
+      const d1 = Math.hypot(x - 12, y - 12), d2 = Math.hypot(x - 28, y - 12);
+      const p = Math.max(1 - d1 / 9, 1 - d2 / 9);              // örtüşen iki tümsek
+      if (p >= 0.2){
+        const i = y * gw + x;
+        probs[i * K] = 0.5 + p / 2;
+        probs[i * K + 1] = 1 - probs[i * K];
+        sinif[i] = 0;
+        maskeBlok++;
+      }
+    }
+  }
+  /* tohumsuz ayrık lekecik */
+  for (let y = 2; y < 5; y++)
+    for (let x = 38; x < 42; x++){
+      const i = y * gw + x;
+      probs[i * K] = 0.8; probs[i * K + 1] = 0.2; sinif[i] = 0; maskeBlok++;
+    }
+  const sonuc = await C.tacPoligonlariCikar({
+    probs, sinif, gw, gh, K, camIdx: 0, esik: 0.5,
+    tohumlar: [{ x: 12, y: 12 }, { x: 28, y: 12 }]
+  });
+  dogrula(sonuc.poligonlar.length === 3,
+    'watershed: 2 tohumlu taç + 1 tohumsuz lekecik (' + sonuc.poligonlar.length + ')');
+  const topBlok = sonuc.poligonlar.reduce((a, p) => a + p.alanBlok, 0);
+  dogrula(topBlok === maskeBlok, 'poligon alanları maskeyi tam kapsar (' + topBlok + '/' + maskeBlok + ')');
+  const ilkIki = sonuc.poligonlar.filter(p => p.tohumlu).map(p => p.alanBlok).sort((a, b) => a - b);
+  dogrula(ilkIki.length === 2 && ilkIki[0] / ilkIki[1] > 0.6,
+    'bitişik taçlar dengeli bölündü (' + ilkIki.join('/') + ')');
+  dogrula(sonuc.poligonlar.every(p => p.guven >= 0.5 && p.guven <= 1), 'poligon güvenleri geçerli aralıkta');
+  /* kontur alanı ile blok alanı tutarlı olmalı (sadeleştirme payıyla) */
+  for (const p of sonuc.poligonlar.slice(0, 1)){
+    const kAlan = Math.abs(C.halkaAlani(p.halkaBlok));
+    dogrula(Math.abs(kAlan - p.alanBlok) / p.alanBlok < 0.12,
+      'kontur alanı ≈ blok alanı (%' + (100 * Math.abs(kAlan - p.alanBlok) / p.alanBlok).toFixed(1) + ' fark)');
+  }
+
+  /* IoU eşleştirme: birebir referans → hepsi TP; kaydırılmış referans → eşik altı */
+  const refMaskeler = sonuc.poligonlar.map(p => {
+    const x0 = Math.max(0, Math.floor(Math.min(...p.halkaBlok.filter((_, i) => i % 2 === 0))) - 1);
+    const y0 = Math.max(0, Math.floor(Math.min(...p.halkaBlok.filter((_, i) => i % 2 === 1))) - 1);
+    const bw = gw - x0, bh = gh - y0;
+    const maske = new Uint8Array(bw * bh);
+    let alanBlok = 0;
+    for (let y = 0; y < bh; y++)
+      for (let x = 0; x < bw; x++)
+        if (sonuc.etiket[(y + y0) * gw + (x + x0)] === p.etiketNo){ maske[y * bw + x] = 1; alanBlok++; }
+    return { maske, x0, y0, bw, bh, alanBlok };
+  });
+  const tam = C.iouEslestir(sonuc.etiket, gw, gh, sonuc.poligonlar, refMaskeler, 0.5);
+  dogrula(tam.tp === 3 && tam.fp === 0 && tam.fn === 0 && tam.f1 === 1,
+    'birebir referans: TP=3, F1=1');
+  dogrula(tam.ciftler.every(c => c.iou > 0.999), 'birebir eşleşmelerde IoU ≈ 1');
+  const bosRef = [{ maske: Uint8Array.from([1]), x0: 0, y0: gh - 1, bw: 1, bh: 1, alanBlok: 1 }];
+  const kacik = C.iouEslestir(sonuc.etiket, gw, gh, sonuc.poligonlar, bosRef, 0.5);
+  dogrula(kacik.tp === 0 && kacik.fn === 1 && kacik.fp === 3, 'kesişmeyen referans: TP=0');
+  dogrula(Math.abs(C.pearsonKare([1, 2, 3, 4], [2.1, 3.9, 6.2, 7.8]) - 1) < 0.01 &&
+    C.pearsonKare([1, 2, 3, 4], [5, 5, 5, 5]) === 0, 'Pearson R² doğru');
 }
 
 console.log('\n================================');
