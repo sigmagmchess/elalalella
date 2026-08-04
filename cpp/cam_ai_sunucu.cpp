@@ -374,7 +374,7 @@ struct Durum {
   std::string gecmisJson = "[]";
   std::string raporJson = "null";        // son eğitimin tez raporu (JSON)
   std::string sonHata;
-  int nE = 0, nV = 0;
+  std::atomic<int> nE{0}, nV{0};
 } G;
 
 // ---- havuz kalıcılığı (kilit çağıran tarafta tutulur) ----
@@ -418,10 +418,12 @@ static void havuzYukle(){
   }
 }
 // yeni örnekleri sınıf ADINA göre birleştirerek havuza ekler; eklenen örnek sayısını döndürür
-static int havuzaEkle(int d, const std::vector<std::string>& adlar,
+static int havuzaEkle(int d, int yamaGelen, const std::vector<std::string>& adlar,
                       const std::vector<float>& X, const std::vector<int>& y){
   if (G.havuz.d == 0) G.havuz.d = d;
   if (G.havuz.d != d) return -1;          // öznitelik sayısı uyuşmalı
+  if (yamaGelen > 0 && (G.havuz.yama == 0 || G.havuz.y.empty()))
+    G.havuz.yama = yamaGelen;             // pencere boyunu ilk gönderen belirler
   std::vector<int> esle(adlar.size());
   for (size_t i = 0; i < adlar.size(); i++){
     auto it = std::find(G.havuz.siniflar.begin(), G.havuz.siniflar.end(), adlar[i]);
@@ -959,9 +961,16 @@ static void istemciIsle(soket_t s){
       std::vector<int> y;
       std::vector<std::string> adlar;
       int d = 0, K = 0, eklenen = 0;
+      bool sahiplenildi = false;
       {
         std::lock_guard<std::mutex> kilit(G.kilit);
-        if (jX && jy && jX->tip == Json::DIZI && jy->tip == Json::DIZI && !jy->dizi.empty()){
+        // atomik test-ve-kur EN BAŞTA: yarışı kaybeden istek havuza da dokunamaz
+        if (G.egitimde.exchange(true))
+          hata = "Eğitim zaten sürüyor — önce /durdur çağırın.";
+        else
+          sahiplenildi = true;
+        if (hata.empty() &&
+            jX && jy && jX->tip == Json::DIZI && jy->tip == Json::DIZI && !jy->dizi.empty()){
           int dGelen = (int)j.sayiAl("d", 36);
           int KGelen = (int)j.sayiAl("K", 0);
           if (ja.hata || KGelen < 2 || dGelen < 1 ||
@@ -982,14 +991,13 @@ static void istemciIsle(soket_t s){
               for (auto& sj : js->dizi) adGelen.push_back(sj.dizgi);
             while ((int)adGelen.size() < KGelen)
               adGelen.push_back("Sınıf " + std::to_string(adGelen.size() + 1));
-            int yamaGelen = (int)j.sayiAl("yama", 0);
-            if (yamaGelen > 0) G.havuz.yama = yamaGelen;
             if (hata.empty()){
               if (sadeceBu){
                 X = std::move(Xg); y = std::move(yg); adlar = adGelen;
                 d = dGelen; K = KGelen; eklenen = n;
               } else {
-                eklenen = havuzaEkle(dGelen, adGelen, Xg, yg);   // bilgisayara kalıcı yazılır
+                int yamaGelen = (int)j.sayiAl("yama", 0);
+                eklenen = havuzaEkle(dGelen, yamaGelen, adGelen, Xg, yg);   // bilgisayara kalıcı yazılır
                 if (eklenen < 0)
                   hata = "Öznitelik sayısı havuzla uyuşmuyor (havuz d=" +
                          std::to_string(G.havuz.d) + ", gelen d=" + std::to_string(dGelen) + ").";
@@ -1009,6 +1017,8 @@ static void istemciIsle(soket_t s){
         if (hata.empty()){
           G.siniflar = adlar;
           G.sonHata.clear();
+        } else if (sahiplenildi){
+          G.egitimde = false;              // sahiplenmiştik ama istek geçersiz — bırak
         }
       }
       if (!hata.empty()){
@@ -1062,6 +1072,11 @@ static void istemciIsle(soket_t s){
       Json j = ja.coz();
       const Json* jX = j.al("X");
       std::lock_guard<std::mutex> kilit(G.kilit);
+      if (!G.modelHazir){                  // kilit altında yeniden denetle: eğitim az önce başlamış olabilir
+        yanit(s, 400, "application/json", "{\"hata\":\"Önce model eğitin ya da yükleyin.\"}");
+        SOKET_KAPAT(s);
+        return;
+      }
       int d = G.model.d, K = G.model.K;
       if (ja.hata || !jX || jX->tip != Json::DIZI || jX->dizi.size() % d != 0){
         yanit(s, 400, "application/json",
@@ -1113,7 +1128,10 @@ static void istemciIsle(soket_t s){
     }
   } else if (basliyorMu("POST /model")){
     std::lock_guard<std::mutex> kilit(G.kilit);
-    if (G.model.yukle((const uint8_t*)govde.data(), govde.size(), &G.siniflar)){
+    if (G.egitimde){
+      yanit(s, 400, "application/json",
+        "{\"hata\":\"Eğitim sürerken model yüklenemez — önce /durdur çağırın.\"}");
+    } else if (G.model.yukle((const uint8_t*)govde.data(), govde.size(), &G.siniflar)){
       G.modelHazir = true;
       G.modelDosyadan = true;
       G.parametre = G.model.parametre;
