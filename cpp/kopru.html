@@ -112,6 +112,16 @@ footer.durum{display:flex;align-items:center;gap:14px;padding:4px 12px;font-size
   color:var(--ink2);background:var(--surface);border-top:1px solid var(--line);flex:0 0 auto;
   flex-wrap:wrap;min-height:26px}
 footer.durum .bosluk{flex:1}
+.cip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;
+  border:1px solid var(--line);border-radius:999px;background:var(--surface2)}
+.cip i{width:11px;height:11px;border-radius:50%;display:inline-block;
+  border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);flex:0 0 11px}
+.uyari{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:7px;padding:7px 9px}
+#turListe label{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;
+  color:var(--ink);cursor:pointer;-webkit-user-select:none;user-select:none}
+#turListe .renkNokta{width:10px;height:10px;border-radius:50%;display:inline-block;flex:0 0 10px}
+.knvSarici{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
+.knvSarici canvas{display:block;width:100%;height:auto}
 </style>
 
 <header class="app">
@@ -119,7 +129,7 @@ footer.durum .bosluk{flex:1}
   <div class="baslik">
     <h1>Çam-AI · C++ Derin Eğitim Sunucusu</h1>
     <div class="alt">~10 milyon parametreli derin YSA — bilgisayarınızdaki <code>cam_ai.exe</code> içinde eğitilir,
-      öğrendikleri diske kaydedilir, veri dışarı gitmez</div>
+      öğrendikleri diske kaydedilir · eğittiğiniz <b>tüm ağaç türlerini</b> görüntüde nokta atışı bulur</div>
   </div>
   <div class="bosluk"></div>
   <span id="ustModel" class="btn kucuk" style="cursor:default">model: yok</span>
@@ -214,16 +224,87 @@ footer.durum .bosluk{flex:1}
     </div>
   </details>
 
+  <details class="adim" id="adim5">
+    <summary><span class="no">5</span> Görüntü Analizi — Tür Tespiti <span class="durum" id="durum5">bekliyor</span></summary>
+    <div class="icerik">
+      <div class="birak" id="birakGorsel">
+        <span class="buyuk">🛰️</span>
+        <b>Ortomozaik / görüntü bırakın</b> ya da tıklayıp seçin<br>
+        <small>GeoTIFF · TIFF · JPG · PNG — Pix4D çıktısı doğrudan açılır</small>
+      </div>
+      <input type="file" id="dosyaGorsel" accept=".tif,.tiff,.jpg,.jpeg,.png,.webp,.bmp,image/*" class="gizli">
+      <div id="gorselYukleKutu" class="gizli">
+        <div class="ilerleme"><div id="gorselCubukEl"></div></div>
+        <div class="ilerleme-yazi" id="gorselYaziEl"></div>
+      </div>
+      <div class="satir">
+        <label>İşleme çözünürlüğü:</label>
+        <select id="secCoz">
+          <option value="2048">2048 px (hızlı)</option>
+          <option value="3072" selected>3072 px (önerilen)</option>
+          <option value="4096">4096 px (ince)</option>
+        </select>
+      </div>
+      <div class="satir">
+        <label>Örnek penceresi:</label>
+        <input type="number" id="yamaA" value="24" min="8" max="128" style="max-width:64px">
+        <label>Tarama:</label>
+        <select id="secAdimA" style="max-width:120px">
+          <option value="0.25" selected>sık (¼ pencere)</option>
+          <option value="0.5">orta (½ pencere)</option>
+          <option value="1">seyrek (hızlı)</option>
+        </select>
+      </div>
+      <div class="ipucu">Örnek penceresi, eğitim verisindeki örnek boyudur (px) — proje dosyanızdan ya da
+        sunucudaki kalıcı havuzdan <b>otomatik</b> alınır; genelde dokunmanız gerekmez.</div>
+      <div id="turKutu" class="gizli">
+        <div style="font-size:12.5px;font-weight:600;margin-bottom:2px">🌳 İşaretlenecek türler</div>
+        <div id="turListe" class="satir" style="gap:4px 12px"></div>
+      </div>
+      <div class="satir">
+        <label for="esikA">Güven eşiği:</label>
+        <input type="range" id="esikA" min="30" max="95" value="50" style="flex:1;min-width:70px">
+        <span id="esikAYazi" style="font-size:11.5px;color:var(--ink2)">%50</span>
+      </div>
+      <div class="satir">
+        <label>Ort. taç çapı:</label>
+        <input type="number" id="tacA" value="3" min="0.5" step="0.5" style="max-width:64px">
+        <span id="tacBirim" style="font-size:11.5px;color:var(--ink2)">m</span>
+      </div>
+      <button class="btn birincil" id="btnAnaliz" disabled>🔍 Analiz Et — türleri nokta atışı işaretle</button>
+      <button class="btn gizli" id="btnAnalizDurdur">⏹ Analizi durdur</button>
+      <div id="analizIlerlemeKutu" class="gizli">
+        <div class="ilerleme"><div id="analizCubuk"></div></div>
+        <div class="ilerleme-yazi" id="analizYazi"></div>
+      </div>
+      <div id="analizOzet" class="basari gizli"></div>
+      <div class="satir gizli" id="aktarSatir">
+        <button class="btn kucuk" id="btnAgacCsv">📊 CSV</button>
+        <button class="btn kucuk" id="btnAgacGeo">🌍 GeoJSON (QGIS)</button>
+        <button class="btn kucuk" id="btnPngIndir">🖼️ İşaretli PNG</button>
+      </div>
+      <div id="analizHata" class="hata gizli"></div>
+    </div>
+  </details>
+
 </aside>
 
 <section class="sahne">
   <div class="sahne-bos" id="sahneBos">
     <span class="dev">🧠</span>
     <b>Henüz eğitim yok</b>
-    <span style="max-width:420px">Soldan sunucuya bağlanın, Çam-AI proje dosyanızı bırakın ve eğitimi
-      başlatın — canlı grafik, karışıklık matrisi ve tür metrikleri burada görünecek.</span>
+    <span style="max-width:440px">Soldan sunucuya bağlanın, Çam-AI proje dosyanızı bırakın ve eğitimi
+      başlatın — canlı grafik, karışıklık matrisi ve tür metrikleri burada görünecek.
+      Eğitimden sonra 5. adıma bir ortomozaik bırakın: model, öğrendiği <b>her türü</b>
+      görüntüde nokta atışı işaretler.</span>
   </div>
   <div class="sahne-ic gizli" id="sahneIc">
+    <div class="kart gizli" id="gorselKart">
+      <h3>🛰️ <span id="gorselBaslik">Görüntü</span></h3>
+      <div class="knvSarici"><canvas id="gorselKnv"></canvas></div>
+      <div id="lejant" class="satir gizli" style="margin-top:8px;gap:6px 12px"></div>
+      <div id="gorselNot" class="ipucu" style="margin-top:6px;font-size:11px"></div>
+    </div>
     <div class="kart">
       <h3>📈 Eğitim eğrisi — <span style="color:#c4553f">eğitim kaybı</span> ·
         <span style="color:var(--accent)">doğrulama makro-F1</span></h3>
@@ -257,6 +338,1963 @@ footer.durum .bosluk{flex:1}
 </footer>
 
 <script>
+/*__CEKIRDEK_BASLA__*/
+/* =====================================================================
+   ÇAM-AI ÇEKİRDEK — DOM'suz saf işlev katmanı
+   1) TIFF/GeoTIFF çözücü (şerit+karo, LZW/Deflate/PackBits/JPEG, BigTIFF)
+   2) Öznitelik çıkarımı (renk, bitki indeksi, doku)
+   3) ML motoru (k-NN, Softmaks, YSA, Rastgele Orman) + Oto-AI seçimi
+   Tümü tekrarlanabilirlik için tohumlu RNG (mulberry32, tohum=42) kullanır.
+   ===================================================================== */
+'use strict';
+
+/* ---------- yardımcılar ---------- */
+function mulberry32(tohum){
+  let t = tohum >>> 0;
+  return function(){
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/* tarayıcıda MessageChannel: arka plan sekmesindeki setTimeout kısıtlamasına takılmaz */
+let _bekletKanal = null;
+const _bekletKuyruk = [];
+function beklet(){
+  if (typeof window === 'undefined' || typeof MessageChannel === 'undefined')
+    return new Promise(r => setTimeout(r, 0));
+  if (!_bekletKanal){
+    _bekletKanal = new MessageChannel();
+    _bekletKanal.port1.onmessage = () => { const f = _bekletKuyruk.shift(); if (f) f(); };
+  }
+  return new Promise(r => { _bekletKuyruk.push(r); _bekletKanal.port2.postMessage(0); });
+}
+function karistir(dizi, rng){
+  for (let i = dizi.length - 1; i > 0; i--){
+    const j = (rng() * (i + 1)) | 0;
+    const t = dizi[i]; dizi[i] = dizi[j]; dizi[j] = t;
+  }
+  return dizi;
+}
+
+/* =====================================================================
+   1) TIFF / GeoTIFF ÇÖZÜCÜ
+   ===================================================================== */
+
+const TIFF_SIKISTIRMA_ADLARI = {
+  1:'sıkıştırmasız', 5:'LZW', 6:'eski JPEG', 7:'JPEG', 8:'Deflate/ZIP',
+  32946:'Deflate', 32773:'PackBits', 34712:'JPEG2000', 50001:'WebP'
+};
+
+function lzwAc(girdi, beklenenBoy){
+  const cikti = new Uint8Array(beklenenBoy);
+  let ciktiN = 0;
+  const onek = new Int32Array(4096), sonek = new Uint8Array(4096);
+  const yigin = new Uint8Array(4200);
+  let bitTampon = 0, bitSayi = 0, poz = 0;
+  let kodBoyu = 9, sonraki = 258, onceki = -1;
+
+  function kodOku(){
+    while (bitSayi < kodBoyu){
+      if (poz >= girdi.length) return 257;           // veri bitti → EOI say
+      bitTampon = ((bitTampon << 8) | girdi[poz++]) >>> 0;
+      bitSayi += 8;
+    }
+    bitSayi -= kodBoyu;
+    return (bitTampon >>> bitSayi) & ((1 << kodBoyu) - 1);
+  }
+  function diziYaz(kod){                              // kodun dizisini yazar, ilk baytı döndürür
+    let n = 0, c = kod;
+    while (c >= 258){ yigin[n++] = sonek[c]; c = onek[c]; }
+    yigin[n++] = c;
+    const ilk = c;
+    for (let i = n - 1; i >= 0; i--){
+      if (ciktiN < cikti.length) cikti[ciktiN++] = yigin[i];
+    }
+    return ilk;
+  }
+  for (;;){
+    const kod = kodOku();
+    if (kod === 257) break;                           // EOI
+    if (kod === 256){ kodBoyu = 9; sonraki = 258; onceki = -1; continue; }
+    if (onceki < 0){
+      if (kod > 255) break;                           // bozuk akış
+      diziYaz(kod); onceki = kod; continue;
+    }
+    let ilk;
+    if (kod < sonraki){
+      ilk = diziYaz(kod);
+      if (sonraki < 4096){ onek[sonraki] = onceki; sonek[sonraki] = ilk; sonraki++; }
+    } else if (kod === sonraki && sonraki < 4096){    // KwKwK durumu
+      let c = onceki; while (c >= 258) c = onek[c];
+      onek[sonraki] = onceki; sonek[sonraki] = c; sonraki++;
+      diziYaz(kod);
+    } else break;                                     // bozuk akış
+    onceki = kod;
+    if (sonraki === (1 << kodBoyu) - 1 && kodBoyu < 12) kodBoyu++;  // TIFF erken geçiş
+    if (ciktiN >= cikti.length) break;
+  }
+  return cikti;
+}
+
+function packbitsAc(girdi, beklenenBoy){
+  const cikti = new Uint8Array(beklenenBoy);
+  let i = 0, o = 0;
+  while (o < beklenenBoy && i < girdi.length){
+    let n = girdi[i++];
+    if (n > 127) n -= 256;
+    if (n >= 0){
+      for (let j = 0; j <= n && i < girdi.length && o < beklenenBoy; j++) cikti[o++] = girdi[i++];
+    } else if (n !== -128){
+      const b = girdi[i++];
+      for (let j = 0; j < 1 - n && o < beklenenBoy; j++) cikti[o++] = b;
+    }
+  }
+  return cikti;
+}
+
+async function deflateAc(girdi, beklenenBoy){
+  if (typeof DecompressionStream === 'undefined')
+    throw new Error('Bu tarayıcı Deflate açmayı desteklemiyor (DecompressionStream yok). Güncel Chrome/Edge/Firefox/Safari kullanın.');
+  for (const bicim of ['deflate', 'deflate-raw']){
+    try{
+      const akis = new Blob([girdi]).stream().pipeThrough(new DecompressionStream(bicim));
+      const ab = await new Response(akis).arrayBuffer();
+      const u8 = new Uint8Array(ab);
+      if (u8.length) return u8;
+    }catch(_e){ /* diğer biçimi dene */ }
+  }
+  throw new Error('Deflate/ZIP verisi açılamadı (bozuk sıkıştırma bloğu olabilir).');
+}
+
+/* JPEG-in-TIFF: JPEGTables (347) + karo verisini tek akışa birleştirip tarayıcıya çözdürt */
+async function jpegParcaCoz(veri, tablolar){
+  if (typeof createImageBitmap === 'undefined')
+    throw new Error('JPEG sıkıştırmalı TIFF bu ortamda çözülemiyor.');
+  let blob;
+  if (tablolar && tablolar.length > 4 && !(veri.length > 3 && veri[2] === 0xFF && veri[3] === 0xDB)){
+    // tablolar: SOI...EOI → SOI ve EOI atılır; veri: SOI atılır
+    blob = new Blob([tablolar.subarray(2, tablolar.length - 2), veri.subarray(2)].map(p => p.slice()),
+                    { type: 'image/jpeg' });
+    blob = new Blob([new Uint8Array([0xFF, 0xD8]), blob], { type: 'image/jpeg' });
+  } else {
+    blob = new Blob([veri.slice()], { type: 'image/jpeg' });
+  }
+  const bmp = await createImageBitmap(blob);
+  const knv = (typeof OffscreenCanvas !== 'undefined')
+    ? new OffscreenCanvas(bmp.width, bmp.height)
+    : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+  const ctx = knv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, 0, 0);
+  const gd = ctx.getImageData(0, 0, bmp.width, bmp.height);
+  bmp.close && bmp.close();
+  return { rgba: gd.data, w: bmp.width, h: bmp.height };
+}
+
+/* --- IFD okuma --- */
+function tiffTipBoyu(tip){
+  return {1:1,2:1,3:2,4:4,5:8,6:1,7:1,8:2,9:4,10:8,11:4,12:8,13:4,16:8,17:8,18:8}[tip] || 1;
+}
+function tiffDegerOku(dv, tip, ofs, az){
+  switch (tip){
+    case 1: case 7: return dv.getUint8(ofs);
+    case 2: return dv.getUint8(ofs);
+    case 3: return dv.getUint16(ofs, az);
+    case 4: case 13: return dv.getUint32(ofs, az);
+    case 5: return dv.getUint32(ofs, az) / (dv.getUint32(ofs + 4, az) || 1);
+    case 6: return dv.getInt8(ofs);
+    case 8: return dv.getInt16(ofs, az);
+    case 9: return dv.getInt32(ofs, az);
+    case 10: return dv.getInt32(ofs, az) / (dv.getInt32(ofs + 4, az) || 1);
+    case 11: return dv.getFloat32(ofs, az);
+    case 12: return dv.getFloat64(ofs, az);
+    case 16: case 17: case 18: return Number(az ? dv.getBigUint64(ofs, true) : dv.getBigUint64(ofs, false));
+    default: return 0;
+  }
+}
+function ifdOku(dv, ofs, az, big){
+  const etiketler = new Map();
+  const girisBoyu = big ? 20 : 12;
+  const adet = big ? Number(dv.getBigUint64(ofs, az)) : dv.getUint16(ofs, az);
+  let p = ofs + (big ? 8 : 2);
+  if (adet > 65535) throw new Error('Bozuk TIFF: IFD girdi sayısı aşırı büyük.');
+  for (let i = 0; i < adet; i++, p += girisBoyu){
+    const etiket = dv.getUint16(p, az);
+    const tip = dv.getUint16(p + 2, az);
+    const sayi = big ? Number(dv.getBigUint64(p + 4, az)) : dv.getUint32(p + 4, az);
+    const birim = tiffTipBoyu(tip);
+    const toplam = birim * sayi;
+    const alanOfs = p + (big ? 12 : 8);
+    const verOfs = toplam <= (big ? 8 : 4)
+      ? alanOfs
+      : (big ? Number(dv.getBigUint64(alanOfs, az)) : dv.getUint32(alanOfs, az));
+    etiketler.set(etiket, { tip, sayi, ofs: verOfs });
+  }
+  const sonraki = big ? Number(dv.getBigUint64(p, az)) : dv.getUint32(p, az);
+  return { etiketler, sonraki };
+}
+function etiketDizi(dv, giris, az, enCok){
+  if (!giris) return null;
+  const n = enCok ? Math.min(giris.sayi, enCok) : giris.sayi;
+  const birim = tiffTipBoyu(giris.tip);
+  const dizi = new Array(n);
+  for (let i = 0; i < n; i++) dizi[i] = tiffDegerOku(dv, giris.tip, giris.ofs + i * birim, az);
+  return dizi;
+}
+function etiketMetin(dv, giris, az){
+  if (!giris) return null;
+  let s = '';
+  for (let i = 0; i < giris.sayi; i++){
+    const c = dv.getUint8(giris.ofs + i);
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s;
+}
+function etiketHam(dv, giris){
+  if (!giris) return null;
+  return new Uint8Array(dv.buffer, dv.byteOffset + giris.ofs, giris.sayi * tiffTipBoyu(giris.tip));
+}
+
+/* --- GeoTIFF coğrafi bilgiler --- */
+function geoOku(dv, etiketler, az){
+  const olcek = etiketDizi(dv, etiketler.get(33550), az, 3);
+  const bagla = etiketDizi(dv, etiketler.get(33922), az, 6);
+  const matris = etiketDizi(dv, etiketler.get(34264), az, 16);
+  let sx = null, sy = null, ox = null, oy = null, donuk = false;
+  if (olcek && bagla && olcek[0] > 0 && olcek[1] > 0){
+    sx = olcek[0]; sy = olcek[1];
+    ox = bagla[3] - bagla[0] * sx;
+    oy = bagla[4] + bagla[1] * sy;
+  } else if (matris && matris.length === 16 && matris[0] !== 0){
+    sx = Math.abs(matris[0]); sy = Math.abs(matris[5]);
+    ox = matris[3]; oy = matris[7];
+    donuk = Math.abs(matris[1]) > 1e-12 || Math.abs(matris[4]) > 1e-12;
+  } else return null;
+
+  /* GeoKey'ler: 32767 = KvUserDefined (EPSG değildir); ModelType 1=projeksiyonlu, 2=coğrafi */
+  let epsg = null, cografi = false, ad = null;
+  const anahtarlar = etiketDizi(dv, etiketler.get(34735), az);
+  const ascii = etiketMetin(dv, etiketler.get(34737), az) || '';
+  if (anahtarlar && anahtarlar.length >= 4){
+    const adet = anahtarlar[3];
+    let modelTip = 0, projKod = null, cogrKod = null;
+    for (let i = 0; i < adet; i++){
+      const b = 4 + i * 4;
+      const anahtar = anahtarlar[b], konum = anahtarlar[b + 1],
+            sayi = anahtarlar[b + 2], deger = anahtarlar[b + 3];
+      if (anahtar === 1024 && konum === 0) modelTip = deger;
+      if (anahtar === 3072 && konum === 0 && deger > 0 && deger < 32767) projKod = deger;
+      if (anahtar === 2048 && konum === 0 && deger > 0 && deger < 32767) cogrKod = deger;
+      if ((anahtar === 1026 || anahtar === 3073) && konum === 34737 && !ad)
+        ad = ascii.substr(deger, sayi).replace(/[|\0]+$/g, '').trim();
+    }
+    if (modelTip === 2){ cografi = true; epsg = cogrKod; }
+    else if (projKod !== null){ epsg = projKod; }
+    else if (cogrKod !== null && modelTip !== 1){ epsg = cogrKod; cografi = true; }
+  }
+  return { sx, sy, ox, oy, epsg, cografi, ad, donuk };
+}
+
+/*
+  tiffCoz(arrayBuffer, secenek) →
+  { w, h, outW, outH, olcek, rgba, gecerli, geo, meta }
+  secenek: { maxDim, safNodata, onProgress(oran, mesaj) }
+  Büyük dosyalar tam çözünürlükte belleğe alınmaz: her şerit/karo açılır,
+  hedef çözünürlüğe örneklenerek yazılır (k≥2 iken 2×2 ortalama).
+*/
+async function tiffCoz(buf, secenek = {}){
+  const maxDim = secenek.maxDim || 3072;
+  const bildir = secenek.onProgress || (() => {});
+  const dv = new DataView(buf);
+  if (buf.byteLength < 16) throw new Error('Dosya çok küçük — geçerli bir TIFF değil.');
+  const imza = dv.getUint16(0, false);
+  let az;                                             // az = küçük endian (II)
+  if (imza === 0x4949) az = true;
+  else if (imza === 0x4D4D) az = false;
+  else throw new Error('TIFF imzası bulunamadı. Dosya .tif uzantılı ama içeriği farklı olabilir.');
+  const surum = dv.getUint16(2, az);
+  let big = false, ifdOfs;
+  if (surum === 42) ifdOfs = dv.getUint32(4, az);
+  else if (surum === 43){
+    big = true;
+    if (dv.getUint16(4, az) !== 8) throw new Error('Desteklenmeyen BigTIFF ofset boyutu.');
+    ifdOfs = Number(dv.getBigUint64(8, az));
+  } else throw new Error('Bilinmeyen TIFF sürümü: ' + surum);
+
+  /* tüm sayfaları oku; tam çözünürlüklü en büyük sayfayı seç
+     (Pix4D/GDAL bazen küçültülmüş ön izleme sayfaları da yazar) */
+  const sayfalar = [];
+  let bekci = 0;
+  while (ifdOfs > 0 && bekci++ < 64){
+    const s = ifdOku(dv, ifdOfs, az, big);
+    sayfalar.push(s.etiketler);
+    ifdOfs = s.sonraki;
+  }
+  if (!sayfalar.length) throw new Error('TIFF içinde görüntü dizini (IFD) bulunamadı.');
+  let sayfa = null, enBuyuk = -1;
+  for (const e of sayfalar){
+    const altTip = etiketDizi(dv, e.get(254), az, 1);
+    if (altTip && (altTip[0] & 1)) continue;          // küçültülmüş kopya → atla
+    const w0 = (etiketDizi(dv, e.get(256), az, 1) || [0])[0];
+    const h0 = (etiketDizi(dv, e.get(257), az, 1) || [0])[0];
+    if (w0 * h0 > enBuyuk){ enBuyuk = w0 * h0; sayfa = e; }
+  }
+  if (!sayfa) sayfa = sayfalar[0];
+
+  const D = (t, varsayilan) => {
+    const dizi = etiketDizi(dv, sayfa.get(t), az);
+    return dizi === null ? varsayilan : dizi;
+  };
+  const w = D(256, [0])[0], h = D(257, [0])[0];
+  if (!w || !h) throw new Error('TIFF boyutları okunamadı.');
+  if (w * h > 4e9) throw new Error('Görüntü aşırı büyük (' + w + '×' + h + ').');
+  const bitler = D(258, [8]);
+  const bit = bitler[0];
+  const sik = D(259, [1])[0];
+  const foto = D(262, [1])[0];
+  const bantSayi = D(277, [bitler.length || 1])[0];
+  const planar = D(284, [1])[0];
+  const ongoru = D(317, [1])[0];
+  const fmt = D(339, [1])[0];                          // 1 uint, 2 int, 3 float
+  const renkHarita = D(320, null);
+  const jpegTablolar = etiketHam(dv, sayfa.get(347));
+  const nodataYazi = etiketMetin(dv, sayfa.get(42113), az);
+  const ekstraOrnekler = D(338, null);                 // 4. bandın alfa olup olmadığını söyler
+  const alfaVar = !ekstraOrnekler || !ekstraOrnekler.length ||
+    ekstraOrnekler[0] === 1 || ekstraOrnekler[0] === 2;
+  const sikAd = TIFF_SIKISTIRMA_ADLARI[sik] || ('bilinmeyen (' + sik + ')');
+
+  let nodata = null;
+  if (nodataYazi != null && nodataYazi.trim() !== ''){
+    const f = parseFloat(nodataYazi);
+    if (isFinite(f)) nodata = f;
+    else if (/nan/i.test(nodataYazi)) nodata = NaN;
+  }
+
+  if (planar === 2 && bantSayi > 1)
+    throw new Error('PlanarConfiguration=2 (bant bant ayrık) TIFF desteklenmiyor. Pix4D\'den standart (chunky) GeoTIFF veya JPG dışa aktarın.');
+  if (![1, 5, 7, 8, 32946, 32773].includes(sik))
+    throw new Error('Desteklenmeyen sıkıştırma: ' + sikAd + '. LZW, Deflate, PackBits, JPEG veya sıkıştırmasız GeoTIFF kullanın.');
+  if (bit !== 8 && bit !== 16 && bit !== 32)
+    throw new Error('Desteklenmeyen bit derinliği: ' + bit + ' bit (8/16/32 desteklenir).');
+  if (bit === 32 && fmt !== 3)
+    throw new Error('32-bit tamsayı TIFF desteklenmiyor (yalnız 32-bit float).');
+  if (ongoru === 3) throw new Error('Öngörücü=3 (kayan nokta farkı) desteklenmiyor.');
+  if (foto === 6 && sik !== 7) throw new Error('JPEG dışı YCbCr TIFF desteklenmiyor.');
+
+  const jpegMi = sik === 7;
+  const karoMu = sayfa.has(322);
+  const cW = karoMu ? D(322, [w])[0] : w;
+  const cH = karoMu ? D(323, [h])[0] : D(278, [h])[0];
+  const ofsGiris = sayfa.get(karoMu ? 324 : 273);
+  const boyGiris = sayfa.get(karoMu ? 325 : 279);
+  if (!ofsGiris) throw new Error('TIFF veri konumları (strip/tile offsets) eksik.');
+  const ofsListe = etiketDizi(dv, ofsGiris, az);
+  let boyListe = boyGiris ? etiketDizi(dv, boyGiris, az) : null;
+  const baytBirim = bit >> 3;
+  if (!boyListe){
+    if (sik !== 1) throw new Error('Sıkıştırılmış TIFF için ByteCounts eksik.');
+    boyListe = ofsListe.map(() => cW * cH * bantSayi * baytBirim);
+  }
+  const karoSutun = karoMu ? Math.ceil(w / cW) : 1;
+
+  /* hedef (çalışma) çözünürlüğü */
+  const k = Math.max(1, Math.ceil(Math.max(w, h) / maxDim));
+  const outW = Math.ceil(w / k), outH = Math.ceil(h / k);
+  const N = outW * outH;
+  const ortalamaVar = k > 1 && foto !== 3;             // palet indeksi ortalanmaz
+  const Tur = bit <= 8 ? Uint8Array : (fmt === 3 || fmt === 2 ? Float32Array : Uint16Array);
+  const bantOut = jpegMi ? Math.min(4, Math.max(3, bantSayi)) : Math.min(4, bantSayi);
+  const bantlar = [];
+  for (let b = 0; b < bantOut; b++) bantlar.push(new Tur(N));
+  const kapsandi = new Uint8Array(N);
+
+  /* parça parça çöz ve örnekle */
+  const toplamParca = ofsListe.length;
+  for (let pi = 0; pi < toplamParca; pi++){
+    if ((pi & 63) === 0){ bildir(pi / toplamParca, 'çözülüyor'); await beklet(); }
+    const px0 = karoMu ? (pi % karoSutun) * cW : 0;
+    const py0 = karoMu ? ((pi / karoSutun) | 0) * cH : pi * cH;
+    if (py0 >= h) break;
+    const px1 = Math.min(w, px0 + cW);
+    const py1 = Math.min(h, py0 + cH);
+    let tyBas = Math.ceil(py0 / k);
+    let txBas = Math.ceil(px0 / k);
+    if (tyBas * k >= py1 || txBas * k >= px1) continue;          // bu parçadan örnek alınmıyor
+    if (!ofsListe[pi] || !boyListe[pi]) continue;                // seyrek (boş) karo
+    if (ofsListe[pi] + boyListe[pi] > buf.byteLength){
+      if (sik !== 1 || ofsListe[pi] >= buf.byteLength) continue; // bozuk kayıt
+      boyListe[pi] = buf.byteLength - ofsListe[pi];              // kırpılmış son parça
+    }
+
+    const ham = new Uint8Array(buf, ofsListe[pi], boyListe[pi]);
+    const parcaW = karoMu ? cW : w;
+    const parcaH = karoMu ? cH : (py1 - py0);
+    const beklenen = parcaW * parcaH * bantSayi * baytBirim;
+    if (beklenen > 268435456)
+      throw new Error('TIFF şerit/karo boyutu çok büyük (' + Math.round(beklenen / 1048576) +
+        ' MB) — dosya tek parça (RowsPerStrip\'siz) yazılmış olabilir. Pix4D/GDAL\'dan karolu ya da LZW şeritli GeoTIFF olarak yeniden dışa aktarın.');
+
+    let rgbaParca = null, orn = null, jpegW = 0;       // orn: sayısal örnek dizisi
+    if (jpegMi){
+      const j = await jpegParcaCoz(ham, jpegTablolar);
+      rgbaParca = j.rgba; jpegW = j.w;
+      if (j.w < px1 - px0) continue;
+    } else {
+      let bayt;
+      if (sik === 1) bayt = (ongoru === 2 ? ham.slice() : ham);  // öngörücü kaynağı bozmasın
+      else if (sik === 5) bayt = lzwAc(ham, beklenen);
+      else if (sik === 32773) bayt = packbitsAc(ham, beklenen);
+      else bayt = await deflateAc(ham, beklenen);
+      if (bayt.length < beklenen && sik === 1 && !karoMu){
+        // bazı yazıcılar son şeridi kırpar — kalan kısmı sıfırla doldur
+        const tam = new Uint8Array(beklenen); tam.set(bayt.subarray(0, Math.min(bayt.length, beklenen)));
+        bayt = tam;
+      }
+      if (bit === 8) orn = bayt;
+      else {
+        const adet = Math.min(beklenen, bayt.length) >> (bit === 16 ? 1 : 2);
+        const dv2 = new DataView(bayt.buffer, bayt.byteOffset, bayt.byteLength);
+        if (bit === 16){
+          orn = new Uint16Array(parcaW * parcaH * bantSayi);
+          if (fmt === 2){ const o2 = new Float32Array(orn.length);
+            for (let i = 0; i < adet; i++) o2[i] = dv2.getInt16(i << 1, az); orn = o2;
+          } else for (let i = 0; i < adet; i++) orn[i] = dv2.getUint16(i << 1, az);
+        } else {
+          orn = new Float32Array(parcaW * parcaH * bantSayi);
+          for (let i = 0; i < adet; i++) orn[i] = dv2.getFloat32(i << 2, az);
+        }
+      }
+      if (ongoru === 2){                                // yatay fark öngörücüsü
+        const maske = bit === 8 ? 0xFF : 0xFFFF;
+        const satirOrn = parcaW * bantSayi;
+        for (let r = 0; r < parcaH; r++){
+          const b0 = r * satirOrn;
+          if (bit === 32 || fmt === 2){
+            for (let i = bantSayi; i < satirOrn; i++) orn[b0 + i] += orn[b0 + i - bantSayi];
+          } else {
+            for (let i = bantSayi; i < satirOrn; i++)
+              orn[b0 + i] = (orn[b0 + i] + orn[b0 + i - bantSayi]) & maske;
+          }
+        }
+      }
+    }
+
+    /* hedefe örnekle */
+    const kanalSayi = jpegMi ? 4 : bantSayi;
+    const kaynakW = jpegMi ? jpegW : parcaW;
+    for (let ty = tyBas; ty < outH; ty++){
+      const sy = ty * k;
+      if (sy >= py1) break;
+      const ly = sy - py0;
+      const ly2 = ortalamaVar ? Math.min(sy + 1, py1 - 1) - py0 : ly;
+      const tabanH = ty * outW;
+      for (let tx = txBas; tx < outW; tx++){
+        const sx = tx * k;
+        if (sx >= px1) break;
+        const lx = sx - px0;
+        const lx2 = ortalamaVar ? Math.min(sx + 1, px1 - 1) - px0 : lx;
+        const hIdx = tabanH + tx;
+        for (let b = 0; b < bantOut; b++){
+          let v;
+          if (jpegMi){
+            const kb = b < 3 ? b : 3;
+            const i00 = (ly * kaynakW + lx) * 4 + kb, i01 = (ly * kaynakW + lx2) * 4 + kb;
+            const i10 = (ly2 * kaynakW + lx) * 4 + kb, i11 = (ly2 * kaynakW + lx2) * 4 + kb;
+            v = ortalamaVar
+              ? (rgbaParca[i00] + rgbaParca[i01] + rgbaParca[i10] + rgbaParca[i11] + 2) >> 2
+              : rgbaParca[i00];
+            if (b === 3 && bantSayi < 4) v = 255;
+          } else {
+            const i00 = (ly * kaynakW + lx) * kanalSayi + b, i01 = (ly * kaynakW + lx2) * kanalSayi + b;
+            const i10 = (ly2 * kaynakW + lx) * kanalSayi + b, i11 = (ly2 * kaynakW + lx2) * kanalSayi + b;
+            if (ortalamaVar){
+              const v00 = orn[i00], v01 = orn[i01], v10 = orn[i10], v11 = orn[i11];
+              /* nodata komşusu olan pikselde ortalama alma — "geçerli çöp" üretir */
+              v = (nodata !== null && (v00 === nodata || v01 === nodata || v10 === nodata || v11 === nodata))
+                ? v00
+                : (v00 + v01 + v10 + v11) / 4;
+            } else v = orn[i00];
+          }
+          bantlar[b][hIdx] = v;
+        }
+        kapsandi[hIdx] = 1;
+      }
+    }
+  }
+  bildir(0.97, 'renkler hazırlanıyor');
+  await beklet();
+
+  /* --- gerdirme (8 bit üstü için yüzde 2–98) --- */
+  const renkBantSayisi = (foto === 2 || jpegMi) && bantOut >= 3 ? 3 : 1;
+  let alfaIdx = -1;
+  if (jpegMi && bantOut >= 4) alfaIdx = 3;
+  else if (!jpegMi){
+    if (foto === 2 && bantOut >= 4 && alfaVar) alfaIdx = 3;
+    else if ((foto === 0 || foto === 1) && bantOut >= 2 && alfaVar) alfaIdx = 1;
+  }
+  const gerdirici = [];
+  for (let b = 0; b < renkBantSayisi; b++){
+    if (Tur === Uint8Array){ gerdirici.push(null); continue; }
+    const veri = bantlar[b];
+    let enAz = Infinity, enCok = -Infinity;
+    for (let i = 0; i < N; i++){
+      if (!kapsandi[i]) continue;
+      const v = veri[i];
+      if (!isFinite(v)) continue;
+      if (nodata !== null && (v === nodata || (isNaN(nodata) && isNaN(v)))) continue;
+      if (v < enAz) enAz = v;
+      if (v > enCok) enCok = v;
+    }
+    if (!isFinite(enAz) || enCok <= enAz){ gerdirici.push({ a: 0, b: 1 }); continue; }
+    const KUTU = 2048;
+    const his = new Float64Array(KUTU);
+    let sayim = 0;
+    const olcekH = (KUTU - 1) / (enCok - enAz);
+    for (let i = 0; i < N; i++){
+      if (!kapsandi[i]) continue;
+      const v = veri[i];
+      if (!isFinite(v)) continue;
+      if (nodata !== null && (v === nodata || (isNaN(nodata) && isNaN(v)))) continue;
+      his[((v - enAz) * olcekH) | 0]++; sayim++;
+    }
+    let alt = enAz, ust = enCok, top = 0;
+    for (let i = 0; i < KUTU; i++){ top += his[i]; if (top >= sayim * 0.02){ alt = enAz + i / olcekH; break; } }
+    top = 0;
+    for (let i = KUTU - 1; i >= 0; i--){ top += his[i]; if (top >= sayim * 0.02){ ust = enAz + (i + 1) / olcekH; break; } }
+    if (ust <= alt){ alt = enAz; ust = enCok; }
+    gerdirici.push({ a: alt, b: ust - alt });
+  }
+  const gerdir = (b, v) => {
+    const g = gerdirici[b];
+    if (!g) return v;
+    return Math.max(0, Math.min(255, Math.round((v - g.a) / g.b * 255)));
+  };
+
+  /* --- RGBA + geçerlilik maskesi --- */
+  const rgba = new Uint8ClampedArray(N * 4);
+  const gecerli = new Uint8Array(N);
+  const paletMi = foto === 3 && renkHarita;
+  const paletBoy = paletMi ? renkHarita.length / 3 : 0;
+  const safKontrol = !!secenek.safNodata;
+  for (let i = 0; i < N; i++){
+    const p = i * 4;
+    if (!kapsandi[i]){ rgba[p + 3] = 0; continue; }
+    let r, g, b2;
+    if (paletMi){
+      const ix = Math.max(0, Math.min(paletBoy - 1, bantlar[0][i] | 0));
+      r = renkHarita[ix] >> 8; g = renkHarita[paletBoy + ix] >> 8; b2 = renkHarita[2 * paletBoy + ix] >> 8;
+    } else if (renkBantSayisi === 3){
+      r = gerdir(0, bantlar[0][i]); g = gerdir(1, bantlar[1][i]); b2 = gerdir(2, bantlar[2][i]);
+    } else {
+      let v = gerdir(0, bantlar[0][i]);
+      if (foto === 0) v = 255 - v;
+      r = g = b2 = v;
+    }
+    let alfa = 255;
+    if (alfaIdx >= 0 && alfaIdx < bantOut){
+      const av = bantlar[alfaIdx][i];
+      alfa = Tur === Uint8Array ? av : (Tur === Uint16Array ? av / 257 : Math.max(0, Math.min(255, av * 255)));
+    }
+    let tamam = alfa > 16;
+    if (tamam && nodata !== null){
+      const v0 = bantlar[0][i];
+      if (v0 === nodata || (isNaN(nodata) && isNaN(v0))) tamam = false;
+    }
+    if (tamam && !isFinite(bantlar[0][i])) tamam = false;
+    if (tamam && safKontrol && renkBantSayisi === 3){
+      if ((r === 0 && g === 0 && b2 === 0) || (r === 255 && g === 255 && b2 === 255)) tamam = false;
+    }
+    rgba[p] = r; rgba[p + 1] = g; rgba[p + 2] = b2; rgba[p + 3] = tamam ? 255 : 0;
+    gecerli[i] = tamam ? 1 : 0;
+  }
+
+  const geo = geoOku(dv, sayfa, az);
+  bildir(1, 'bitti');
+  return {
+    w, h, outW, outH, olcek: k, rgba, gecerli, geo,
+    meta: {
+      sikAd, bit, fmt, bantSayi, karoMu, big,
+      parcaBoy: karoMu ? (cW + '×' + cH) : ('şerit ' + cH + ' satır'),
+      sayfaSayisi: sayfalar.length, nodata,
+      gri: renkBantSayisi === 1 && !paletMi
+    }
+  };
+}
+
+/* =====================================================================
+   2) ÖZNİTELİK ÇIKARIMI — "verideki ortak yanların" sayısal özeti
+   ===================================================================== */
+
+const OZELLIK_ADLARI = [
+  'Kırmızı ort.', 'Yeşil ort.', 'Mavi ort.', 'Kırmızı std', 'Yeşil std', 'Mavi std',
+  'Parlaklık ort.', 'Parlaklık std', 'Ton (cos)', 'Ton (sin)', 'Doygunluk', 'Değer (V)',
+  'ExG ort.', 'ExG std', 'GLI ort.', 'GLI std', 'VARI ort.', 'VARI std', 'NGRDI ort.', 'NGRDI std',
+  'Gradyan ort.', 'Gradyan std', 'Değer aralığı', 'Doku entropisi',
+  /* 24+ : ince ayrım kanalları — iğne/geniş yaprak dokusu, ton dağılımı, şekil/yön.
+     Hiçbiri kural içermez; hangisinin işe yaradığını model veriden öğrenir. */
+  'Ton dağılımı', 'Koyu piksel oranı', 'Koyu-yeşil doku', 'İnce doku enerjisi',
+  'Kaba doku enerjisi', 'Doku ölçek oranı', 'Yön tutarlılığı', 'GLCM kontrast',
+  'GLCM homojenlik', 'GLCM enerji', 'Kenar yoğunluğu', 'Parlaklık çarpıklığı'
+];
+const OZELLIK_SAYISI = 36;
+const OZELLIK_KUMELERI = {
+  'Renk':             Array.from({ length: 12 }, (_, i) => i),
+  'Renk+İndeks':      Array.from({ length: 20 }, (_, i) => i),
+  'Renk+İndeks+Doku': Array.from({ length: 24 }, (_, i) => i),
+  'Tüm ipuçları':     Array.from({ length: 36 }, (_, i) => i)
+};
+
+/* Verilen görüntü için yeniden kullanılabilir çıkarıcı üretir.
+   cikar(cx, cy, cikti[36]) → yeterli geçerli piksel yoksa false.
+   0–23: renk/indeks/temel doku; 24–35: ince ayrım kanalları (ton dağılımı,
+   çok ölçekli doku, yön tutarlılığı, GLCM, kenar yoğunluğu, çarpıklık).
+   Kanallar yalnızca "duyu"dur — ağırlıklarını model veriden öğrenir. */
+function ozellikCikarici(rgba, gecerli, W, H, yama){
+  const yari = yama >> 1;
+  const kenar = yama;
+  const N2 = kenar * kenar;
+  const gri = new Float32Array(N2);
+  const gvar = new Uint8Array(N2);
+  const integ = new Float64Array((kenar + 1) * (kenar + 1));
+  const hist = new Float64Array(16);
+  const glcm = new Float64Array(64);
+  return function cikar(cx, cy, cikti){
+    const x0 = cx - yari, y0 = cy - yari;
+    let n = 0;
+    let sR = 0, sG = 0, sB = 0, kR = 0, kG = 0, kB = 0;
+    let sGri = 0, kGri = 0, cGri = 0;
+    let sExg = 0, kExg = 0, sGli = 0, kGli = 0, sVari = 0, kVari = 0, sNg = 0, kNg = 0;
+    let hCos = 0, hSin = 0, nHue = 0, nKoyu = 0, nKoyuYesil = 0;
+    let enAz = 1e9, enCok = -1e9;
+    for (let j = 0; j < kenar; j++){
+      const y = y0 + j;
+      const satirOk = y >= 0 && y < H;
+      for (let i = 0; i < kenar; i++){
+        const x = x0 + i;
+        const yerel = j * kenar + i;
+        if (!satirOk || x < 0 || x >= W || !gecerli[y * W + x]){ gvar[yerel] = 0; continue; }
+        const p = (y * W + x) * 4;
+        const r = rgba[p] / 255, g = rgba[p + 1] / 255, b = rgba[p + 2] / 255;
+        const griV = 0.299 * r + 0.587 * g + 0.114 * b;
+        gri[yerel] = griV; gvar[yerel] = 1; n++;
+        sR += r; sG += g; sB += b; kR += r * r; kG += g * g; kB += b * b;
+        sGri += griV; kGri += griV * griV; cGri += griV * griV * griV;
+        if (griV < enAz) enAz = griV;
+        if (griV > enCok) enCok = griV;
+        const t = r + g + b + 1e-6;
+        const exg = (2 * g - r - b) / t;
+        const gli = (2 * g - r - b) / (2 * g + r + b + 1e-6);
+        let vari = (g - r) / (g + r - b + 1e-6);
+        if (vari > 1.5) vari = 1.5; else if (vari < -1.5) vari = -1.5;
+        const ng = (g - r) / (g + r + 1e-6);
+        sExg += exg; kExg += exg * exg;
+        sGli += gli; kGli += gli * gli;
+        sVari += vari; kVari += vari * vari;
+        sNg += ng; kNg += ng * ng;
+        /* piksel bazında ton (dairesel dağılım için) ve koyuluk sayaçları */
+        const pV = r > g ? (r > b ? r : b) : (g > b ? g : b);
+        const pK = r < g ? (r < b ? r : b) : (g < b ? g : b);
+        const pF = pV - pK;
+        if (pF > 0.02){
+          let h6;
+          if (pV === r) h6 = ((g - b) / pF) % 6;
+          else if (pV === g) h6 = (b - r) / pF + 2;
+          else h6 = (r - g) / pF + 4;
+          const hRad = h6 * Math.PI / 3;
+          hCos += Math.cos(hRad); hSin += Math.sin(hRad); nHue++;
+        }
+        if (pV < 0.35) nKoyu++;
+        if (exg > 0.05 && pV < 0.45) nKoyuYesil++;
+      }
+    }
+    if (n < N2 * 0.4) return false;
+    const ORT = s => s / n;
+    const STD = (kk, s) => Math.sqrt(Math.max(0, kk / n - (s / n) * (s / n)));
+    const rO = ORT(sR), gO = ORT(sG), bO = ORT(sB);
+    /* ortalama renkten HSV (8–11 no'lu kanallar, eski sürümle birebir) */
+    const enB = Math.max(rO, gO, bO), enK = Math.min(rO, gO, bO), frk = enB - enK;
+    let ton = 0;
+    if (frk > 1e-9){
+      if (enB === rO) ton = ((gO - bO) / frk) % 6;
+      else if (enB === gO) ton = (bO - rO) / frk + 2;
+      else ton = (rO - gO) / frk + 4;
+      ton *= Math.PI / 3;
+    }
+    const doy = enB > 1e-9 ? frk / enB : 0;
+    const griOrt = ORT(sGri), griStd = STD(kGri, sGri);
+
+    /* boşlukları ortalamayla doldur, integral görüntü kur (çok ölçekli doku için) */
+    for (let i = 0; i < N2; i++) if (!gvar[i]) gri[i] = griOrt;
+    const k1 = kenar + 1;
+    for (let j = 0; j < kenar; j++){
+      let satir = 0;
+      for (let i = 0; i < kenar; i++){
+        satir += gri[j * kenar + i];
+        integ[(j + 1) * k1 + (i + 1)] = integ[j * k1 + (i + 1)] + satir;
+      }
+    }
+    const kutuOrt = (xa, ya, xb, yb) => {
+      if (xa < 0) xa = 0; if (ya < 0) ya = 0;
+      if (xb > kenar - 1) xb = kenar - 1; if (yb > kenar - 1) yb = kenar - 1;
+      const top = integ[(yb + 1) * k1 + (xb + 1)] - integ[ya * k1 + (xb + 1)]
+                - integ[(yb + 1) * k1 + xa] + integ[ya * k1 + xa];
+      return top / ((yb - ya + 1) * (xb - xa + 1));
+    };
+    let e1 = 0, e2 = 0, nE = 0;
+    for (let j = 0; j < kenar; j++){
+      for (let i = 0; i < kenar; i++){
+        const yerel = j * kenar + i;
+        if (!gvar[yerel]) continue;
+        const o3 = kutuOrt(i - 1, j - 1, i + 1, j + 1);
+        const o7 = kutuOrt(i - 3, j - 3, i + 3, j + 3);
+        e1 += Math.abs(gri[yerel] - o3);
+        e2 += Math.abs(o3 - o7);
+        nE++;
+      }
+    }
+    e1 = nE ? e1 / nE : 0;
+    e2 = nE ? e2 / nE : 0;
+
+    /* doku: gradyan + entropi + yön tutarlılığı + GLCM + kenar yoğunluğu */
+    let sGr = 0, kGr = 0, nGr = 0, nKenarPik = 0;
+    let jxx = 0, jyy = 0, jxy = 0;
+    hist.fill(0); glcm.fill(0);
+    const aralik = Math.max(1e-6, enCok - enAz);
+    let glcmN = 0;
+    for (let j = 1; j < kenar - 1; j++){
+      for (let i = 1; i < kenar - 1; i++){
+        const yerel = j * kenar + i;
+        if (!gvar[yerel]) continue;
+        hist[Math.min(15, (gri[yerel] * 16) | 0)]++;
+        const qa = Math.min(7, ((gri[yerel] - enAz) / aralik * 8) | 0);
+        if (gvar[yerel + 1]){
+          const qb = Math.min(7, ((gri[yerel + 1] - enAz) / aralik * 8) | 0);
+          glcm[qa * 8 + qb]++; glcmN++;
+        }
+        if (gvar[yerel + kenar]){
+          const qb = Math.min(7, ((gri[yerel + kenar] - enAz) / aralik * 8) | 0);
+          glcm[qa * 8 + qb]++; glcmN++;
+        }
+        if (gvar[yerel - 1] && gvar[yerel + 1] && gvar[yerel - kenar] && gvar[yerel + kenar]){
+          const gx = (gri[yerel + 1] - gri[yerel - 1]) / 2;
+          const gy = (gri[yerel + kenar] - gri[yerel - kenar]) / 2;
+          const mag = Math.sqrt(gx * gx + gy * gy);
+          sGr += mag; kGr += mag * mag; nGr++;
+          if (mag > 0.06) nKenarPik++;
+          jxx += gx * gx; jyy += gy * gy; jxy += gx * gy;
+        }
+      }
+    }
+    let hTop = 0;
+    for (let i = 0; i < 16; i++) hTop += hist[i];
+    let entropi = 0;
+    if (hTop > 0){
+      for (let i = 0; i < 16; i++){
+        if (hist[i] > 0){ const pr = hist[i] / hTop; entropi -= pr * Math.log2(pr); }
+      }
+      entropi /= 4;                                    // 0–1 aralığına indir
+    }
+    let kontrast = 0, homojenlik = 0, enerji = 0;
+    if (glcmN > 0){
+      for (let a = 0; a < 8; a++){
+        for (let b2 = 0; b2 < 8; b2++){
+          const pr = glcm[a * 8 + b2] / glcmN;
+          if (!pr) continue;
+          const f = a - b2;
+          kontrast += pr * f * f;
+          homojenlik += pr / (1 + Math.abs(f));
+          enerji += pr * pr;
+        }
+      }
+    }
+    const izT = jxx + jyy;
+    const tutarlilik = izT > 1e-9
+      ? Math.sqrt((jxx - jyy) * (jxx - jyy) + 4 * jxy * jxy) / izT : 0;
+    const m3 = cGri / n - 3 * griOrt * (kGri / n) + 2 * griOrt * griOrt * griOrt;
+    let carpiklik = m3 / Math.max(griStd * griStd * griStd, 1e-6);
+    if (carpiklik > 3) carpiklik = 3; else if (carpiklik < -3) carpiklik = -3;
+
+    cikti[0] = rO; cikti[1] = gO; cikti[2] = bO;
+    cikti[3] = STD(kR, sR); cikti[4] = STD(kG, sG); cikti[5] = STD(kB, sB);
+    cikti[6] = griOrt; cikti[7] = griStd;
+    cikti[8] = Math.cos(ton); cikti[9] = Math.sin(ton); cikti[10] = doy; cikti[11] = enB;
+    cikti[12] = ORT(sExg); cikti[13] = STD(kExg, sExg);
+    cikti[14] = ORT(sGli); cikti[15] = STD(kGli, sGli);
+    cikti[16] = ORT(sVari); cikti[17] = STD(kVari, sVari);
+    cikti[18] = ORT(sNg); cikti[19] = STD(kNg, sNg);
+    cikti[20] = nGr ? sGr / nGr : 0;
+    cikti[21] = nGr ? Math.sqrt(Math.max(0, kGr / nGr - (sGr / nGr) * (sGr / nGr))) : 0;
+    cikti[22] = enCok > enAz ? enCok - enAz : 0;
+    cikti[23] = entropi;
+    cikti[24] = nHue ? 1 - Math.sqrt((hCos / nHue) * (hCos / nHue) + (hSin / nHue) * (hSin / nHue)) : 0;
+    cikti[25] = nKoyu / n;
+    cikti[26] = nKoyuYesil / n;
+    cikti[27] = e1;
+    cikti[28] = e2;
+    cikti[29] = Math.min(8, e1 / (e2 + 1e-4));
+    cikti[30] = tutarlilik;
+    cikti[31] = kontrast;
+    cikti[32] = homojenlik;
+    cikti[33] = enerji;
+    cikti[34] = nGr ? nKenarPik / nGr : 0;
+    cikti[35] = carpiklik;
+    return true;
+  };
+}
+
+/* =====================================================================
+   3) ML MOTORU — sıfırdan yazılmış dört model ailesi
+   Ortak arayüz: model.tahminProba(x: Float64Array(d), cikti: Float32Array(K))
+   ===================================================================== */
+
+function standartlastiriciKur(X, n, d){
+  const ort = new Float64Array(d), std = new Float64Array(d);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < d; j++) ort[j] += X[i * d + j];
+  for (let j = 0; j < d; j++) ort[j] /= Math.max(1, n);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < d; j++){ const f = X[i * d + j] - ort[j]; std[j] += f * f; }
+  for (let j = 0; j < d; j++) std[j] = Math.max(1e-8, Math.sqrt(std[j] / Math.max(1, n)));
+  return {
+    ort, std,
+    donustur(Xk, nk){
+      const Y = new Float32Array(nk * d);
+      for (let i = 0; i < nk; i++)
+        for (let j = 0; j < d; j++) Y[i * d + j] = (Xk[i * d + j] - ort[j]) / std[j];
+      return Y;
+    },
+    tek(x, cikti){
+      for (let j = 0; j < d; j++) cikti[j] = (x[j] - ort[j]) / std[j];
+    }
+  };
+}
+
+function kolonSec(X, n, kolonlar){
+  const dk = kolonlar.length;
+  const Y = new Float32Array(n * dk);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < dk; j++) Y[i * dk + j] = X[i * OZELLIK_SAYISI + kolonlar[j]];
+  return Y;
+}
+
+/* --- k-NN --- */
+function knnKur(X, y, n, d, K, kk){
+  const enD = new Float64Array(kk), enI = new Int32Array(kk);
+  return {
+    tip: 'knn', k: kk, X, y, n, d, K,
+    tahminProba(x, cikti){
+      let dolu = 0;
+      for (let i = 0; i < n; i++){
+        let mesafe = 0;
+        const taban = i * d;
+        for (let j = 0; j < d; j++){ const f = x[j] - X[taban + j]; mesafe += f * f; }
+        if (dolu < kk){
+          let p = dolu++;
+          enD[p] = mesafe; enI[p] = i;
+          while (p > 0 && enD[p] < enD[p - 1]){
+            const td = enD[p]; enD[p] = enD[p - 1]; enD[p - 1] = td;
+            const ti = enI[p]; enI[p] = enI[p - 1]; enI[p - 1] = ti; p--;
+          }
+        } else if (mesafe < enD[kk - 1]){
+          let p = kk - 1;
+          enD[p] = mesafe; enI[p] = i;
+          while (p > 0 && enD[p] < enD[p - 1]){
+            const td = enD[p]; enD[p] = enD[p - 1]; enD[p - 1] = td;
+            const ti = enI[p]; enI[p] = enI[p - 1]; enI[p - 1] = ti; p--;
+          }
+        }
+      }
+      cikti.fill(0);
+      let top = 0;
+      for (let i = 0; i < dolu; i++){
+        const agirlik = 1 / (Math.sqrt(enD[i]) + 1e-3);
+        cikti[y[enI[i]]] += agirlik; top += agirlik;
+      }
+      if (top > 0) for (let c = 0; c < K; c++) cikti[c] /= top;
+    }
+  };
+}
+
+/* --- Softmaks (çok sınıflı lojistik) regresyon --- */
+async function softmaksEgit(X, y, n, d, K, ayar, rng){
+  const { hiz = 0.1, l2 = 1e-3, devir = 200, parti = 32 } = ayar;
+  const W = new Float64Array(K * d), b = new Float64Array(K);
+  const skor = new Float64Array(K);
+  const sira = Array.from({ length: n }, (_, i) => i);
+  for (let e = 0; e < devir; e++){
+    karistir(sira, rng);
+    const lr = hiz / (1 + 0.02 * e);
+    for (let p0 = 0; p0 < n; p0 += parti){
+      const p1 = Math.min(n, p0 + parti);
+      for (let s = p0; s < p1; s++){
+        const i = sira[s], taban = i * d;
+        let enB = -1e30;
+        for (let c = 0; c < K; c++){
+          let z = b[c];
+          const wb = c * d;
+          for (let j = 0; j < d; j++) z += W[wb + j] * X[taban + j];
+          skor[c] = z;
+          if (z > enB) enB = z;
+        }
+        let top = 0;
+        for (let c = 0; c < K; c++){ skor[c] = Math.exp(skor[c] - enB); top += skor[c]; }
+        for (let c = 0; c < K; c++){
+          const hata = skor[c] / top - (y[i] === c ? 1 : 0);
+          const adim = lr * hata;
+          const wb = c * d;
+          for (let j = 0; j < d; j++) W[wb + j] -= adim * X[taban + j] + lr * l2 * W[wb + j];
+          b[c] -= adim;
+        }
+      }
+    }
+    if ((e & 15) === 15) await beklet();               // arayüz nefes alsın
+  }
+  return {
+    tip: 'softmaks', W, b, d, K,
+    tahminProba(x, cikti){
+      let enB = -1e30;
+      for (let c = 0; c < K; c++){
+        let z = b[c];
+        const wb = c * d;
+        for (let j = 0; j < d; j++) z += W[wb + j] * x[j];
+        cikti[c] = z;
+        if (z > enB) enB = z;
+      }
+      let top = 0;
+      for (let c = 0; c < K; c++){ cikti[c] = Math.exp(cikti[c] - enB); top += cikti[c]; }
+      for (let c = 0; c < K; c++) cikti[c] /= top;
+    }
+  };
+}
+
+/* --- Çok katmanlı yapay sinir ağı (ReLU + softmaks, Adam) --- */
+async function ysaEgit(X, y, n, d, K, ayar, rng){
+  const { gizli = [24], hiz = 0.01, devir = 150, parti = 32 } = ayar;
+  const boyut = [d, ...gizli, K];
+  const L = boyut.length - 1;
+  const W = [], b = [], mW = [], vW = [], mB = [], vB = [];
+  const gauss = () => {
+    const u = Math.max(rng(), 1e-12), v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  for (let l = 0; l < L; l++){
+    const nin = boyut[l], nout = boyut[l + 1];
+    const w = new Float64Array(nout * nin);
+    const olc = Math.sqrt(2 / nin);
+    for (let i = 0; i < w.length; i++) w[i] = gauss() * olc;
+    W.push(w); b.push(new Float64Array(nout));
+    mW.push(new Float64Array(nout * nin)); vW.push(new Float64Array(nout * nin));
+    mB.push(new Float64Array(nout)); vB.push(new Float64Array(nout));
+  }
+  const akt = boyut.map(s => new Float64Array(s));
+  const del = boyut.map(s => new Float64Array(s));
+  const gW = W.map(w => new Float64Array(w.length));
+  const gB = b.map(bb => new Float64Array(bb.length));
+  const B1 = 0.9, B2 = 0.999, EPS = 1e-8;
+  let t = 0;
+  const sira = Array.from({ length: n }, (_, i) => i);
+
+  function ileri(){
+    for (let l = 0; l < L; l++){
+      const nin = boyut[l], nout = boyut[l + 1];
+      const w = W[l], bb = b[l], girdiA = akt[l], ciktiA = akt[l + 1];
+      for (let o = 0; o < nout; o++){
+        let z = bb[o];
+        const wb = o * nin;
+        for (let j = 0; j < nin; j++) z += w[wb + j] * girdiA[j];
+        ciktiA[o] = (l === L - 1) ? z : (z > 0 ? z : 0);
+      }
+    }
+    const son = akt[L];
+    let enB = -1e30;
+    for (let c = 0; c < K; c++) if (son[c] > enB) enB = son[c];
+    let top = 0;
+    for (let c = 0; c < K; c++){ son[c] = Math.exp(son[c] - enB); top += son[c]; }
+    for (let c = 0; c < K; c++) son[c] /= top;
+  }
+
+  for (let e = 0; e < devir; e++){
+    karistir(sira, rng);
+    for (let p0 = 0; p0 < n; p0 += parti){
+      const p1 = Math.min(n, p0 + parti);
+      for (let l = 0; l < L; l++){ gW[l].fill(0); gB[l].fill(0); }
+      for (let s = p0; s < p1; s++){
+        const i = sira[s];
+        for (let j = 0; j < d; j++) akt[0][j] = X[i * d + j];
+        ileri();
+        const son = akt[L];
+        for (let c = 0; c < K; c++) del[L][c] = son[c] - (y[i] === c ? 1 : 0);
+        for (let l = L - 1; l >= 0; l--){
+          const nin = boyut[l], nout = boyut[l + 1];
+          const w = W[l], girdiA = akt[l], dOut = del[l + 1], dIn = del[l];
+          for (let o = 0; o < nout; o++){
+            const dv2 = dOut[o];
+            gB[l][o] += dv2;
+            const wb = o * nin;
+            for (let j = 0; j < nin; j++) gW[l][wb + j] += dv2 * girdiA[j];
+          }
+          if (l > 0){
+            dIn.fill(0);
+            for (let o = 0; o < nout; o++){
+              const dv2 = dOut[o], wb = o * nin;
+              for (let j = 0; j < nin; j++) dIn[j] += dv2 * w[wb + j];
+            }
+            for (let j = 0; j < nin; j++) if (akt[l][j] <= 0) dIn[j] = 0;
+          }
+        }
+      }
+      const bolen = p1 - p0;
+      t++;
+      const d1 = 1 - Math.pow(B1, t), d2 = 1 - Math.pow(B2, t);
+      for (let l = 0; l < L; l++){
+        const w = W[l], gg = gW[l], mm = mW[l], vv = vW[l];
+        for (let i = 0; i < w.length; i++){
+          const g = gg[i] / bolen;
+          mm[i] = B1 * mm[i] + (1 - B1) * g;
+          vv[i] = B2 * vv[i] + (1 - B2) * g * g;
+          w[i] -= hiz * (mm[i] / d1) / (Math.sqrt(vv[i] / d2) + EPS);
+        }
+        const bb = b[l], gb = gB[l], mb = mB[l], vb = vB[l];
+        for (let i = 0; i < bb.length; i++){
+          const g = gb[i] / bolen;
+          mb[i] = B1 * mb[i] + (1 - B1) * g;
+          vb[i] = B2 * vb[i] + (1 - B2) * g * g;
+          bb[i] -= hiz * (mb[i] / d1) / (Math.sqrt(vb[i] / d2) + EPS);
+        }
+      }
+    }
+    if ((e & 7) === 7) await beklet();                 // arayüz nefes alsın
+  }
+  return {
+    tip: 'ysa', W, b, boyut, K,
+    tahminProba(x, cikti){
+      for (let j = 0; j < d; j++) akt[0][j] = x[j];
+      ileri();
+      for (let c = 0; c < K; c++) cikti[c] = akt[L][c];
+    }
+  };
+}
+
+/* --- Rastgele Orman --- */
+async function ormanEgit(X, y, n, d, K, ayar, rng){
+  const { agac = 40, derinlik = 10, minYaprak = 3 } = ayar;
+  const mtry = Math.max(1, Math.round(Math.sqrt(d)));
+  const agaclar = [];
+  const onem = new Float64Array(d);
+
+  function yaprakYap(idx){
+    const dagilim = new Float32Array(K);
+    for (const i of idx) dagilim[y[i]]++;
+    let top = 0;
+    for (let c = 0; c < K; c++) top += dagilim[c];
+    if (top > 0) for (let c = 0; c < K; c++) dagilim[c] /= top;
+    return { yaprak: dagilim };
+  }
+  function gini(sayim, top){
+    if (!top) return 0;
+    let s = 0;
+    for (let c = 0; c < K; c++){ const p = sayim[c] / top; s += p * p; }
+    return 1 - s;
+  }
+  function dugumKur(idx, seviye){
+    if (idx.length < 2 * minYaprak || seviye >= derinlik) return yaprakYap(idx);
+    const sayimT = new Float64Array(K);
+    for (const i of idx) sayimT[y[i]]++;
+    let saf = false;
+    for (let c = 0; c < K; c++) if (sayimT[c] === idx.length) saf = true;
+    if (saf) return yaprakYap(idx);
+    const anaGini = gini(sayimT, idx.length);
+    let enJ = -1, enEsik = 0, enKazanc = 1e-9, enSol = null;
+    for (let f = 0; f < mtry; f++){
+      const j = (rng() * d) | 0;
+      const sirali = idx.slice().sort((a, bx) => X[a * d + j] - X[bx * d + j]);
+      const solSayim = new Float64Array(K);
+      for (let s = 0; s < sirali.length - 1; s++){
+        solSayim[y[sirali[s]]]++;
+        const solN = s + 1, sagN = sirali.length - solN;
+        if (solN < minYaprak || sagN < minYaprak) continue;
+        const v1 = X[sirali[s] * d + j], v2 = X[sirali[s + 1] * d + j];
+        if (v2 <= v1) continue;
+        let sagGini;
+        {
+          let sTop = 0;
+          for (let c = 0; c < K; c++){ const kalan = sayimT[c] - solSayim[c]; sTop += (kalan / sagN) * (kalan / sagN); }
+          sagGini = 1 - sTop;
+        }
+        const solGini = gini(solSayim, solN);
+        const kazanc = anaGini - (solN * solGini + sagN * sagGini) / sirali.length;
+        if (kazanc > enKazanc){
+          enKazanc = kazanc; enJ = j; enEsik = (v1 + v2) / 2;
+          enSol = solN;
+        }
+      }
+    }
+    if (enJ < 0) return yaprakYap(idx);
+    const sol = [], sag = [];
+    for (const i of idx) (X[i * d + enJ] <= enEsik ? sol : sag).push(i);
+    if (!sol.length || !sag.length) return yaprakYap(idx);
+    onem[enJ] += enKazanc * idx.length;
+    return {
+      j: enJ, esik: enEsik,
+      sol: dugumKur(sol, seviye + 1),
+      sag: dugumKur(sag, seviye + 1)
+    };
+  }
+  for (let a = 0; a < agac; a++){
+    const orneklem = new Array(n);
+    for (let i = 0; i < n; i++) orneklem[i] = (rng() * n) | 0;
+    agaclar.push(dugumKur(orneklem, 0));
+    if ((a & 1) === 1) await beklet();                 // arayüz nefes alsın
+  }
+  return {
+    tip: 'orman', agaclar, K, onem,
+    tahminProba(x, cikti){
+      cikti.fill(0);
+      for (const kok of agaclar){
+        let dugum = kok;
+        while (!dugum.yaprak) dugum = x[dugum.j] <= dugum.esik ? dugum.sol : dugum.sag;
+        for (let c = 0; c < K; c++) cikti[c] += dugum.yaprak[c];
+      }
+      for (let c = 0; c < K; c++) cikti[c] /= agaclar.length;
+    }
+  };
+}
+
+/* --- ölçütler --- */
+function karisiklikOlc(gercek, tahmin, K){
+  const M = new Float64Array(K * K);
+  for (let i = 0; i < gercek.length; i++) M[gercek[i] * K + tahmin[i]]++;
+  return M;
+}
+function dogrulukVeF1(M, K){
+  let dogru = 0, toplam = 0;
+  for (let c = 0; c < K; c++)
+    for (let c2 = 0; c2 < K; c2++){ toplam += M[c * K + c2]; if (c === c2) dogru += M[c * K + c2]; }
+  let f1Top = 0;
+  for (let c = 0; c < K; c++){
+    let tp = M[c * K + c], fp = 0, fn = 0;
+    for (let c2 = 0; c2 < K; c2++){
+      if (c2 !== c){ fp += M[c2 * K + c]; fn += M[c * K + c2]; }
+    }
+    const p = tp + fp > 0 ? tp / (tp + fp) : 0;
+    const r = tp + fn > 0 ? tp / (tp + fn) : 0;
+    f1Top += p + r > 0 ? 2 * p * r / (p + r) : 0;
+  }
+  return { dogruluk: toplam ? dogru / toplam : 0, f1: f1Top / K };
+}
+
+function katmanliKatlar(y, n, katSayi, rng){
+  const gruplar = new Map();
+  for (let i = 0; i < n; i++){
+    if (!gruplar.has(y[i])) gruplar.set(y[i], []);
+    gruplar.get(y[i]).push(i);
+  }
+  const katlar = Array.from({ length: katSayi }, () => []);
+  for (const liste of gruplar.values()){
+    karistir(liste, rng);
+    liste.forEach((i, s) => katlar[s % katSayi].push(i));
+  }
+  return katlar;
+}
+
+function fisherSkorlari(X, y, n, d, K){
+  const sayim = new Float64Array(K);
+  const ort = new Float64Array(K * d), ortG = new Float64Array(d);
+  for (let i = 0; i < n; i++){
+    sayim[y[i]]++;
+    for (let j = 0; j < d; j++){ ort[y[i] * d + j] += X[i * d + j]; ortG[j] += X[i * d + j]; }
+  }
+  for (let c = 0; c < K; c++)
+    if (sayim[c]) for (let j = 0; j < d; j++) ort[c * d + j] /= sayim[c];
+  for (let j = 0; j < d; j++) ortG[j] /= Math.max(1, n);
+  const varyans = new Float64Array(K * d);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < d; j++){
+      const f = X[i * d + j] - ort[y[i] * d + j];
+      varyans[y[i] * d + j] += f * f;
+    }
+  const skorlar = new Array(d);
+  for (let j = 0; j < d; j++){
+    let pay = 0, payda = 0;
+    for (let c = 0; c < K; c++){
+      const f = ort[c * d + j] - ortG[j];
+      pay += sayim[c] * f * f;
+      payda += varyans[c * d + j];
+    }
+    skorlar[j] = payda > 1e-12 ? pay / payda : 0;
+  }
+  return skorlar;
+}
+
+/* --- Oto-AI ayar uzayı (genis=true: daha geniş hiperparametre taraması) --- */
+function otoAyarListesi(genis){
+  const liste = [];
+  const kkListe = genis ? [1, 3, 5, 7, 9] : [3, 5, 7];
+  const smListe = genis
+    ? [[0.3, 1e-3], [0.1, 1e-4], [0.05, 1e-3], [0.5, 1e-4], [0.02, 1e-3]]
+    : [[0.3, 1e-3], [0.1, 1e-4], [0.05, 1e-3]];
+  const ysaListe = genis ? [[24], [48], [32, 16], [64], [64, 32]] : [[24], [48], [32, 16]];
+  const rfListe = genis ? [[30, 10], [60, 14], [100, 16], [40, 6]] : [[30, 10], [60, 14]];
+  for (const kume of Object.keys(OZELLIK_KUMELERI)){
+    for (const kk of kkListe)
+      liste.push({ model: 'k-NN (k=' + kk + ')', kume, kur: (X, y, n, d, K, rng) => knnKur(X, y, n, d, K, kk) });
+    for (const [hiz, l2] of smListe)
+      liste.push({ model: 'Softmaks (η=' + hiz + ')', kume,
+        kur: (X, y, n, d, K, rng) => softmaksEgit(X, y, n, d, K, { hiz, l2, devir: 150 }, rng) });
+    for (const gizli of ysaListe)
+      liste.push({ model: 'YSA [' + gizli.join('·') + ']', kume,
+        kur: (X, y, n, d, K, rng) => ysaEgit(X, y, n, d, K, { gizli, hiz: 0.01, devir: 90 }, rng) });
+    for (const [agac, derinlik] of rfListe)
+      liste.push({ model: 'R.Orman (' + agac + ' ağaç)', kume,
+        kur: (X, y, n, d, K, rng) => ormanEgit(X, y, n, d, K, { agac, derinlik }, rng) });
+  }
+  return liste;
+}
+
+/*
+  otoEgit: tüm kombinasyonları katmanlı çapraz doğrulamada yarıştırır,
+  kazananı tüm veriyle yeniden eğitir.
+  → { liderlik, enIyi:{ad, kume, kolonlar, model, std, cv}, fisher }
+*/
+async function otoEgit(X24, y, n, K, secenek = {}){
+  const katSayi = Math.max(2, Math.min(secenek.katSayi || 5, n));
+  const bildir = secenek.onProgress || (() => {});
+  const sonucBildir = secenek.onSonuc || (() => {});
+  const ayarlar = otoAyarListesi(!!secenek.genisArama);
+  const liderlik = [];
+  const rngKat = mulberry32(42);
+  const katlar = katmanliKatlar(y, n, katSayi, rngKat);
+  const onbellek = new Map();                          // öznitelik kümesi → alt matris
+
+  for (let a = 0; a < ayarlar.length; a++){
+    const ayar = ayarlar[a];
+    const kolonlar = OZELLIK_KUMELERI[ayar.kume];
+    if (!onbellek.has(ayar.kume)) onbellek.set(ayar.kume, kolonSec(X24, n, kolonlar));
+    const Xk = onbellek.get(ayar.kume);
+    const dk = kolonlar.length;
+    const M = new Float64Array(K * K);
+    for (let kat = 0; kat < katSayi; kat++){
+      const testIdx = katlar[kat];
+      if (!testIdx.length) continue;
+      const egitIdx = [];
+      for (let k2 = 0; k2 < katSayi; k2++) if (k2 !== kat) egitIdx.push(...katlar[k2]);
+      const nE = egitIdx.length, nT = testIdx.length;
+      const XE = new Float32Array(nE * dk), yE = new Int32Array(nE);
+      for (let i = 0; i < nE; i++){
+        yE[i] = y[egitIdx[i]];
+        XE.set(Xk.subarray(egitIdx[i] * dk, (egitIdx[i] + 1) * dk), i * dk);
+      }
+      const std = standartlastiriciKur(XE, nE, dk);
+      const XEs = std.donustur(XE, nE);
+      const rng = mulberry32(1000 + a * 17 + kat);
+      const model = await ayar.kur(XEs, yE, nE, dk, K, rng);
+      const xTek = new Float64Array(dk), pTek = new Float32Array(K);
+      const gercek = new Int32Array(nT), tahmin = new Int32Array(nT);
+      for (let i = 0; i < nT; i++){
+        const g = testIdx[i];
+        for (let j = 0; j < dk; j++) xTek[j] = Xk[g * dk + j];
+        std.tek(xTek, xTek);
+        model.tahminProba(xTek, pTek);
+        let enC = 0;
+        for (let c = 1; c < K; c++) if (pTek[c] > pTek[enC]) enC = c;
+        gercek[i] = y[g]; tahmin[i] = enC;
+      }
+      const Mk = karisiklikOlc(gercek, tahmin, K);
+      for (let i = 0; i < M.length; i++) M[i] += Mk[i];
+      bildir((a + (kat + 1) / katSayi) / ayarlar.length,
+        ayar.model + ' · ' + ayar.kume + ' (kat ' + (kat + 1) + '/' + katSayi + ')');
+      await beklet();
+    }
+    const olcum = dogrulukVeF1(M, K);
+    const kayit = { ad: ayar.model, kume: ayar.kume, dogruluk: olcum.dogruluk, f1: olcum.f1, indeks: a };
+    liderlik.push(kayit);
+    sonucBildir(kayit, liderlik.slice().sort((p, q) => q.f1 - p.f1 || q.dogruluk - p.dogruluk));
+  }
+  liderlik.sort((p, q) => q.f1 - p.f1 || q.dogruluk - p.dogruluk);
+  const kazanan = liderlik[0];
+  const ayar = ayarlar[kazanan.indeks];
+  const kolonlar = OZELLIK_KUMELERI[ayar.kume];
+  const Xk = onbellek.get(ayar.kume);
+  const dk = kolonlar.length;
+  bildir(0.99, 'kazanan tüm veriyle yeniden eğitiliyor: ' + ayar.model);
+  await beklet();
+  const std = standartlastiriciKur(Xk, n, dk);
+  const Xs = std.donustur(Xk, n);
+  const yI = y instanceof Int32Array ? y : Int32Array.from(y);
+  /* k-NN kazandıysa dayanak setini seyrelt: çıkarım maliyeti n ile doğru orantılı,
+     sınıf başına 400 tohumlu örnek doğruluğu korurken haritalamayı kat kat hızlandırır */
+  let sonX = Xs, sonY = yI, sonN = n;
+  if (ayar.model.indexOf('k-NN') === 0 && n > 800){
+    const rngAlt = mulberry32(77);
+    const kova = new Map();
+    for (let i = 0; i < n; i++){
+      const c = yI[i];
+      if (!kova.has(c)) kova.set(c, { say: 0, liste: [] });
+      const s = kova.get(c);
+      s.say++;
+      if (s.liste.length < 400) s.liste.push(i);
+      else { const j = (rngAlt() * s.say) | 0; if (j < 400) s.liste[j] = i; }
+    }
+    const secim = [];
+    for (const s of kova.values()) secim.push(...s.liste);
+    secim.sort((p, q) => p - q);
+    sonN = secim.length;
+    sonX = new Float32Array(sonN * dk);
+    sonY = new Int32Array(sonN);
+    for (let i = 0; i < sonN; i++){
+      sonY[i] = yI[secim[i]];
+      sonX.set(Xs.subarray(secim[i] * dk, (secim[i] + 1) * dk), i * dk);
+    }
+  }
+  const model = await ayar.kur(sonX, sonY, sonN, dk, K, mulberry32(42));
+  const fisher = fisherSkorlari(X24, y, n, OZELLIK_SAYISI, K)
+    .map((s, j) => ({ ad: OZELLIK_ADLARI[j], skor: s, indeks: j }))
+    .sort((p, q) => q.skor - p.skor);
+  return {
+    liderlik,
+    enIyi: { ad: ayar.model, kume: ayar.kume, kolonlar, model, std,
+             cv: { dogruluk: kazanan.dogruluk, f1: kazanan.f1, katSayi } },
+    fisher
+  };
+}
+
+/* =====================================================================
+   Model serileştirme (kaydet / yükle)
+   ===================================================================== */
+function modelPaketle(enIyi, siniflar, yama){
+  const m = enIyi.model;
+  const paket = {
+    bicim: 'cam-ai-model', surum: 2, tip: m.tip,
+    ad: enIyi.ad, kume: enIyi.kume, kolonlar: enIyi.kolonlar,
+    yama, siniflar: siniflar.map(s => ({ ad: s.ad, renk: s.renk })),
+    std: { ort: Array.from(enIyi.std.ort), std: Array.from(enIyi.std.std) },
+    cv: enIyi.cv
+  };
+  if (m.tip === 'knn'){
+    paket.k = m.k; paket.n = m.n; paket.d = m.d;
+    paket.X = Array.from(m.X); paket.y = Array.from(m.y);
+  } else if (m.tip === 'softmaks'){
+    paket.W = Array.from(m.W); paket.b = Array.from(m.b); paket.d = m.d;
+  } else if (m.tip === 'ysa'){
+    paket.boyut = m.boyut.slice();
+    paket.W = m.W.map(w => Array.from(w)); paket.b = m.b.map(bb => Array.from(bb));
+  } else if (m.tip === 'orman'){
+    const duzle = dugum => dugum.yaprak
+      ? { y: Array.from(dugum.yaprak) }
+      : { j: dugum.j, e: dugum.esik, s: duzle(dugum.sol), g: duzle(dugum.sag) };
+    paket.agaclar = m.agaclar.map(duzle);
+  }
+  return paket;
+}
+
+function modelAc(paket){
+  if (!paket || paket.bicim !== 'cam-ai-model') throw new Error('Bu dosya bir Çam-AI model dosyası değil.');
+  const K = paket.siniflar.length;
+  let model;
+  if (paket.tip === 'knn'){
+    model = knnKur(Float32Array.from(paket.X), Int32Array.from(paket.y), paket.n, paket.d, K, paket.k);
+  } else if (paket.tip === 'softmaks'){
+    const W = Float64Array.from(paket.W), b = Float64Array.from(paket.b), d = paket.d;
+    model = { tip: 'softmaks', W, b, d, K,
+      tahminProba(x, cikti){
+        let enB = -1e30;
+        for (let c = 0; c < K; c++){
+          let z = b[c];
+          for (let j = 0; j < d; j++) z += W[c * d + j] * x[j];
+          cikti[c] = z; if (z > enB) enB = z;
+        }
+        let top = 0;
+        for (let c = 0; c < K; c++){ cikti[c] = Math.exp(cikti[c] - enB); top += cikti[c]; }
+        for (let c = 0; c < K; c++) cikti[c] /= top;
+      } };
+  } else if (paket.tip === 'ysa'){
+    const boyut = paket.boyut, L = boyut.length - 1;
+    const W = paket.W.map(w => Float64Array.from(w)), b = paket.b.map(bb => Float64Array.from(bb));
+    const akt = boyut.map(s => new Float64Array(s));
+    model = { tip: 'ysa', W, b, boyut, K,
+      tahminProba(x, cikti){
+        for (let j = 0; j < boyut[0]; j++) akt[0][j] = x[j];
+        for (let l = 0; l < L; l++){
+          const nin = boyut[l], nout = boyut[l + 1], w = W[l], bb = b[l];
+          for (let o = 0; o < nout; o++){
+            let z = bb[o];
+            for (let j = 0; j < nin; j++) z += w[o * nin + j] * akt[l][j];
+            akt[l + 1][o] = (l === L - 1) ? z : (z > 0 ? z : 0);
+          }
+        }
+        const son = akt[L];
+        let enB = -1e30;
+        for (let c = 0; c < K; c++) if (son[c] > enB) enB = son[c];
+        let top = 0;
+        for (let c = 0; c < K; c++){ cikti[c] = Math.exp(son[c] - enB); top += cikti[c]; }
+        for (let c = 0; c < K; c++) cikti[c] /= top;
+      } };
+  } else if (paket.tip === 'orman'){
+    const ac = dugum => dugum.y
+      ? { yaprak: Float32Array.from(dugum.y) }
+      : { j: dugum.j, esik: dugum.e, sol: ac(dugum.s), sag: ac(dugum.g) };
+    const agaclar = paket.agaclar.map(ac);
+    model = { tip: 'orman', agaclar, K,
+      tahminProba(x, cikti){
+        cikti.fill(0);
+        for (const kok of agaclar){
+          let dugum = kok;
+          while (!dugum.yaprak) dugum = x[dugum.j] <= dugum.esik ? dugum.sol : dugum.sag;
+          for (let c = 0; c < K; c++) cikti[c] += dugum.yaprak[c];
+        }
+        for (let c = 0; c < K; c++) cikti[c] /= agaclar.length;
+      } };
+  } else throw new Error('Bilinmeyen model tipi: ' + paket.tip);
+  const std = {
+    ort: Float64Array.from(paket.std.ort), std: Float64Array.from(paket.std.std),
+    tek(x, cikti){ for (let j = 0; j < this.ort.length; j++) cikti[j] = (x[j] - this.ort[j]) / this.std[j]; }
+  };
+  return {
+    ad: paket.ad, kume: paket.kume, kolonlar: paket.kolonlar, model, std,
+    cv: paket.cv || null, yama: paket.yama, siniflar: paket.siniflar
+  };
+}
+
+/* =====================================================================
+   Görüntünün tamamını sınıflandırma
+   ===================================================================== */
+async function haritaSiniflandir(ayar){
+  const { rgba, gecerli, W, H, yama, adim, model, std, kolonlar, K, onProgress } = ayar;
+  const bildir = onProgress || (() => {});
+  const yari = yama >> 1;
+  const gw = Math.max(1, Math.floor((W - yama) / adim) + 1);
+  const gh = Math.max(1, Math.floor((H - yama) / adim) + 1);
+  const probs = new Float32Array(gw * gh * K);
+  const sinif = new Uint8Array(gw * gh).fill(255);     // 255 = veri yok
+  const cikar = ozellikCikarici(rgba, gecerli, W, H, yama);
+  const oz = new Float64Array(OZELLIK_SAYISI);
+  const xTek = new Float64Array(kolonlar.length);
+  const pTek = new Float32Array(K);
+  let islenen = 0;
+  for (let gy = 0; gy < gh; gy++){
+    const cy = yari + gy * adim;
+    for (let gx = 0; gx < gw; gx++){
+      const cx = yari + gx * adim;
+      if (cikar(cx, cy, oz)){
+        for (let j = 0; j < kolonlar.length; j++) xTek[j] = oz[kolonlar[j]];
+        std.tek(xTek, xTek);
+        model.tahminProba(xTek, pTek);
+        const taban = (gy * gw + gx) * K;
+        let enC = 0;
+        for (let c = 0; c < K; c++){ probs[taban + c] = pTek[c]; if (pTek[c] > pTek[enC]) enC = c; }
+        sinif[gy * gw + gx] = enC;
+      }
+      if ((++islenen & 511) === 0){ bildir(islenen / (gw * gh)); await beklet(); }
+    }
+  }
+  bildir(1);
+  return { gw, gh, adim, yari, probs, sinif };
+}
+
+function probYumusat(probs, gw, gh, K){
+  const yeni = new Float32Array(probs.length);
+  for (let y = 0; y < gh; y++){
+    for (let x = 0; x < gw; x++){
+      let n = 0;
+      const taban = (y * gw + x) * K;
+      for (let dy = -1; dy <= 1; dy++){
+        for (let dx = -1; dx <= 1; dx++){
+          const yy = y + dy, xx = x + dx;
+          if (yy < 0 || yy >= gh || xx < 0 || xx >= gw) continue;
+          const kTaban = (yy * gw + xx) * K;
+          let bos = true;
+          for (let c = 0; c < K; c++) if (probs[kTaban + c] > 0){ bos = false; break; }
+          if (bos) continue;
+          for (let c = 0; c < K; c++) yeni[taban + c] += probs[kTaban + c];
+          n++;
+        }
+      }
+      if (n > 0) for (let c = 0; c < K; c++) yeni[taban + c] /= n;
+    }
+  }
+  return yeni;
+}
+
+/* Çokgen içini tarama-satırı (çift-tek kuralı) ile doldurur; yazılan piksel sayısını döndürür */
+function cokgenDoldur(maske, W, H, noktalar, deger){
+  const n = noktalar.length >> 1;
+  if (n < 3) return 0;
+  let enAzY = Infinity, enCokY = -Infinity;
+  for (let i = 0; i < n; i++){
+    const y = noktalar[i * 2 + 1];
+    if (y < enAzY) enAzY = y;
+    if (y > enCokY) enCokY = y;
+  }
+  const y0 = Math.max(0, Math.floor(enAzY)), y1 = Math.min(H - 1, Math.ceil(enCokY));
+  const xs = [];
+  let yazilan = 0;
+  for (let y = y0; y <= y1; y++){
+    xs.length = 0;
+    const yc = y + 0.5;
+    for (let i = 0; i < n; i++){
+      const ax = noktalar[i * 2], ay = noktalar[i * 2 + 1];
+      const j = (i + 1) % n;
+      const bx = noktalar[j * 2], by = noktalar[j * 2 + 1];
+      if ((ay <= yc && by > yc) || (by <= yc && ay > yc))
+        xs.push(ax + (yc - ay) / (by - ay) * (bx - ax));
+    }
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2){
+      const xa = Math.max(0, Math.round(xs[k])), xb = Math.min(W - 1, Math.round(xs[k + 1]) - 1);
+      for (let x = xa; x <= xb; x++){ maske[y * W + x] = deger; yazilan++; }
+    }
+  }
+  return yazilan;
+}
+
+/* Sihirli değnek: tohum renginden verilen toleransla 4-komşuluk taşma doldurma */
+function tasmaDoldur(rgba, gecerli, W, H, tohumX, tohumY, tolerans, maske, deger, enCokPx){
+  const x0 = tohumX | 0, y0 = tohumY | 0;
+  if (x0 < 0 || y0 < 0 || x0 >= W || y0 >= H) return 0;
+  const bas = y0 * W + x0;
+  if (!gecerli[bas]) return 0;
+  const p0 = bas * 4;
+  const r0 = rgba[p0], g0 = rgba[p0 + 1], b0 = rgba[p0 + 2];
+  const tol2 = tolerans * tolerans * 3;
+  const sinir = enCokPx || 3000000;
+  const gezildi = new Uint8Array(W * H);
+  const yigin = [bas];
+  gezildi[bas] = 1;
+  let yazilan = 0;
+  while (yigin.length){
+    const i = yigin.pop();
+    const p = i * 4;
+    const dr = rgba[p] - r0, dg = rgba[p + 1] - g0, db = rgba[p + 2] - b0;
+    if (dr * dr + dg * dg + db * db > tol2) continue;
+    maske[i] = deger;
+    if (++yazilan >= sinir) break;
+    const x = i % W;
+    if (x > 0 && !gezildi[i - 1] && gecerli[i - 1]){ gezildi[i - 1] = 1; yigin.push(i - 1); }
+    if (x < W - 1 && !gezildi[i + 1] && gecerli[i + 1]){ gezildi[i + 1] = 1; yigin.push(i + 1); }
+    if (i >= W && !gezildi[i - W] && gecerli[i - W]){ gezildi[i - W] = 1; yigin.push(i - W); }
+    if (i < W * (H - 1) && !gezildi[i + W] && gecerli[i + W]){ gezildi[i + W] = 1; yigin.push(i + W); }
+  }
+  return yazilan;
+}
+
+/*
+  Tek tek ağaç işaretleme: çam olasılık ızgarasında yerel maksimumlar,
+  taç çapına karşılık gelen en az mesafeyle (NMS) seyreltilir.
+  minMesafe blok cinsindendir; dönen x/y blok koordinatıdır.
+*/
+function agacIsaretle(ayar){
+  const { probs, sinif, gw, gh, K, camIdx, esik, minMesafe } = ayar;
+  const d = Math.max(1, minMesafe | 0);
+  const d2 = d * d;
+  const adaylar = [];
+  for (let i = 0; i < gw * gh; i++){
+    if (sinif[i] === 255) continue;
+    const taban = i * K;
+    const p = probs[taban + camIdx];
+    if (p < esik) continue;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+    if (enC === camIdx) adaylar.push(i);
+  }
+  adaylar.sort((a, b) => probs[b * K + camIdx] - probs[a * K + camIdx]);
+  const sepet = new Map();                             // uzamsal kova: O(1) komşu denetimi
+  const kabul = [];
+  for (const i of adaylar){
+    const x = i % gw, y = (i / gw) | 0;
+    const sx = (x / d) | 0, sy = (y / d) | 0;
+    let yakinVar = false;
+    for (let by = sy - 1; by <= sy + 1 && !yakinVar; by++){
+      for (let bx = sx - 1; bx <= sx + 1 && !yakinVar; bx++){
+        const liste = sepet.get(by * 1048576 + bx);
+        if (!liste) continue;
+        for (const k of liste){
+          const dx = k.x - x, dy = k.y - y;
+          if (dx * dx + dy * dy < d2){ yakinVar = true; break; }
+        }
+      }
+    }
+    if (yakinVar) continue;
+    const kayit = { x, y, p: probs[i * K + camIdx] };
+    kabul.push(kayit);
+    const anahtar = sy * 1048576 + sx;
+    if (!sepet.has(anahtar)) sepet.set(anahtar, []);
+    sepet.get(anahtar).push(kayit);
+    if (kabul.length >= 200000) break;                 // emniyet sınırı (çok geniş ormanlar)
+  }
+  /* nokta atışı: tepe konumunu taç penceresi içindeki olasılık ağırlıklı merkeze incelt */
+  const yariP = Math.max(1, Math.round(d / 2));
+  for (const k of kabul){
+    let tx = 0, ty = 0, tw = 0;
+    const x0 = Math.max(0, k.x - yariP), x1 = Math.min(gw - 1, k.x + yariP);
+    const y0 = Math.max(0, k.y - yariP), y1 = Math.min(gh - 1, k.y + yariP);
+    for (let y = y0; y <= y1; y++){
+      for (let x = x0; x <= x1; x++){
+        const i = y * gw + x;
+        if (sinif[i] === 255) continue;
+        const taban = i * K;
+        const p = probs[taban + camIdx];
+        if (p < esik) continue;
+        let enC = 0;
+        for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+        if (enC !== camIdx) continue;
+        tx += x * p; ty += y * p; tw += p;
+      }
+    }
+    if (tw > 0){ k.x = tx / tw; k.y = ty / tw; }
+  }
+  return kabul;
+}
+
+/* İntegral görüntüyle kutu-çekirdek yoğunluğu; en yoğun bloğu döndürür */
+function yogunlukHaritasi(maske, gw, gh, yaricap){
+  const r = Math.max(1, yaricap | 0);
+  const gw1 = gw + 1;
+  const integ = new Float64Array(gw1 * (gh + 1));
+  for (let y = 0; y < gh; y++){
+    let satir = 0;
+    for (let x = 0; x < gw; x++){
+      satir += maske[y * gw + x];
+      integ[(y + 1) * gw1 + (x + 1)] = integ[y * gw1 + (x + 1)] + satir;
+    }
+  }
+  const yog = new Float32Array(gw * gh);
+  let enDeger = -1, enX = 0, enY = 0;
+  for (let y = 0; y < gh; y++){
+    const y0 = Math.max(0, y - r), y1 = Math.min(gh - 1, y + r);
+    for (let x = 0; x < gw; x++){
+      const x0 = Math.max(0, x - r), x1 = Math.min(gw - 1, x + r);
+      const top = integ[(y1 + 1) * gw1 + (x1 + 1)] - integ[y0 * gw1 + (x1 + 1)]
+                - integ[(y1 + 1) * gw1 + x0] + integ[y0 * gw1 + x0];
+      const v = top / ((y1 - y0 + 1) * (x1 - x0 + 1));
+      yog[y * gw + x] = v;
+      if (v > enDeger){ enDeger = v; enX = x; enY = y; }
+    }
+  }
+  return { yog, enX, enY, enDeger };
+}
+
+function bagliBilesenSay(maske, gw, gh){
+  const gezildi = new Uint8Array(gw * gh);
+  const yigin = new Int32Array(gw * gh);
+  let adet = 0;
+  for (let i = 0; i < gw * gh; i++){
+    if (!maske[i] || gezildi[i]) continue;
+    adet++;
+    let ust = 0;
+    yigin[ust++] = i; gezildi[i] = 1;
+    while (ust > 0){
+      const p = yigin[--ust];
+      const px = p % gw, py = (p / gw) | 0;
+      if (px > 0 && maske[p - 1] && !gezildi[p - 1]){ gezildi[p - 1] = 1; yigin[ust++] = p - 1; }
+      if (px < gw - 1 && maske[p + 1] && !gezildi[p + 1]){ gezildi[p + 1] = 1; yigin[ust++] = p + 1; }
+      if (py > 0 && maske[p - gw] && !gezildi[p - gw]){ gezildi[p - gw] = 1; yigin[ust++] = p - gw; }
+      if (py < gh - 1 && maske[p + gw] && !gezildi[p + gw]){ gezildi[p + gw] = 1; yigin[ust++] = p + gw; }
+    }
+  }
+  return adet;
+}
+/* =====================================================================
+   TAÇ POLİGONLARI — tohumlu watershed + kontur takibi + sadeleştirme
+   ===================================================================== */
+
+/* Douglas-Peucker (açık zincir) */
+function dpSadelestir(noktalar, eps){
+  const n = noktalar.length >> 1;
+  if (n <= 2) return noktalar.slice();
+  const tut = new Uint8Array(n);
+  tut[0] = tut[n - 1] = 1;
+  const yigin = [[0, n - 1]];
+  while (yigin.length){
+    const [a, b] = yigin.pop();
+    const ax = noktalar[a * 2], ay = noktalar[a * 2 + 1];
+    const bx = noktalar[b * 2], by = noktalar[b * 2 + 1];
+    const dx = bx - ax, dy = by - ay;
+    const boy2 = dx * dx + dy * dy;
+    let enUzak = -1, enMesafe = eps;
+    for (let i = a + 1; i < b; i++){
+      const px = noktalar[i * 2] - ax, py = noktalar[i * 2 + 1] - ay;
+      let d;
+      if (boy2 < 1e-12) d = Math.sqrt(px * px + py * py);
+      else d = Math.abs(px * dy - py * dx) / Math.sqrt(boy2);
+      if (d > enMesafe){ enMesafe = d; enUzak = i; }
+    }
+    if (enUzak >= 0){ tut[enUzak] = 1; yigin.push([a, enUzak], [enUzak, b]); }
+  }
+  const cikti = [];
+  for (let i = 0; i < n; i++) if (tut[i]) cikti.push(noktalar[i * 2], noktalar[i * 2 + 1]);
+  return cikti;
+}
+
+/* Kapalı halkayı iki zincire bölüp DP uygular */
+function halkaSadelestir(halka, eps){
+  const n = halka.length >> 1;
+  if (n <= 4) return halka.slice();
+  const yarim = n >> 1;
+  const z1 = halka.slice(0, (yarim + 1) * 2);
+  const z2 = halka.slice(yarim * 2).concat([halka[0], halka[1]]);
+  const s1 = dpSadelestir(z1, eps);
+  const s2 = dpSadelestir(z2, eps);
+  return s1.slice(0, s1.length - 2).concat(s2.slice(0, s2.length - 2));
+}
+
+function halkaAlani(halka){                             // shoelace (y-aşağı düzlemde işaretli)
+  let a = 0;
+  const n = halka.length >> 1;
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    a += halka[i * 2] * halka[j * 2 + 1] - halka[j * 2] * halka[i * 2 + 1];
+  }
+  return a / 2;
+}
+
+/* Etiket ızgarasında verilen etiketin DIŞ konturunu köşe koordinatlarıyla çıkarır.
+   Kenar parçaları iç bölge solda kalacak şekilde üretilip zincirlenir;
+   birden çok halka çıkarsa en büyük |alan| dış halkadır (delikler atılır). */
+function konturZincirle(etiket, gw, gh, hedef, x0, y0, x1, y1){
+  const baslangic = new Map();                          // "x_y" → bitiş [x,y]
+  const ekle = (ax, ay, bx, by) => baslangic.set(ax + '_' + ay, bx + '_' + by);
+  for (let y = y0; y <= y1; y++){
+    for (let x = x0; x <= x1; x++){
+      if (etiket[y * gw + x] !== hedef) continue;
+      if (y === 0 || etiket[(y - 1) * gw + x] !== hedef) ekle(x, y, x + 1, y);
+      if (x === gw - 1 || etiket[y * gw + x + 1] !== hedef) ekle(x + 1, y, x + 1, y + 1);
+      if (y === gh - 1 || etiket[(y + 1) * gw + x] !== hedef) ekle(x + 1, y + 1, x, y + 1);
+      if (x === 0 || etiket[y * gw + x - 1] !== hedef) ekle(x, y + 1, x, y);
+    }
+  }
+  let enHalka = null, enAlan = 0;
+  while (baslangic.size){
+    const bas = baslangic.keys().next().value;
+    const halka = [];
+    let simdiki = bas;
+    let bekci = baslangic.size + 4;
+    while (bekci-- > 0){
+      const son = baslangic.get(simdiki);
+      if (son === undefined) break;
+      baslangic.delete(simdiki);
+      const [hx, hy] = simdiki.split('_');
+      halka.push(+hx, +hy);
+      if (son === bas) break;
+      simdiki = son;
+    }
+    const alan = Math.abs(halkaAlani(halka));
+    if (alan > enAlan){ enAlan = alan; enHalka = halka; }
+  }
+  return enHalka;
+}
+
+/*
+  Tohumlu watershed + kontur: çam maskesini ağaç tohumlarına göre taçlara böler,
+  her tacın dış poligonunu üretir. Deterministiktir (olasılık azalan, eşitlikte
+  indeks artan sırayla taşma).
+  ayar: { probs, sinif, gw, gh, K, camIdx, esik, tohumlar:[{x,y}], onProgress }
+  → { poligonlar:[{id, halkaBlok:[x,y,...](köşe koordinatı), alanBlok, guven,
+       merkezX, merkezY (blok), tohumlu}], etiket: Int32Array(gw*gh) }
+*/
+async function tacPoligonlariCikar(ayar){
+  const { probs, sinif, gw, gh, K, camIdx, esik, tohumlar, onProgress } = ayar;
+  const bildir = onProgress || (() => {});
+  const N = gw * gh;
+  const maske = new Uint8Array(N);
+  const p = new Float32Array(N);
+  for (let i = 0; i < N; i++){
+    if (sinif[i] === 255) continue;
+    const taban = i * K;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[taban + c] > probs[taban + enC]) enC = c;
+    if (enC === camIdx && probs[taban + camIdx] >= esik){
+      maske[i] = 1;
+      p[i] = probs[taban + camIdx];
+    }
+  }
+  const etiket = new Int32Array(N);
+  /* öncelik kuyruğu: yüksek olasılık önce, eşitlikte küçük indeks önce */
+  const hK = [], hI = [], hL = [];
+  const once = (a, b) => hK[a] > hK[b] || (hK[a] === hK[b] && hI[a] < hI[b]);
+  function it(a, b){
+    let t = hK[a]; hK[a] = hK[b]; hK[b] = t;
+    t = hI[a]; hI[a] = hI[b]; hI[b] = t;
+    t = hL[a]; hL[a] = hL[b]; hL[b] = t;
+  }
+  function pushH(k, i, l){
+    hK.push(k); hI.push(i); hL.push(l);
+    let c = hK.length - 1;
+    while (c > 0){
+      const e = (c - 1) >> 1;
+      if (once(e, c)) break;
+      it(e, c); c = e;
+    }
+  }
+  function popH(){
+    const son = hK.length - 1;
+    it(0, son);
+    const kayit = [hK.pop(), hI.pop(), hL.pop()];
+    let c = 0;
+    for (;;){
+      const s1 = c * 2 + 1, s2 = c * 2 + 2;
+      let en = c;
+      if (s1 < hK.length && once(s1, en)) en = s1;
+      if (s2 < hK.length && once(s2, en)) en = s2;
+      if (en === c) break;
+      it(c, en); c = en;
+    }
+    return kayit;
+  }
+  let sonEtiket = 0;
+  for (const t of tohumlar){
+    const tx = Math.max(0, Math.min(gw - 1, Math.round(t.x)));
+    const ty = Math.max(0, Math.min(gh - 1, Math.round(t.y)));
+    const i = ty * gw + tx;
+    if (!maske[i] || etiket[i]) continue;              // maske dışı/çakışan tohum atlanır
+    etiket[i] = ++sonEtiket;
+    pushH(p[i], i, sonEtiket);
+  }
+  let sayac = 0;
+  while (hK.length){
+    const [, i, l] = popH();
+    const x = i % gw;
+    const komsular = [
+      x > 0 ? i - 1 : -1, x < gw - 1 ? i + 1 : -1,
+      i >= gw ? i - gw : -1, i < N - gw ? i + gw : -1
+    ];
+    for (const j of komsular){
+      if (j < 0 || !maske[j] || etiket[j]) continue;
+      etiket[j] = l;
+      pushH(p[j], j, l);
+    }
+    if ((++sayac & 8191) === 0){ bildir(0.1 + 0.5 * sayac / N, 'taçlar ayrıştırılıyor'); await beklet(); }
+  }
+  /* tohumsuz kalan maske bileşenleri: kendi başına taç */
+  const kuyruk = new Int32Array(N);
+  for (let i = 0; i < N; i++){
+    if (!maske[i] || etiket[i]) continue;
+    const l = ++sonEtiket;
+    let bas = 0, uc = 0;
+    kuyruk[uc++] = i; etiket[i] = l;
+    while (bas < uc){
+      const q = kuyruk[bas++];
+      const x = q % gw;
+      const komsular = [
+        x > 0 ? q - 1 : -1, x < gw - 1 ? q + 1 : -1,
+        q >= gw ? q - gw : -1, q < N - gw ? q + gw : -1
+      ];
+      for (const j of komsular){
+        if (j < 0 || !maske[j] || etiket[j]) continue;
+        etiket[j] = l; kuyruk[uc++] = j;
+      }
+    }
+  }
+  /* etiket istatistikleri */
+  const alan = new Int32Array(sonEtiket + 1);
+  const pTop = new Float64Array(sonEtiket + 1);
+  const sx = new Float64Array(sonEtiket + 1), sy = new Float64Array(sonEtiket + 1);
+  const bb = new Int32Array((sonEtiket + 1) * 4);
+  for (let l = 1; l <= sonEtiket; l++){
+    bb[l * 4] = gw; bb[l * 4 + 1] = gh; bb[l * 4 + 2] = -1; bb[l * 4 + 3] = -1;
+  }
+  for (let i = 0; i < N; i++){
+    const l = etiket[i];
+    if (!l) continue;
+    const x = i % gw, y = (i / gw) | 0;
+    alan[l]++; pTop[l] += p[i]; sx[l] += x; sy[l] += y;
+    if (x < bb[l * 4]) bb[l * 4] = x;
+    if (y < bb[l * 4 + 1]) bb[l * 4 + 1] = y;
+    if (x > bb[l * 4 + 2]) bb[l * 4 + 2] = x;
+    if (y > bb[l * 4 + 3]) bb[l * 4 + 3] = y;
+  }
+  const poligonlar = [];
+  for (let l = 1; l <= sonEtiket; l++){
+    if (!alan[l]) continue;
+    const halka = konturZincirle(etiket, gw, gh, l, bb[l * 4], bb[l * 4 + 1], bb[l * 4 + 2], bb[l * 4 + 3]);
+    if (!halka || halka.length < 6) continue;
+    const sade = halkaSadelestir(halka, 0.35);
+    poligonlar.push({
+      id: poligonlar.length + 1,
+      halkaBlok: sade.length >= 6 ? sade : halka,
+      alanBlok: alan[l],
+      guven: pTop[l] / alan[l],
+      merkezX: sx[l] / alan[l],
+      merkezY: sy[l] / alan[l],
+      tohumlu: l <= tohumlar.length,
+      etiketNo: l
+    });
+    if ((l & 255) === 0){ bildir(0.6 + 0.35 * l / sonEtiket, 'konturlar çiziliyor'); await beklet(); }
+  }
+  bildir(1, 'bitti');
+  return { poligonlar, etiket };
+}
+
+/* =====================================================================
+   DOĞRULUK: IoU tabanlı açgözlü eşleştirme + Pearson R²
+   ===================================================================== */
+function pearsonKare(xs, ys){
+  const n = xs.length;
+  if (n < 2) return 0;
+  let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+  for (let i = 0; i < n; i++){
+    sx += xs[i]; sy += ys[i];
+    sxx += xs[i] * xs[i]; syy += ys[i] * ys[i]; sxy += xs[i] * ys[i];
+  }
+  const pay = n * sxy - sx * sy;
+  const payda = (n * sxx - sx * sx) * (n * syy - sy * sy);
+  if (payda <= 1e-12) return 0;
+  return (pay * pay) / payda;
+}
+
+/*
+  Tahmin etiket ızgarası ile referans maskelerini blok çözünürlüğünde IoU ile eşleştirir.
+  tahminler: tacPoligonlariCikar çıktısındaki poligon listesi (etiketNo + alanBlok + bbox türetilir)
+  referanslar: [{maske:Uint8Array(bw*bh), x0, y0, bw, bh, alanBlok}]
+  → { tp, fp, fn, precision, recall, f1, ciftler:[{tahminIdx, refIdx, iou}] }
+*/
+function iouEslestir(etiket, gw, gh, tahminler, referanslar, esik){
+  const adaylar = [];
+  for (let ri = 0; ri < referanslar.length; ri++){
+    const r = referanslar[ri];
+    const kesisim = new Map();                          // etiketNo → kesişen blok sayısı
+    for (let y = 0; y < r.bh; y++){
+      const gy = r.y0 + y;
+      if (gy < 0 || gy >= gh) continue;
+      for (let x = 0; x < r.bw; x++){
+        if (!r.maske[y * r.bw + x]) continue;
+        const gx = r.x0 + x;
+        if (gx < 0 || gx >= gw) continue;
+        const l = etiket[gy * gw + gx];
+        if (l) kesisim.set(l, (kesisim.get(l) || 0) + 1);
+      }
+    }
+    for (const [l, kes] of kesisim){
+      const t = tahminler.find(tp2 => tp2.etiketNo === l);
+      if (!t) continue;
+      const iou = kes / (t.alanBlok + r.alanBlok - kes);
+      adaylar.push({ tahminIdx: tahminler.indexOf(t), refIdx: ri, iou });
+    }
+  }
+  adaylar.sort((a, b) => b.iou - a.iou || a.refIdx - b.refIdx || a.tahminIdx - b.tahminIdx);
+  const tKullanildi = new Uint8Array(tahminler.length);
+  const rKullanildi = new Uint8Array(referanslar.length);
+  const ciftler = [];
+  for (const a of adaylar){
+    if (a.iou < esik) break;
+    if (tKullanildi[a.tahminIdx] || rKullanildi[a.refIdx]) continue;
+    tKullanildi[a.tahminIdx] = 1;
+    rKullanildi[a.refIdx] = 1;
+    ciftler.push(a);
+  }
+  const tp = ciftler.length;
+  const fp = tahminler.length - tp;
+  const fn = referanslar.length - tp;
+  const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+  const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+  const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
+  return { tp, fp, fn, precision, recall, f1, ciftler };
+}
+/*__CEKIRDEK_BITIR__*/
+</script>
+<script>
 'use strict';
 const $ = id => document.getElementById(id);
 const goster = (el, evet) => el.classList.toggle('gizli', !evet);
@@ -266,15 +2304,17 @@ function durumYaz(no, metin, tamam){
   el.classList.toggle('tamam', !!tamam);
 }
 const adres = () => $('adres').value.replace(/\/+$/, '');
-const sayiTR = x => Number(x).toLocaleString('tr-TR');
+const sayiTR = (x, hane) => Number(x).toLocaleString('tr-TR',
+  hane != null ? { minimumFractionDigits: hane, maximumFractionDigits: hane } : undefined);
 const yuzde = x => (x * 100).toFixed(1).replace('.', ',') + '%';
 
-let BAGLI = false, VERI = null, IZLEYICI = null, GECMIS = [], RAPOR = null;
+let BAGLI = false, VERI = null, IZLEYICI = null, GECMIS = [], RAPOR = null, SON = null;
 
 async function baglan(){
   try{
     const d = await (await fetch(adres() + '/durum')).json();
     BAGLI = true;
+    SON = d;
     durumYaz(1, '✓ bağlı', true);
     let bilgi = '✓ Sunucu hazır.';
     if (d.modelHazir)
@@ -290,10 +2330,15 @@ async function baglan(){
     $('adim2').open = true;
     havuzGoster(d.havuz);
     guncelle(d);
+    turSecimKur();
+    yamaOtoAyarla();
+    aktifDurumTazele();
     if (d.egitimde) izlemeyeBasla();
     else if (d.modelHazir) raporYukle();
   }catch(e){
     BAGLI = false;
+    SON = null;
+    aktifDurumTazele();
     durumYaz(1, 'bağlanamadı');
     $('baglantiBilgi').textContent = '✗ Bağlanılamadı — cam_ai.exe çalışıyor mu? (Konsol penceresi açık kalmalı.)';
     $('baglantiBilgi').className = 'hata';
@@ -359,10 +2404,12 @@ async function veriOku(dosya){
       const esle = new Map(gorulen.map((c, i) => [c, i]));
       VERI = { d, K: gorulen.length,
         siniflar: gorulen.map(c => adlar[c] || ('Sınıf ' + (c + 1))),
-        X, y: yTum.map(c => esle.get(c)) };
+        X, y: yTum.map(c => esle.get(c)),
+        yama: j.havuz[0].yama || 0 };
     } else if (Array.isArray(j.X) && Array.isArray(j.y)){
       VERI = { d: j.d || 36, K: j.K || Math.max(...j.y) + 1,
-        siniflar: (j.siniflar || []).map(s => s.ad || String(s)), X: j.X, y: j.y };
+        siniflar: (j.siniflar || []).map(s => s.ad || String(s)), X: j.X, y: j.y,
+        yama: j.yama || 0 };
       while (VERI.siniflar.length < VERI.K) VERI.siniflar.push('Sınıf ' + (VERI.siniflar.length + 1));
     } else throw new Error('Tanınmayan biçim — Çam-AI proje dosyası ya da {d,K,X,y} bekleniyor.');
     if (VERI.K < 2) throw new Error('En az 2 sınıfta örnek gerekir.');
@@ -375,6 +2422,7 @@ async function veriOku(dosya){
     goster(vb, true);
     $('adim3').open = true;
     durumYaz(2, '✓ yeni veri hazır', true);
+    yamaOtoAyarla();
   }catch(h){
     VERI = null;
     vb.className = 'hata';
@@ -409,6 +2457,7 @@ $('btnEgit').addEventListener('click', async () => {
   if (VERI) Object.assign(govde, {
     d: VERI.d, K: VERI.K, siniflar: VERI.siniflar, X: VERI.X, y: VERI.y
   });
+  if (VERI && VERI.yama) govde.yama = VERI.yama;
   try{
     const y = await (await fetch(adres() + '/egit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -661,6 +2710,476 @@ $('btnHizliTest').addEventListener('click', async () => {
     ts.textContent = '✗ ' + h.message;
   }
   goster(ts, true);
+});
+
+
+/* ===================== 5) GÖRÜNTÜ ANALİZİ — TÜR TESPİTİ =====================
+   Görüntü tarayıcıda çözülür (çekirdek TIFF çözücü), 36'lık blok öznitelikleri
+   parça parça C++ sunucusuna gönderilir (POST /tahmin), modelin tanıdığı HER
+   tür için nokta atışı işaretleme (NMS + ağırlıklı merkez) yerelde yapılır. */
+
+const SINIF_RENKLERI = ['#2fa84f', '#e2574c', '#3b7dd8', '#e0a52e', '#9b59b6', '#17a2b8', '#e67e22', '#7f8c8d'];
+const ARKAPLAN_DESENI = /değil|degil|arka\s*plan|zemin|yol|bina|toprak|gölge|golge|çıplak|ciplak/i;
+const EMOJI_DESENI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu;
+const temizAd = s => s.replace(EMOJI_DESENI, '').trim() || s;
+
+const ANALIZ = { gorsel: null, taban: null, sonuc: null, gruplar: null, enYogun: null,
+                 tacCalisPx: 8, mesgul: false, iptal: false };
+let YAMA_ELLE = false;
+$('yamaA').addEventListener('input', () => { YAMA_ELLE = true; });
+
+function aktifDurumTazele(){
+  const modelVar = !!(BAGLI && SON && SON.modelHazir && !SON.egitimde);
+  $('btnAnaliz').disabled = !(modelVar && ANALIZ.gorsel && !ANALIZ.mesgul);
+  goster($('aktarSatir'), !!ANALIZ.gruplar);
+}
+
+function yamaOtoAyarla(){
+  if (YAMA_ELLE) return;
+  const oneri = (VERI && VERI.yama) || (SON && SON.havuz && SON.havuz.yama) || 0;
+  if (oneri >= 8 && oneri <= 128) $('yamaA').value = oneri;
+}
+
+/* model sınıflarından tür onay kutuları — arkaplan sınıfları varsayılan kapalı */
+function turSecimKur(){
+  const adlar = SON && SON.modelHazir && Array.isArray(SON.siniflar) ? SON.siniflar : [];
+  goster($('turKutu'), adlar.length > 0);
+  if (!adlar.length) return;
+  const onceki = new Map([...$('turListe').querySelectorAll('input')]
+    .map(k => [k.dataset.ad, k.checked]));
+  $('turListe').innerHTML = '';
+  adlar.forEach((ad, c) => {
+    const etiket = document.createElement('label');
+    const kutu = document.createElement('input');
+    kutu.type = 'checkbox';
+    kutu.dataset.ad = ad;
+    kutu.checked = onceki.has(ad) ? onceki.get(ad) : !ARKAPLAN_DESENI.test(ad);
+    kutu.addEventListener('change', () => { if (ANALIZ.sonuc) agacGruplariHesapla(); });
+    const nokta = document.createElement('span');
+    nokta.className = 'renkNokta';
+    nokta.style.background = SINIF_RENKLERI[c % SINIF_RENKLERI.length];
+    etiket.append(kutu, nokta, document.createTextNode(ad));
+    $('turListe').append(etiket);
+  });
+}
+
+/* ---- görüntü yükleme ---- */
+const birakG = $('birakGorsel');
+birakG.addEventListener('click', () => $('dosyaGorsel').click());
+birakG.addEventListener('dragover', e => { e.preventDefault(); birakG.classList.add('ustunde'); });
+birakG.addEventListener('dragleave', () => birakG.classList.remove('ustunde'));
+birakG.addEventListener('drop', e => {
+  e.preventDefault(); birakG.classList.remove('ustunde');
+  if (e.dataTransfer.files.length) gorselOku(e.dataTransfer.files[0]);
+});
+$('dosyaGorsel').addEventListener('change', e => {
+  if (e.target.files.length) gorselOku(e.target.files[0]);
+  e.target.value = '';
+});
+
+async function resimYukleK(dosya, maxDim){
+  let bmp;
+  try{ bmp = await createImageBitmap(dosya, { imageOrientation: 'from-image' }); }
+  catch(_e){ bmp = await createImageBitmap(dosya); }
+  const w = bmp.width, h = bmp.height;
+  const k = Math.max(1, Math.ceil(Math.max(w, h) / maxDim));
+  const outW = Math.ceil(w / k), outH = Math.ceil(h / k);
+  const knv = document.createElement('canvas');
+  knv.width = outW; knv.height = outH;
+  const ctx = knv.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, 0, 0, outW, outH);
+  bmp.close && bmp.close();
+  const gd = ctx.getImageData(0, 0, outW, outH);
+  const N = outW * outH;
+  const gecerli = new Uint8Array(N);
+  const rgba = new Uint8ClampedArray(gd.data.buffer.slice(0));
+  for (let i = 0; i < N; i++){
+    const tamam = rgba[i * 4 + 3] > 16;
+    if (!tamam) rgba[i * 4 + 3] = 0;
+    gecerli[i] = tamam ? 1 : 0;
+  }
+  return { w, h, outW, outH, olcek: k, rgba, gecerli, geo: null };
+}
+
+async function gorselOku(dosya){
+  if (ANALIZ.mesgul) return;
+  const hataEl = $('analizHata');
+  goster(hataEl, false);
+  ANALIZ.mesgul = true;
+  aktifDurumTazele();
+  const kutu = $('gorselYukleKutu'), cubuk = $('gorselCubukEl'), yazi = $('gorselYaziEl');
+  goster(kutu, true);
+  const ilerle = (oran, mesaj) => {
+    cubuk.style.width = Math.round(oran * 100) + '%';
+    yazi.textContent = mesaj;
+  };
+  ilerle(0.03, 'dosya okunuyor…');
+  try{
+    const tiffMi = /\.tiff?$/i.test(dosya.name);
+    const maxDim = parseInt($('secCoz').value, 10) || 3072;
+    let g;
+    if (tiffMi){
+      const buf = await dosya.arrayBuffer();
+      ilerle(0.06, 'TIFF çözülüyor…');
+      g = await tiffCoz(buf, { maxDim,
+        onProgress: (oran, mesaj) => ilerle(0.06 + oran * 0.88, mesaj + '… %' + Math.round(oran * 100)) });
+    } else {
+      g = await resimYukleK(dosya, maxDim);
+    }
+    g.dosyaAd = dosya.name;
+    ANALIZ.gorsel = g;
+    ANALIZ.sonuc = null; ANALIZ.gruplar = null; ANALIZ.enYogun = null;
+    ilerle(0.97, 'tuval hazırlanıyor…');
+    await beklet();
+    const taban = document.createElement('canvas');
+    taban.width = g.outW; taban.height = g.outH;
+    taban.getContext('2d').putImageData(new ImageData(g.rgba, g.outW, g.outH), 0, 0);
+    ANALIZ.taban = taban;
+    const knv = $('gorselKnv');
+    knv.width = g.outW; knv.height = g.outH;
+    gorselCiz();
+    $('gorselBaslik').textContent = dosya.name;
+    gorselNotKur(g);
+    $('tacBirim').textContent = g.geo && !g.geo.cografi ? 'm' : 'px';
+    goster($('sahneBos'), false);
+    goster($('sahneIc'), true);
+    goster($('gorselKart'), true);
+    goster($('lejant'), false);
+    goster($('analizOzet'), false);
+    durumYaz(5, '✓ görüntü hazır', true);
+  }catch(h){
+    hataEl.textContent = '✗ Yükleme başarısız: ' + (h && h.message ? h.message : h) +
+      '\nPix4D\'den "GeoTIFF (LZW)" ya da JPG olarak dışa aktarmayı deneyin; çok büyükse işleme çözünürlüğünü 2048\'e düşürün.';
+    goster(hataEl, true);
+  }finally{
+    ANALIZ.mesgul = false;
+    goster(kutu, false);
+    aktifDurumTazele();
+  }
+}
+
+function gorselNotKur(g){
+  const p = ['Özgün ' + sayiTR(g.w) + '×' + sayiTR(g.h) + ' px' +
+    (g.olcek > 1 ? ' → işlenen ' + sayiTR(g.outW) + '×' + sayiTR(g.outH) + ' (1/' + g.olcek + ')' : '')];
+  if (g.geo){
+    p.push('GSD ' + (g.geo.cografi ? g.geo.sx.toExponential(2) + '°/px'
+      : (g.geo.sx * 100).toFixed(2).replace('.', ',') + ' cm/px'));
+    p.push(g.geo.epsg ? 'EPSG:' + g.geo.epsg : 'koordinat sistemi tanımsız');
+    if (!g.geo.cografi)
+      p.push('kapsam ' + sayiTR(g.w * g.geo.sx, 1) + ' × ' + sayiTR(g.h * g.geo.sy, 1) + ' m');
+  } else p.push('coğrafi bilgi yok — piksel koordinatları kullanılır');
+  $('gorselNot').textContent = '🛰️ ' + p.join(' · ');
+}
+
+/* ---- analiz: blok öznitelikleri → sunucu tahmini → işaretleme ---- */
+$('btnAnaliz').addEventListener('click', analizCalistir);
+$('btnAnalizDurdur').addEventListener('click', () => { ANALIZ.iptal = true; });
+
+async function analizCalistir(){
+  if (ANALIZ.mesgul || !ANALIZ.gorsel) return;
+  const hataEl = $('analizHata');
+  goster(hataEl, false);
+  goster($('analizOzet'), false);
+  ANALIZ.mesgul = true;
+  ANALIZ.iptal = false;
+  aktifDurumTazele();
+  goster($('btnAnalizDurdur'), true);
+  goster($('analizIlerlemeKutu'), true);
+  const g = ANALIZ.gorsel;
+  try{
+    const d = await (await fetch(adres() + '/durum')).json();
+    SON = d;
+    if (!d.modelHazir) throw new Error('Sunucuda hazır model yok — önce Adım 3\'te eğitin ya da Adım 4\'ten model yükleyin.');
+    if (d.egitimde) throw new Error('Eğitim sürerken analiz yapılamaz — bitmesini bekleyin.');
+    const dGirdi = d.boyut && d.boyut.length ? d.boyut[0] : 0;
+    if (dGirdi !== OZELLIK_SAYISI)
+      throw new Error('Model ' + dGirdi + ' öznitelikli — görüntü analizi ' + OZELLIK_SAYISI +
+        ' öznitelikli Çam-AI verisiyle eğitilmiş model ister.');
+    turSecimKur();
+    const K = d.siniflar.length;
+    const yama = Math.min(128, Math.max(8, parseInt($('yamaA').value, 10) || 24));
+    const adim = Math.max(3, Math.round(yama * (parseFloat($('secAdimA').value) || 0.25)));
+    if (g.outW < yama || g.outH < yama)
+      throw new Error('Görüntü (' + g.outW + '×' + g.outH + ') örnek penceresinden (' + yama + ' px) küçük.');
+    const yari = yama >> 1;
+    const gw = Math.max(1, Math.floor((g.outW - yama) / adim) + 1);
+    const gh = Math.max(1, Math.floor((g.outH - yama) / adim) + 1);
+    const toplamHucre = gw * gh;
+    const probs = new Float32Array(toplamHucre * K);
+    const sinif = new Uint8Array(toplamHucre).fill(255);
+    const cikar = ozellikCikarici(g.rgba, g.gecerli, g.outW, g.outH, yama);
+    const oz = new Float64Array(OZELLIK_SAYISI);
+    const PARCA = 2500;
+    let X = [], hucreler = [], islenen = 0;
+    const ilerle = () => {
+      const oran = islenen / toplamHucre;
+      $('analizCubuk').style.width = Math.round(oran * 100) + '%';
+      $('analizYazi').textContent = 'bloklar sunucuda sınıflandırılıyor… %' + Math.round(oran * 100) +
+        ' (' + sayiTR(Math.min(islenen, toplamHucre)) + '/' + sayiTR(toplamHucre) + ' blok)';
+    };
+    async function gonder(){
+      if (!hucreler.length) return;
+      const y = await (await fetch(adres() + '/tahmin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ X })
+      })).json();
+      if (y.hata) throw new Error(y.hata);
+      for (let i = 0; i < hucreler.length; i++){
+        const taban = hucreler[i] * K, pv = y.probs[i];
+        let enC = 0;
+        for (let c = 0; c < K; c++){
+          probs[taban + c] = pv[c];
+          if (pv[c] > pv[enC]) enC = c;
+        }
+        sinif[hucreler[i]] = enC;
+      }
+      X = []; hucreler = [];
+    }
+    for (let gy = 0; gy < gh; gy++){
+      const cy = yari + gy * adim;
+      for (let gx = 0; gx < gw; gx++){
+        if (cikar(yari + gx * adim, cy, oz)){
+          for (let j = 0; j < OZELLIK_SAYISI; j++) X.push(+oz[j].toFixed(5));
+          hucreler.push(gy * gw + gx);
+          if (hucreler.length >= PARCA){ ilerle(); await gonder(); }
+        }
+        if ((++islenen & 1023) === 0){ ilerle(); await beklet(); }
+        if (ANALIZ.iptal) throw new Error('Analiz durduruldu.');
+      }
+    }
+    ilerle();
+    await gonder();
+    $('analizYazi').textContent = 'işaretler hesaplanıyor…';
+    await beklet();
+    const probsY = probYumusat(probs, gw, gh, K);
+    ANALIZ.sonuc = { gw, gh, adim, yari, K, siniflar: d.siniflar.slice(), probs, probsY, sinif };
+    agacGruplariHesapla();
+    durumYaz(5, '✓ analiz tamam', true);
+  }catch(h){
+    hataEl.textContent = '✗ ' + (h && h.message ? h.message : h);
+    goster(hataEl, true);
+  }finally{
+    ANALIZ.mesgul = false;
+    goster($('btnAnalizDurdur'), false);
+    goster($('analizIlerlemeKutu'), false);
+    aktifDurumTazele();
+  }
+}
+
+/* seçili türler için NMS'li nokta atışı işaretleme + en yoğun bölge */
+function agacGruplariHesapla(){
+  const s = ANALIZ.sonuc, g = ANALIZ.gorsel;
+  if (!s || !g) return;
+  const esik = parseInt($('esikA').value, 10) / 100;
+  const seciliAdlar = new Set([...$('turListe').querySelectorAll('input')]
+    .filter(k => k.checked).map(k => k.dataset.ad));
+  const secili = s.siniflar.map((ad, c) => seciliAdlar.has(ad) ? c : -1).filter(c => c >= 0);
+  const geoVar = !!(g.geo && !g.geo.cografi);
+  let tac = parseFloat(String($('tacA').value || '').replace(',', '.'));
+  if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
+  const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
+  const dBlok = Math.max(1, Math.round(tacCalisPx / s.adim));
+  const gruplar = [];
+  const maske = new Uint8Array(s.gw * s.gh);
+  for (const c of secili){
+    const agaclar = agacIsaretle({ probs: s.probsY, sinif: s.sinif, gw: s.gw, gh: s.gh,
+      K: s.K, camIdx: c, esik, minMesafe: dBlok });
+    gruplar.push({ idx: c, ad: s.siniflar[c],
+      renk: SINIF_RENKLERI[c % SINIF_RENKLERI.length], agaclar });
+    for (let i = 0; i < s.gw * s.gh; i++){
+      if (s.sinif[i] === 255) continue;
+      const taban = i * s.K;
+      let enC = 0;
+      for (let c2 = 1; c2 < s.K; c2++)
+        if (s.probsY[taban + c2] > s.probsY[taban + enC]) enC = c2;
+      if (enC === c && s.probsY[taban + c] >= esik) maske[i] = 1;
+    }
+  }
+  const toplam = gruplar.reduce((t, gr) => t + gr.agaclar.length, 0);
+  const yog = yogunlukHaritasi(maske, s.gw, s.gh, Math.max(3, dBlok * 3));
+  ANALIZ.enYogun = toplam && yog.enDeger > 0.02
+    ? { gx: yog.enX, gy: yog.enY, deger: yog.enDeger } : null;
+  ANALIZ.gruplar = gruplar;
+  ANALIZ.tacCalisPx = Math.max(4, tacCalisPx);
+  gorselCiz();
+  lejantKur();
+  ozetKur(toplam, esik, tac, geoVar);
+  aktifDurumTazele();
+}
+
+function gorselCiz(){
+  const g = ANALIZ.gorsel;
+  if (!g || !ANALIZ.taban) return;
+  const knv = $('gorselKnv'), ctx = knv.getContext('2d');
+  ctx.clearRect(0, 0, knv.width, knv.height);
+  ctx.drawImage(ANALIZ.taban, 0, 0);
+  const s = ANALIZ.sonuc;
+  if (!s || !ANALIZ.gruplar) return;
+  const r = Math.max(3, ANALIZ.tacCalisPx / 2);
+  const kalin = Math.max(1.2, r * 0.18);
+  for (const gr of ANALIZ.gruplar){
+    for (const a of gr.agaclar){
+      const x = s.yari + a.x * s.adim, y = s.yari + a.y * s.adim;
+      ctx.lineWidth = kalin * 1.9;
+      ctx.strokeStyle = 'rgba(255,255,255,.92)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.lineWidth = kalin;
+      ctx.strokeStyle = gr.renk;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.beginPath(); ctx.arc(x, y, Math.max(2, kalin * 1.3), 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = gr.renk;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(1, kalin * 0.7), 0, 2 * Math.PI); ctx.fill();
+    }
+  }
+  if (ANALIZ.enYogun){
+    const x = s.yari + ANALIZ.enYogun.gx * s.adim, y = s.yari + ANALIZ.enYogun.gy * s.adim;
+    const R = Math.max(r * 3.2, 20);
+    ctx.setLineDash([R * 0.35, R * 0.22]);
+    ctx.lineWidth = Math.max(2.5, kalin * 1.6);
+    ctx.strokeStyle = '#ffb300';
+    ctx.beginPath(); ctx.arc(x, y, R, 0, 2 * Math.PI); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = Math.round(Math.max(16, R * 0.55)) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⭐', x, y);
+  }
+}
+
+function lejantKur(){
+  const kutu = $('lejant');
+  kutu.innerHTML = '';
+  if (!ANALIZ.gruplar){ goster(kutu, false); return; }
+  for (const gr of ANALIZ.gruplar){
+    const cip = document.createElement('span');
+    cip.className = 'cip';
+    const i = document.createElement('i');
+    i.style.background = gr.renk;
+    cip.append(i, document.createTextNode(gr.ad + ' · ' + sayiTR(gr.agaclar.length)));
+    kutu.append(cip);
+  }
+  if (ANALIZ.enYogun){
+    const cip = document.createElement('span');
+    cip.className = 'cip';
+    cip.textContent = '⭐ en yoğun bölge';
+    kutu.append(cip);
+  }
+  goster(kutu, true);
+}
+
+function ozetKur(toplam, esik, tac, geoVar){
+  const kutu = $('analizOzet'), s = ANALIZ.sonuc, g = ANALIZ.gorsel;
+  if (!toplam){
+    kutu.className = 'uyari';
+    kutu.innerHTML = '🚫 Eşik üstünde işaretlenecek ağaç bulunamadı — eşiği düşürmeyi ya da başka tür seçmeyi deneyin.';
+    goster(kutu, true);
+    return;
+  }
+  const parcalar = ANALIZ.gruplar.filter(gr => gr.agaclar.length)
+    .map(gr => gr.ad + ' <b>' + sayiTR(gr.agaclar.length) + '</b>');
+  let metin = '📍 Toplam <b>' + sayiTR(toplam) + ' ağaç</b> işaretlendi: ' + parcalar.join(' · ') +
+    '<br><small>eşik %' + Math.round(esik * 100) + ' · taç ~' + String(tac).replace('.', ',') +
+    (geoVar ? ' m' : ' px') + ' · ' + sayiTR(s.gw * s.gh) + ' blok tarandı</small>';
+  if (ANALIZ.enYogun){
+    const ozX = (s.yari + ANALIZ.enYogun.gx * s.adim) * g.olcek;
+    const ozY = (s.yari + ANALIZ.enYogun.gy * s.adim) * g.olcek;
+    if (geoVar){
+      const E = g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx;
+      const N = g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy;
+      metin += '<br>⭐ En yoğun bölge: E ' + sayiTR(E, 1) + ', N ' + sayiTR(N, 1) +
+        (g.geo.epsg ? ' (EPSG:' + g.geo.epsg + ')' : '') +
+        ' — yerel kaplama ' + yuzde(ANALIZ.enYogun.deger);
+    } else {
+      metin += '<br>⭐ En yoğun bölge: px ' + sayiTR(Math.round(ozX)) + ', ' + sayiTR(Math.round(ozY)) +
+        ' — yerel kaplama ' + yuzde(ANALIZ.enYogun.deger);
+    }
+  }
+  kutu.className = 'basari';
+  kutu.innerHTML = metin;
+  goster(kutu, true);
+}
+
+/* eşik / taç değişince işaretlemeyi ucuz yoldan yenile (sunucuya gitmeden) */
+let isaretPlanli = false;
+function isaretYenilePlanla(){
+  if (!ANALIZ.sonuc || isaretPlanli) return;
+  isaretPlanli = true;
+  requestAnimationFrame(() => { isaretPlanli = false; agacGruplariHesapla(); });
+}
+$('esikA').addEventListener('input', () => {
+  $('esikAYazi').textContent = '%' + $('esikA').value;
+  isaretYenilePlanla();
+});
+$('tacA').addEventListener('change', isaretYenilePlanla);
+
+/* ---- dışa aktarımlar ---- */
+function indir(ad, icerik, tip){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(icerik instanceof Blob ? icerik : new Blob([icerik], { type: tip }));
+  a.download = ad;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+const dosyaKok = () => (ANALIZ.gorsel && ANALIZ.gorsel.dosyaAd || 'analiz').replace(/\.[^.]+$/, '');
+
+function dunyaKoord(gx, gy){
+  const g = ANALIZ.gorsel, s = ANALIZ.sonuc;
+  const ozX = (s.yari + gx * s.adim) * g.olcek, ozY = (s.yari + gy * s.adim) * g.olcek;
+  if (g.geo)
+    return [g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx,
+            g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy];
+  return [ozX, -ozY];
+}
+
+$('btnAgacCsv').addEventListener('click', () => {
+  if (!ANALIZ.gruplar || !ANALIZ.sonuc) return;
+  const g = ANALIZ.gorsel, s = ANALIZ.sonuc;
+  const geoVar = !!g.geo;
+  const satirlar = ['no;tur;guven;px_x;px_y' + (geoVar ? ';E;N' : '')];
+  let no = 0;
+  for (const gr of ANALIZ.gruplar)
+    for (const a of gr.agaclar){
+      const ozX = (s.yari + a.x * s.adim) * g.olcek, ozY = (s.yari + a.y * s.adim) * g.olcek;
+      let satir = (++no) + ';' + temizAd(gr.ad) + ';' + a.p.toFixed(4) + ';' +
+        ozX.toFixed(1) + ';' + ozY.toFixed(1);
+      if (geoVar){
+        const [E, N] = dunyaKoord(a.x, a.y);
+        satir += ';' + E.toFixed(3) + ';' + N.toFixed(3);
+      }
+      satirlar.push(satir);
+    }
+  indir(dosyaKok() + '_agac_turleri.csv', '﻿' + satirlar.join('\r\n'), 'text/csv;charset=utf-8');
+});
+
+$('btnAgacGeo').addEventListener('click', () => {
+  if (!ANALIZ.gruplar || !ANALIZ.sonuc) return;
+  const g = ANALIZ.gorsel;
+  const ozellikler = [];
+  let no = 0;
+  for (const gr of ANALIZ.gruplar)
+    for (const a of gr.agaclar)
+      ozellikler.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: dunyaKoord(a.x, a.y) },
+        properties: { no: ++no, tur: temizAd(gr.ad), guven: +a.p.toFixed(4) }
+      });
+  if (ANALIZ.enYogun)
+    ozellikler.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: dunyaKoord(ANALIZ.enYogun.gx, ANALIZ.enYogun.gy) },
+      properties: { tur: 'en_yogun_bolge', yerel_kaplama: +ANALIZ.enYogun.deger.toFixed(4) }
+    });
+  const fc = { type: 'FeatureCollection', features: ozellikler };
+  if (g.geo && g.geo.epsg)
+    fc.crs = { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::' + g.geo.epsg } };
+  indir(dosyaKok() + '_agac_turleri.geojson', JSON.stringify(fc), 'application/geo+json');
+});
+
+$('btnPngIndir').addEventListener('click', () => {
+  $('gorselKnv').toBlob(b => { if (b) indir(dosyaKok() + '_isaretli.png', b); }, 'image/png');
 });
 
 baglan();

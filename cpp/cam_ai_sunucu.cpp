@@ -350,6 +350,7 @@ struct DerinYsa {
 // ============================ eğitim durumu ===========================
 struct Havuz {                            // bilgisayarda birikimli eğitim verisi
   int d = 0;
+  int yama = 0;                           // örnek penceresi (px) — görüntü analizinde aynı boy kullanılır
   std::vector<std::string> siniflar;
   std::vector<float> X;
   std::vector<int> y;
@@ -380,7 +381,7 @@ struct Durum {
 static void havuzKaydet(){
   std::ofstream f(HAVUZ_DOSYA, std::ios::binary);
   if (!f) return;
-  f << "{\"d\":" << G.havuz.d << ",\"siniflar\":[";
+  f << "{\"d\":" << G.havuz.d << ",\"yama\":" << G.havuz.yama << ",\"siniflar\":[";
   for (size_t i = 0; i < G.havuz.siniflar.size(); i++)
     f << (i ? "," : "") << '"' << jsonKacis(G.havuz.siniflar[i]) << '"';
   f << "],\"y\":[";
@@ -405,6 +406,7 @@ static void havuzYukle(){
   const Json* js = j.al("siniflar");
   if (ja.hata || !jX || !jy || !js) return;
   G.havuz.d = (int)j.sayiAl("d", 36);
+  G.havuz.yama = (int)j.sayiAl("yama", 0);
   G.havuz.siniflar.clear();
   for (auto& sj : js->dizi) G.havuz.siniflar.push_back(sj.dizgi);
   G.havuz.y.clear();
@@ -890,7 +892,8 @@ static std::string durumJson(){
     << ",\"parametre\":" << G.parametre
     << ",\"modelDosyadan\":" << (G.modelDosyadan ? "true" : "false")
     << ",\"nEgitim\":" << G.nE << ",\"nDogrulama\":" << G.nV
-    << ",\"havuz\":{\"n\":" << G.havuz.y.size() << ",\"d\":" << G.havuz.d << ",\"siniflar\":[";
+    << ",\"havuz\":{\"n\":" << G.havuz.y.size() << ",\"d\":" << G.havuz.d
+    << ",\"yama\":" << G.havuz.yama << ",\"siniflar\":[";
   {
     auto sayim = G.havuz.sayimlar();
     for (size_t i = 0; i < G.havuz.siniflar.size(); i++)
@@ -979,6 +982,8 @@ static void istemciIsle(soket_t s){
               for (auto& sj : js->dizi) adGelen.push_back(sj.dizgi);
             while ((int)adGelen.size() < KGelen)
               adGelen.push_back("Sınıf " + std::to_string(adGelen.size() + 1));
+            int yamaGelen = (int)j.sayiAl("yama", 0);
+            if (yamaGelen > 0) G.havuz.yama = yamaGelen;
             if (hata.empty()){
               if (sadeceBu){
                 X = std::move(Xg); y = std::move(yg); adlar = adGelen;

@@ -3,6 +3,9 @@
 ~10 milyon parametreli derin YSA'yı (36 öznitelik → 2096 → 2096 → 1568 → 1040 → 512 → N sınıf;
 ReLU + BatchNorm + Dropout 0,2 + Adam + kosinüs öğrenme çizelgesi + erken durdurma, tohum=42)
 bilgisayarınızda eğitir ve `http://localhost:8787` üzerinden HTML'e bağlar.
+Köprü (`kopru.html`) yalnızca eğitim ekranı değildir: **5. adımda** bir ortomozaik
+(GeoTIFF/JPG/PNG) bırakırsınız, modelin tanıdığı **her ağaç türü** görüntüde
+kendi rengiyle nokta atışı işaretlenir (çok türlü tespit + CSV/GeoJSON/PNG dışa aktarım).
 
 ## Windows'ta .exe yapmak
 
@@ -40,6 +43,29 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
    raporu indirir. **💾 Modeli indir** (`cam_ai_10m.bin`, ~38 MB) yedek almak içindir —
    model zaten diske otomatik kaydedilir.
 
+## 5. Adım — Görüntü Analizi (çok türlü nokta atışı tespit)
+
+Eğitimden (ya da kayıtlı model yüklendikten) sonra **5. adıma** ortomozaik bırakın:
+
+- **GeoTIFF/TIFF** doğrudan tarayıcıda çözülür (LZW/Deflate/PackBits/JPEG,
+  BigTIFF, şerit/karo, nodata); JPG/PNG de olur. Koordinat sistemi (EPSG) ve
+  GSD otomatik okunur.
+- Görüntü, eğitimdekiyle aynı **36 öznitelikli** bloklara bölünür; bloklar
+  parça parça sunucuya gönderilir (`POST /tahmin`) — büyük görüntülerde
+  ilerleme çubuğu ve ⏹ durdurma vardır.
+- Modelin tanıdığı **her tür için** ayrı renkte nokta atışı işaret (NMS +
+  olasılık ağırlıklı merkez inceltme), tür onay kutularıyla filtre,
+  güven eşiği ve ortalama taç çapı ayarı, ⭐ en yoğun bölge.
+- **Örnek penceresi** (eğitim örneği boyu, px) proje dosyasından ya da
+  sunucudaki kalıcı havuzdan otomatik gelir (`/egit` gövdesindeki `yama`
+  alanı havuzda saklanır, `/durum` içinde geri döner).
+- Dışa aktarım: **CSV** (tür, güven, piksel + UTM koordinatları),
+  **GeoJSON** (QGIS'te açılır, EPSG etiketli, tür öznitelikli),
+  **işaretli PNG**.
+
+> Eşik ve taç çapı değişiklikleri sunucuya gitmeden anında yeniden
+> işaretlenir; yalnızca "Analiz Et" sunucuda tahmin çalıştırır.
+
 ## Kendi HTML'inizden bağlanmak
 
 CORS açıktır; herhangi bir sayfadan `fetch` yeterli:
@@ -68,7 +94,7 @@ açılışta otomatik geri yükler:
 
 | Dosya | İçerik |
 |---|---|
-| `cam_ai_havuz.json` | Birikimli eğitim verisi — `/egit`'e gönderilen her yeni veri, **sınıf adına göre** öncekilerle birleştirilir |
+| `cam_ai_havuz.json` | Birikimli eğitim verisi — `/egit`'e gönderilen her yeni veri, **sınıf adına göre** öncekilerle birleştirilir; örnek penceresi (`yama`) de burada saklanır |
 | `cam_ai_model.bin` | En son eğitilen model (sınıf adları dahil) — açılışta yüklenir, `/tahmin` hemen çalışır |
 
 `/egit` varsayılan olarak **tüm havuzla** eğitir (yeni gönderilen veri önce
