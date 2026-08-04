@@ -98,7 +98,8 @@ section.sahne{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0
 .sahne-bos .dev{font-size:52px;opacity:.5}
 .kart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .kart h3{font-size:13.5px;margin-bottom:8px}
-canvas.grafik{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+canvas.grafik{width:100%;height:auto;aspect-ratio:820/260;border:1px solid var(--line);
+  border-radius:8px;background:var(--surface)}
 .izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .stat-kart{border:1px solid var(--line);border-radius:9px;padding:8px 6px;text-align:center;background:var(--surface2)}
 .stat-kart .deger{font-size:18px;font-weight:700;line-height:1.2}
@@ -256,7 +257,8 @@ footer.durum .bosluk{flex:1}
         </select>
       </div>
       <div class="ipucu">Örnek penceresi, eğitim verisindeki örnek boyudur (px) — proje dosyanızdan ya da
-        sunucudaki kalıcı havuzdan <b>otomatik</b> alınır; genelde dokunmanız gerekmez.</div>
+        sunucudaki kalıcı havuzdan <b>otomatik</b> alınır; genelde dokunmanız gerekmez.
+        İşleme çözünürlüğünü de eğitimde kullandığınız değerle aynı tutun (varsayılan 3072).</div>
       <div id="turKutu" class="gizli">
         <div style="font-size:12.5px;font-weight:600;margin-bottom:2px">🌳 İşaretlenecek türler</div>
         <div id="turListe" class="satir" style="gap:4px 12px"></div>
@@ -2307,10 +2309,14 @@ const adres = () => $('adres').value.replace(/\/+$/, '');
 const sayiTR = (x, hane) => Number(x).toLocaleString('tr-TR',
   hane != null ? { minimumFractionDigits: hane, maximumFractionDigits: hane } : undefined);
 const yuzde = x => (x * 100).toFixed(1).replace('.', ',') + '%';
+const kacHtml = s => String(s).replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-let BAGLI = false, VERI = null, IZLEYICI = null, GECMIS = [], RAPOR = null, SON = null;
+let BAGLI = false, VERI = null, TESTV = null, IZLEYICI = null,
+    GECMIS = [], RAPOR = null, SON = null, MODEL_KIRLI = false;
 
 async function baglan(){
+  clearInterval(IZLEYICI);                 // eski sunucunun izleyicisi yeni adresi yoklamasın
   try{
     const d = await (await fetch(adres() + '/durum')).json();
     BAGLI = true;
@@ -2319,7 +2325,7 @@ async function baglan(){
     let bilgi = '✓ Sunucu hazır.';
     if (d.modelHazir)
       bilgi += ' Kayıtlı model: <b>' + sayiTR(d.parametre) + ' parametre</b>' +
-        (d.siniflar.length ? ' (' + d.siniflar.join(' · ') + ')' : '') + '.';
+        (d.siniflar.length ? ' (' + d.siniflar.map(kacHtml).join(' · ') + ')' : '') + '.';
     $('baglantiBilgi').innerHTML = bilgi;
     $('baglantiBilgi').className = 'basari';
     $('ustModel').textContent = d.modelHazir
@@ -2362,16 +2368,19 @@ function havuzGoster(h){
     tr.children[1].textContent = sayiTR(h.siniflar[i].n);
     tr.children[2].textContent = yuzde(h.siniflar[i].n / toplam);
   });
-  durumYaz(2, '✓ ' + sayiTR(h.n) + ' örnek kayıtlı', true);
+  if (!VERI) durumYaz(2, '✓ ' + sayiTR(h.n) + ' örnek kayıtlı', true);
 }
 
 function guncelle(d){
   const havuzDolu = d && d.havuz && d.havuz.n > 0;
-  $('btnEgit').disabled = !(BAGLI && (VERI || havuzDolu));
+  const egitimde = !!(d && d.egitimde);
+  $('btnEgit').disabled = !(BAGLI && (VERI || havuzDolu) && !egitimde);
   $('btnModelIndir').disabled = !(BAGLI && d && d.modelHazir);
-  $('btnHizliTest').disabled = !(BAGLI && VERI && d && d.modelHazir);
+  $('btnModelYukle').disabled = egitimde;
+  $('btnHizliTest').disabled = !(BAGLI && (VERI || TESTV) && d && d.modelHazir && !egitimde);
   $('btnTezRapor').disabled = !RAPOR;
   if (d && d.modelHazir) durumYaz(4, '✓ model hazır', true);
+  else if (!egitimde) durumYaz(4, 'bekliyor');
 }
 
 /* ---- veri ---- */
@@ -2416,12 +2425,15 @@ async function veriOku(dosya){
     const sayim = new Array(VERI.K).fill(0);
     VERI.y.forEach(c => sayim[c]++);
     vb.className = 'basari';
-    vb.innerHTML = '✓ <b>' + dosya.name + '</b> — ' + sayiTR(VERI.y.length) + ' örnek · ' +
-      VERI.d + ' öznitelik<br>' + VERI.siniflar.map((s, c) => s + ' (' + sayim[c] + ')').join(' · ') +
+    vb.innerHTML = '✓ <b>' + kacHtml(dosya.name) + '</b> — ' + sayiTR(VERI.y.length) + ' örnek · ' +
+      VERI.d + ' öznitelik<br>' +
+      VERI.siniflar.map((s, c) => kacHtml(s) + ' (' + sayim[c] + ')').join(' · ') +
       '<br><small>Eğitim başlayınca kalıcı havuza eklenecek.</small>';
     goster(vb, true);
     $('adim3').open = true;
     durumYaz(2, '✓ yeni veri hazır', true);
+    TESTV = VERI;
+    YAMA_ELLE = false;                     // proje kendi penceresini bildiriyor — oto ayar geri kazansın
     yamaOtoAyarla();
   }catch(h){
     VERI = null;
@@ -2441,11 +2453,7 @@ $('btnHavuzBosalt').addEventListener('click', async () => {
 let egitimBaslangici = 0;
 $('btnEgit').addEventListener('click', async () => {
   goster($('egitHata'), false);
-  goster($('egitSonuc'), false);
-  goster($('matrisKart'), false);
-  goster($('metrikKart'), false);
-  RAPOR = null;
-  GECMIS = [];
+  const kok = adres();                     // işlem boyunca adres sabitlenir
   const govde = {
     ayarlar: {
       hedefParam: +$('hedef').value || 1e7,
@@ -2459,11 +2467,25 @@ $('btnEgit').addEventListener('click', async () => {
   });
   if (VERI && VERI.yama) govde.yama = VERI.yama;
   try{
-    const y = await (await fetch(adres() + '/egit', {
+    const y = await (await fetch(kok + '/egit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(govde)
     })).json();
     if (y.hata) throw new Error(y.hata);
+    /* eski grafik/rapor yalnız sunucu isteği KABUL edince silinir */
+    RAPOR = null;
+    GECMIS = [];
+    goster($('egitSonuc'), false);
+    goster($('matrisKart'), false);
+    goster($('metrikKart'), false);
+    if (VERI){
+      VERI = null;                         // aynı verinin ikinci eğitimde havuza yeniden eklenmesini önler
+      const vb = $('veriBilgi');
+      vb.className = 'basari';
+      vb.innerHTML = '✓ Veriler sunucunun <b>kalıcı havuzuna eklendi</b> — sonraki eğitimler ' +
+        'havuzdaki her şeyle sürer. Yeni veri için yeni bir proje dosyası bırakın.';
+      goster(vb, true);
+    }
     egitimBaslangici = performance.now();
     durumYaz(3, 'eğitiliyor…');
     izlemeyeBasla();
@@ -2477,13 +2499,18 @@ $('btnDurdur').addEventListener('click', () =>
 
 function izlemeyeBasla(){
   clearInterval(IZLEYICI);
+  const kok = adres();                     // izleme, başlatıldığı sunucuya bağlı kalır
   goster($('sahneBos'), false);
   goster($('sahneIc'), true);
   goster($('btnDurdur'), true);
   goster($('egitIlerlemeKutu'), true);
   IZLEYICI = setInterval(async () => {
     try{
-      const d = await (await fetch(adres() + '/durum')).json();
+      const d = await (await fetch(kok + '/durum')).json();
+      SON = d;
+      if (d.egitimde) MODEL_KIRLI = true;  // eğitim bitince eski analiz sonucu geçersiz sayılır
+      guncelle(d);
+      aktifDurumTazele();
       if (d.epoch > 0 && (!GECMIS.length || GECMIS[GECMIS.length - 1].epoch !== d.epoch))
         GECMIS.push({ epoch: d.epoch, kayip: d.kayip, valF1: d.valF1 });
       $('egitCubuk').style.width = Math.round(100 * d.epoch / Math.max(1, d.enCokDevir)) + '%';
@@ -2536,9 +2563,11 @@ async function raporYukle(){
     /* karışıklık matrisi */
     const K = r.siniflar.length;
     const kisa = s => s.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim().slice(0, 9);
-    let html = '<tr><th></th>' + r.siniflar.map(s => '<th title="' + s + '">' + kisa(s) + '</th>').join('') + '</tr>';
+    let html = '<tr><th></th>' + r.siniflar.map(s =>
+      '<th title="' + kacHtml(s) + '">' + kacHtml(kisa(s)) + '</th>').join('') + '</tr>';
     for (let c = 0; c < K; c++){
-      html += '<tr><th style="text-align:left" title="' + r.siniflar[c] + '">' + kisa(r.siniflar[c]) + '</th>';
+      html += '<tr><th style="text-align:left" title="' + kacHtml(r.siniflar[c]) + '">' +
+        kacHtml(kisa(r.siniflar[c])) + '</th>';
       for (let c2 = 0; c2 < K; c2++){
         const v = r.matris[c][c2];
         html += '<td class="' + (c === c2 ? 'kose' : (v ? 'hatali' : '')) + '">' + v + '</td>';
@@ -2551,7 +2580,7 @@ async function raporYukle(){
     $('metrikTablo').innerHTML = '<tr><th>Tür</th><th>Precision</th><th>Recall</th><th>F1</th><th>Örnek</th></tr>' +
       r.siniflar.map((s, c) => {
         const m = r.sinifMetrik[c];
-        return '<tr><td>' + s + '</td><td>' + yuzde(m.p) + '</td><td>' + yuzde(m.r) +
+        return '<tr><td>' + kacHtml(s) + '</td><td>' + yuzde(m.p) + '</td><td>' + yuzde(m.r) +
           '</td><td><b>' + yuzde(m.f1) + '</b></td><td>' + m.destek + '</td></tr>';
       }).join('') +
       '<tr><td><b>Makro ortalama</b></td><td colspan="2"></td><td><b>' + yuzde(r.makroF1) +
@@ -2673,6 +2702,7 @@ $('modelDosya').addEventListener('change', async e => {
   try{
     const y = await (await fetch(adres() + '/model', { method: 'POST', body: buf })).json();
     if (y.hata) throw new Error(y.hata);
+    analizSonucGecersizKil();              // eski modelin işaretleri yeni modelinmiş gibi kalmasın
     ts.className = 'basari';
     ts.textContent = '✓ Model yüklendi (' + sayiTR(y.parametre) + ' parametre) ve bilgisayara kaydedildi.';
   }catch(h){
@@ -2683,12 +2713,13 @@ $('modelDosya').addEventListener('change', async e => {
   baglan();
 });
 $('btnHizliTest').addEventListener('click', async () => {
-  if (!VERI) return;
+  const V = VERI || TESTV;                 // eğitimden sonra da son yüklenen veriyle test edilebilsin
+  if (!V) return;
   const idx = [];
-  for (let i = 0; i < VERI.y.length && idx.length < 300; i += 7) idx.push(i);
+  for (let i = 0; i < V.y.length && idx.length < 300; i += 7) idx.push(i);
   const X = [];
   for (const i of idx)
-    for (let j = 0; j < VERI.d; j++) X.push(VERI.X[i * VERI.d + j]);
+    for (let j = 0; j < V.d; j++) X.push(V.X[i * V.d + j]);
   const ts = $('testSonuc');
   try{
     const y = await (await fetch(adres() + '/tahmin', {
@@ -2699,7 +2730,7 @@ $('btnHizliTest').addEventListener('click', async () => {
     const adEsle = new Map((y.sinifAdlari || []).map((ad, i) => [ad, i]));
     let dogru = 0, esli = 0;
     idx.forEach((i, s) => {
-      const beklenen = adEsle.has(VERI.siniflar[VERI.y[i]]) ? adEsle.get(VERI.siniflar[VERI.y[i]]) : -1;
+      const beklenen = adEsle.has(V.siniflar[V.y[i]]) ? adEsle.get(V.siniflar[V.y[i]]) : -1;
       if (beklenen >= 0){ esli++; if (y.sinif[s] === beklenen) dogru++; }
     });
     ts.className = 'basari';
@@ -2732,6 +2763,24 @@ function aktifDurumTazele(){
   const modelVar = !!(BAGLI && SON && SON.modelHazir && !SON.egitimde);
   $('btnAnaliz').disabled = !(modelVar && ANALIZ.gorsel && !ANALIZ.mesgul);
   goster($('aktarSatir'), !!ANALIZ.gruplar);
+  const geoVar = !!(ANALIZ.gruplar && ANALIZ.gorsel && ANALIZ.gorsel.geo);
+  $('btnAgacGeo').disabled = !geoVar;
+  $('btnAgacGeo').title = geoVar ? '' : 'Coğrafi referans yok — GeoJSON yalnız GeoTIFF görüntüler için';
+}
+
+/* model değişince (yeniden eğitim / .bin yükleme) eski işaretler bayat sayılır */
+function analizSonucGecersizKil(){
+  if (!ANALIZ.sonuc && !ANALIZ.gruplar) return;
+  ANALIZ.sonuc = null;
+  ANALIZ.gruplar = null;
+  ANALIZ.enYogun = null;
+  goster($('lejant'), false);
+  goster($('analizOzet'), false);
+  if (ANALIZ.gorsel){
+    gorselCiz();
+    durumYaz(5, '✓ görüntü hazır — model değişti, yeniden analiz edin', true);
+  } else durumYaz(5, 'bekliyor');
+  aktifDurumTazele();
 }
 
 function yamaOtoAyarla(){
@@ -2743,6 +2792,12 @@ function yamaOtoAyarla(){
 /* model sınıflarından tür onay kutuları — arkaplan sınıfları varsayılan kapalı */
 function turSecimKur(){
   const adlar = SON && SON.modelHazir && Array.isArray(SON.siniflar) ? SON.siniflar : [];
+  const adFarki = ANALIZ.sonuc && (adlar.length !== ANALIZ.sonuc.siniflar.length ||
+    adlar.some((ad, i) => ad !== ANALIZ.sonuc.siniflar[i]));
+  if (MODEL_KIRLI || adFarki){
+    analizSonucGecersizKil();
+    MODEL_KIRLI = false;
+  }
   goster($('turKutu'), adlar.length > 0);
   if (!adlar.length) return;
   const onceki = new Map([...$('turListe').querySelectorAll('input')]
@@ -2800,12 +2855,20 @@ async function resimYukleK(dosya, maxDim){
     if (!tamam) rgba[i * 4 + 3] = 0;
     gecerli[i] = tamam ? 1 : 0;
   }
-  return { w, h, outW, outH, olcek: k, rgba, gecerli, geo: null };
+  /* ceil yüzünden gerçek ölçek tam k olmayabilir — dışa aktarımlar kesin çarpanı kullanır */
+  return { w, h, outW, outH, olcek: k, olcekX: w / outW, olcekY: h / outH,
+           rgba, gecerli, geo: null };
 }
+const olcX = g => g.olcekX || g.olcek;
+const olcY = g => g.olcekY || g.olcek;
 
 async function gorselOku(dosya){
-  if (ANALIZ.mesgul) return;
   const hataEl = $('analizHata');
+  if (ANALIZ.mesgul){
+    hataEl.textContent = '⏳ Süren işlem bitince görüntüyü yeniden bırakın.';
+    goster(hataEl, true);
+    return;
+  }
   goster(hataEl, false);
   ANALIZ.mesgul = true;
   aktifDurumTazele();
@@ -2819,6 +2882,9 @@ async function gorselOku(dosya){
   try{
     const tiffMi = /\.tiff?$/i.test(dosya.name);
     const maxDim = parseInt($('secCoz').value, 10) || 3072;
+    if (!tiffMi && dosya.size > 314572800)
+      throw new Error('Bu görüntü JPG/PNG olarak çok büyük (' + (dosya.size / 1048576).toFixed(0) +
+        ' MB) — Pix4D\'den GeoTIFF (LZW) dışa aktarın; GeoTIFF şerit şerit küçültülerek okunur.');
     let g;
     if (tiffMi){
       const buf = await dosya.arrayBuffer();
@@ -2842,7 +2908,11 @@ async function gorselOku(dosya){
     gorselCiz();
     $('gorselBaslik').textContent = dosya.name;
     gorselNotKur(g);
-    $('tacBirim').textContent = g.geo && !g.geo.cografi ? 'm' : 'px';
+    const yeniBirim = g.geo && !g.geo.cografi ? 'm' : 'px';
+    if ($('tacBirim').textContent !== yeniBirim){
+      $('tacBirim').textContent = yeniBirim;
+      $('tacA').value = yeniBirim === 'm' ? '3' : '60';   // birim değişti — o birimin varsayılanına dön
+    }
     goster($('sahneBos'), false);
     goster($('sahneIc'), true);
     goster($('gorselKart'), true);
@@ -2869,6 +2939,7 @@ function gorselNotKur(g){
     p.push(g.geo.epsg ? 'EPSG:' + g.geo.epsg : 'koordinat sistemi tanımsız');
     if (!g.geo.cografi)
       p.push('kapsam ' + sayiTR(g.w * g.geo.sx, 1) + ' × ' + sayiTR(g.h * g.geo.sy, 1) + ' m');
+    if (g.geo.donuk) p.push('⚠️ dönüklü koordinat dönüşümü — E/N değerleri yaklaşıktır');
   } else p.push('coğrafi bilgi yok — piksel koordinatları kullanılır');
   $('gorselNot').textContent = '🛰️ ' + p.join(' · ');
 }
@@ -2885,11 +2956,16 @@ async function analizCalistir(){
   ANALIZ.mesgul = true;
   ANALIZ.iptal = false;
   aktifDurumTazele();
+  $('btnEgit').disabled = true;            // analiz sürerken model değiştirilemesin
+  $('btnModelYukle').disabled = true;
   goster($('btnAnalizDurdur'), true);
   goster($('analizIlerlemeKutu'), true);
+  $('analizCubuk').style.width = '0%';
+  $('analizYazi').textContent = 'hazırlanıyor…';
+  const kok = adres();                     // analiz boyunca adres sabitlenir
   const g = ANALIZ.gorsel;
   try{
-    const d = await (await fetch(adres() + '/durum')).json();
+    const d = await (await fetch(kok + '/durum')).json();
     SON = d;
     if (!d.modelHazir) throw new Error('Sunucuda hazır model yok — önce Adım 3\'te eğitin ya da Adım 4\'ten model yükleyin.');
     if (d.egitimde) throw new Error('Eğitim sürerken analiz yapılamaz — bitmesini bekleyin.');
@@ -2921,13 +2997,23 @@ async function analizCalistir(){
     };
     async function gonder(){
       if (!hucreler.length) return;
-      const y = await (await fetch(adres() + '/tahmin', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ X })
-      })).json();
+      let y;
+      try{
+        y = await (await fetch(kok + '/tahmin', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ X })
+        })).json();
+      }catch(_e){
+        throw new Error('Sunucuya ulaşılamadı — cam_ai.exe kapanmış olabilir. Yeniden bağlanıp analizi tekrarlayın.');
+      }
       if (y.hata) throw new Error(y.hata);
+      /* model sabitleme: analiz ortasında model değişirse parçalar karışmasın */
+      if (Array.isArray(y.sinifAdlari) && y.sinifAdlari.join(' ') !== d.siniflar.join(' '))
+        throw new Error('Model analiz sırasında değişti — analizi yeniden başlatın.');
       for (let i = 0; i < hucreler.length; i++){
         const taban = hucreler[i] * K, pv = y.probs[i];
+        if (!pv || pv.length !== K)
+          throw new Error('Sunucu yanıtı sınıf sayısıyla uyuşmuyor — analizi yeniden başlatın.');
         let enC = 0;
         for (let c = 0; c < K; c++){
           probs[taban + c] = pv[c];
@@ -2960,11 +3046,14 @@ async function analizCalistir(){
   }catch(h){
     hataEl.textContent = '✗ ' + (h && h.message ? h.message : h);
     goster(hataEl, true);
+    durumYaz(5, ANALIZ.gorsel ? '✓ görüntü hazır' : 'bekliyor', !!ANALIZ.gorsel);
   }finally{
     ANALIZ.mesgul = false;
+    $('btnModelYukle').disabled = false;
     goster($('btnAnalizDurdur'), false);
     goster($('analizIlerlemeKutu'), false);
     aktifDurumTazele();
+    baglan();                              // btnEgit ve durum bilgileri sunucudan tazelenir
   }
 }
 
@@ -2979,7 +3068,7 @@ function agacGruplariHesapla(){
   const geoVar = !!(g.geo && !g.geo.cografi);
   let tac = parseFloat(String($('tacA').value || '').replace(',', '.'));
   if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
-  const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
+  const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / olcX(g));
   const dBlok = Math.max(1, Math.round(tacCalisPx / s.adim));
   const gruplar = [];
   const maske = new Uint8Array(s.gw * s.gh);
@@ -3079,13 +3168,13 @@ function ozetKur(toplam, esik, tac, geoVar){
     return;
   }
   const parcalar = ANALIZ.gruplar.filter(gr => gr.agaclar.length)
-    .map(gr => gr.ad + ' <b>' + sayiTR(gr.agaclar.length) + '</b>');
+    .map(gr => kacHtml(gr.ad) + ' <b>' + sayiTR(gr.agaclar.length) + '</b>');
   let metin = '📍 Toplam <b>' + sayiTR(toplam) + ' ağaç</b> işaretlendi: ' + parcalar.join(' · ') +
     '<br><small>eşik %' + Math.round(esik * 100) + ' · taç ~' + String(tac).replace('.', ',') +
     (geoVar ? ' m' : ' px') + ' · ' + sayiTR(s.gw * s.gh) + ' blok tarandı</small>';
   if (ANALIZ.enYogun){
-    const ozX = (s.yari + ANALIZ.enYogun.gx * s.adim) * g.olcek;
-    const ozY = (s.yari + ANALIZ.enYogun.gy * s.adim) * g.olcek;
+    const ozX = (s.yari + ANALIZ.enYogun.gx * s.adim) * olcX(g);
+    const ozY = (s.yari + ANALIZ.enYogun.gy * s.adim) * olcY(g);
     if (geoVar){
       const E = g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx;
       const N = g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy;
@@ -3127,7 +3216,7 @@ const dosyaKok = () => (ANALIZ.gorsel && ANALIZ.gorsel.dosyaAd || 'analiz').repl
 
 function dunyaKoord(gx, gy){
   const g = ANALIZ.gorsel, s = ANALIZ.sonuc;
-  const ozX = (s.yari + gx * s.adim) * g.olcek, ozY = (s.yari + gy * s.adim) * g.olcek;
+  const ozX = (s.yari + gx * s.adim) * olcX(g), ozY = (s.yari + gy * s.adim) * olcY(g);
   if (g.geo)
     return [g.geo.ox + (ozX + 0.5 * g.olcek) * g.geo.sx,
             g.geo.oy - (ozY + 0.5 * g.olcek) * g.geo.sy];
@@ -3138,16 +3227,18 @@ $('btnAgacCsv').addEventListener('click', () => {
   if (!ANALIZ.gruplar || !ANALIZ.sonuc) return;
   const g = ANALIZ.gorsel, s = ANALIZ.sonuc;
   const geoVar = !!g.geo;
+  const hane = geoVar && g.geo.cografi ? 8 : 3;          // derece için 8 hane (~1 mm), metre için 3
+  const alan = t => /[;"\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
   const satirlar = ['no;tur;guven;px_x;px_y' + (geoVar ? ';E;N' : '')];
   let no = 0;
   for (const gr of ANALIZ.gruplar)
     for (const a of gr.agaclar){
-      const ozX = (s.yari + a.x * s.adim) * g.olcek, ozY = (s.yari + a.y * s.adim) * g.olcek;
-      let satir = (++no) + ';' + temizAd(gr.ad) + ';' + a.p.toFixed(4) + ';' +
+      const ozX = (s.yari + a.x * s.adim) * olcX(g), ozY = (s.yari + a.y * s.adim) * olcY(g);
+      let satir = (++no) + ';' + alan(temizAd(gr.ad)) + ';' + a.p.toFixed(4) + ';' +
         ozX.toFixed(1) + ';' + ozY.toFixed(1);
       if (geoVar){
         const [E, N] = dunyaKoord(a.x, a.y);
-        satir += ';' + E.toFixed(3) + ';' + N.toFixed(3);
+        satir += ';' + E.toFixed(hane) + ';' + N.toFixed(hane);
       }
       satirlar.push(satir);
     }
@@ -3157,6 +3248,7 @@ $('btnAgacCsv').addEventListener('click', () => {
 $('btnAgacGeo').addEventListener('click', () => {
   if (!ANALIZ.gruplar || !ANALIZ.sonuc) return;
   const g = ANALIZ.gorsel;
+  if (!g.geo) return;                      // coğrafi referanssız görüntüde GeoJSON anlamsız (düğme zaten kapalı)
   const ozellikler = [];
   let no = 0;
   for (const gr of ANALIZ.gruplar)
@@ -3181,6 +3273,14 @@ $('btnAgacGeo').addEventListener('click', () => {
 $('btnPngIndir').addEventListener('click', () => {
   $('gorselKnv').toBlob(b => { if (b) indir(dosyaKok() + '_isaretli.png', b); }, 'image/png');
 });
+
+/* tema canlı değişince tuvaller yeni renklerle yeniden çizilsin */
+try{
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    grafikCiz();
+    gorselCiz();
+  });
+}catch(_e){ /* eski tarayıcı — önemsiz */ }
 
 baglan();
 </script>

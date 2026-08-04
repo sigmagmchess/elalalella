@@ -884,13 +884,14 @@ static void yanit(soket_t s, int kod, const std::string& tip, const std::string&
 
 static std::string durumJson(){
   std::lock_guard<std::mutex> kilit(G.kilit);
+  auto s = [](double v){ return std::isfinite(v) ? v : 0.0; };  // NaN/inf geçersiz JSON üretmesin
   std::ostringstream o;
   o << "{\"surum\":\"1.0\",\"egitimde\":" << (G.egitimde ? "true" : "false")
     << ",\"modelHazir\":" << (G.modelHazir ? "true" : "false")
     << ",\"epoch\":" << G.epoch << ",\"enCokDevir\":" << G.enCokDevir
-    << ",\"kayip\":" << G.kayip << ",\"valKayip\":" << G.valKayip
-    << ",\"valF1\":" << G.valF1 << ",\"enIyiF1\":" << G.enIyiF1
-    << ",\"enIyiEpoch\":" << G.enIyiEpoch << ",\"lr\":" << G.lr
+    << ",\"kayip\":" << s(G.kayip) << ",\"valKayip\":" << s(G.valKayip)
+    << ",\"valF1\":" << s(G.valF1) << ",\"enIyiF1\":" << s(G.enIyiF1)
+    << ",\"enIyiEpoch\":" << G.enIyiEpoch << ",\"lr\":" << s(G.lr)
     << ",\"parametre\":" << G.parametre
     << ",\"modelDosyadan\":" << (G.modelDosyadan ? "true" : "false")
     << ",\"nEgitim\":" << G.nE << ",\"nDogrulama\":" << G.nV
