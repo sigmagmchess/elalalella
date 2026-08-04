@@ -281,16 +281,19 @@ struct DerinYsa {
     for (int c = 0; c < K; c++) probs[c] /= top;
   }
 
-  // v2 (CAMAI11M): sınıf adları da dosyada saklanır; v1 (CAMAI10M) okunmaya devam eder
-  bool kaydet(std::vector<uint8_t>& cikti, const std::vector<std::string>& siniflar) const {
+  // v3 (CAMAI12M): örnek penceresi (yama) da saklanır; v2 (CAMAI11M, sınıf adlı)
+  // ve v1 (CAMAI10M) okunmaya devam eder
+  bool kaydet(std::vector<uint8_t>& cikti, const std::vector<std::string>& siniflar,
+              int yama = 0) const {
     if (boyut.empty()) return false;
     auto yaz32 = [&](int32_t v){ cikti.insert(cikti.end(), (uint8_t*)&v, (uint8_t*)&v + 4); };
     auto yazF = [&](const std::vector<float>& v){
       cikti.insert(cikti.end(), (const uint8_t*)v.data(), (const uint8_t*)v.data() + v.size() * 4);
     };
     cikti.clear();
-    const char* imza = "CAMAI11M";
+    const char* imza = "CAMAI12M";
     cikti.insert(cikti.end(), imza, imza + 8);
+    yaz32(yama);
     yaz32((int32_t)boyut.size());
     for (int b : boyut) yaz32(b);
     yaz32((int32_t)siniflar.size());
@@ -303,22 +306,41 @@ struct DerinYsa {
     yazF(Ws); yazF(bs);
     return true;
   }
-  bool yukle(const uint8_t* veri, size_t boy, std::vector<std::string>* siniflarCikti = nullptr){
-    bool v2 = boy >= 12 && memcmp(veri, "CAMAI11M", 8) == 0;
-    if (!v2 && (boy < 12 || memcmp(veri, "CAMAI10M", 8) != 0)) return false;
+  bool yukle(const uint8_t* veri, size_t boy, std::vector<std::string>* siniflarCikti = nullptr,
+             int* yamaCikti = nullptr){
+    if (boy < 12) return false;
+    bool v3 = memcmp(veri, "CAMAI12M", 8) == 0;
+    bool v2 = v3 || memcmp(veri, "CAMAI11M", 8) == 0;
+    if (!v2 && memcmp(veri, "CAMAI10M", 8) != 0) return false;
     size_t p = 8;
-    auto oku32 = [&]() -> int32_t { int32_t v; memcpy(&v, veri + p, 4); p += 4; return v; };
-    int nb = oku32();
+    int32_t deger = 0;
+    auto oku32 = [&](int32_t& v) -> bool {
+      if (p + 4 > boy) return false;
+      memcpy(&v, veri + p, 4);
+      p += 4;
+      return true;
+    };
+    if (yamaCikti) *yamaCikti = 0;
+    if (v3){
+      if (!oku32(deger) || deger < 0 || deger > 4096) return false;
+      if (yamaCikti) *yamaCikti = deger;
+    }
+    if (!oku32(deger)) return false;
+    int nb = deger;
     if (nb < 3 || nb > 16) return false;
     boyut.resize(nb);
-    for (int i = 0; i < nb; i++) boyut[i] = oku32();
+    for (int i = 0; i < nb; i++){
+      if (!oku32(deger) || deger < 1 || deger > 1000000) return false;
+      boyut[i] = deger;
+    }
     d = boyut.front(); K = boyut.back();
     if (v2){
-      int adSayi = oku32();
-      if (adSayi < 0 || adSayi > 64) return false;
+      if (!oku32(deger) || deger < 0 || deger > 64) return false;
+      int adSayi = deger;
       if (siniflarCikti) siniflarCikti->clear();
       for (int i = 0; i < adSayi; i++){
-        int uz = oku32();
+        if (!oku32(deger)) return false;
+        int uz = deger;
         if (uz < 0 || p + (size_t)uz > boy) return false;
         std::string ad((const char*)veri + p, uz);
         p += uz;
@@ -367,6 +389,7 @@ struct Durum {
   std::atomic<int> epoch{0}, enCokDevir{0}, enIyiEpoch{0};
   std::atomic<double> kayip{0}, valKayip{0}, valF1{0}, enIyiF1{0}, lr{0};
   std::atomic<long long> parametre{0};
+  std::atomic<int> modelYama{0};         // modelin eğitildiği örnek penceresi (px)
   std::mutex kilit;                      // model + gecmis + siniflar + havuz erişimi
   DerinYsa model;
   std::vector<std::string> siniflar;
@@ -441,7 +464,7 @@ static int havuzaEkle(int d, int yamaGelen, const std::vector<std::string>& adla
 }
 static void modelDosyayaKaydet(){
   std::vector<uint8_t> ikili;
-  if (!G.model.kaydet(ikili, G.siniflar)) return;
+  if (!G.model.kaydet(ikili, G.siniflar, G.modelYama)) return;
   std::ofstream f(MODEL_DOSYA, std::ios::binary);
   if (f) f.write((const char*)ikili.data(), ikili.size());
 }
@@ -893,6 +916,7 @@ static std::string durumJson(){
     << ",\"valF1\":" << s(G.valF1) << ",\"enIyiF1\":" << s(G.enIyiF1)
     << ",\"enIyiEpoch\":" << G.enIyiEpoch << ",\"lr\":" << s(G.lr)
     << ",\"parametre\":" << G.parametre
+    << ",\"modelYama\":" << G.modelYama
     << ",\"modelDosyadan\":" << (G.modelDosyadan ? "true" : "false")
     << ",\"nEgitim\":" << G.nE << ",\"nDogrulama\":" << G.nV
     << ",\"havuz\":{\"n\":" << G.havuz.y.size() << ",\"d\":" << G.havuz.d
@@ -1018,6 +1042,9 @@ static void istemciIsle(soket_t s){
         if (hata.empty()){
           G.siniflar = adlar;
           G.sonHata.clear();
+          int yamaIstek = (int)j.sayiAl("yama", 0);
+          if (yamaIstek > 0) G.modelYama = yamaIstek;
+          else if (!sadeceBu && G.havuz.yama > 0) G.modelYama = G.havuz.yama;
         } else if (sahiplenildi){
           G.egitimde = false;              // sahiplenmiştik ama istek geçersiz — bırak
         }
@@ -1110,7 +1137,7 @@ static void istemciIsle(soket_t s){
   } else if (basliyorMu("GET /model")){
     std::lock_guard<std::mutex> kilit(G.kilit);
     std::vector<uint8_t> ikili;
-    if (!G.modelHazir || !G.model.kaydet(ikili, G.siniflar)){
+    if (!G.modelHazir || !G.model.kaydet(ikili, G.siniflar, G.modelYama)){
       yanit(s, 400, "application/json", "{\"hata\":\"Kaydedilecek model yok.\"}");
     } else {
       std::string govdeB((char*)ikili.data(), ikili.size());
@@ -1129,10 +1156,16 @@ static void istemciIsle(soket_t s){
     }
   } else if (basliyorMu("POST /model")){
     std::lock_guard<std::mutex> kilit(G.kilit);
+    DerinYsa yeni;                        // önce geçici modele oku: bozuk dosya canlı modeli bozamaz
+    std::vector<std::string> yeniSiniflar;
+    int yeniYama = 0;
     if (G.egitimde){
       yanit(s, 400, "application/json",
         "{\"hata\":\"Eğitim sürerken model yüklenemez — önce /durdur çağırın.\"}");
-    } else if (G.model.yukle((const uint8_t*)govde.data(), govde.size(), &G.siniflar)){
+    } else if (yeni.yukle((const uint8_t*)govde.data(), govde.size(), &yeniSiniflar, &yeniYama)){
+      G.model = std::move(yeni);
+      G.siniflar = std::move(yeniSiniflar);
+      if (yeniYama > 0) G.modelYama = yeniYama;
       G.modelHazir = true;
       G.modelDosyadan = true;
       G.parametre = G.model.parametre;
@@ -1173,7 +1206,14 @@ int main(int argc, char** argv){
     std::ifstream f(MODEL_DOSYA, std::ios::binary);
     if (f){
       std::vector<uint8_t> ikili((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-      if (G.model.yukle(ikili.data(), ikili.size(), &G.siniflar)){
+      DerinYsa acilan;
+      std::vector<std::string> acilanSiniflar;
+      int acilanYama = 0;
+      if (acilan.yukle(ikili.data(), ikili.size(), &acilanSiniflar, &acilanYama)){
+        G.model = std::move(acilan);
+        G.siniflar = std::move(acilanSiniflar);
+        if (acilanYama > 0) G.modelYama = acilanYama;
+        else if (G.havuz.yama > 0) G.modelYama = G.havuz.yama;   // eski .bin — havuzdan tahmin et
         G.modelHazir = true;
         G.modelDosyadan = true;
         G.parametre = G.model.parametre;

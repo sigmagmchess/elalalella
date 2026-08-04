@@ -2914,7 +2914,8 @@ async function analizEt(dosya){
     $('durumAnaliz').textContent = 'ağaçlar işaretleniyor…';
     agaclariHesapla(false);
     const adet = D.agaclar ? D.agaclar.length : 0;
-    $('durumAnaliz').textContent = '✓ ' + sayiTR(adet) + ' çam işaretlendi';
+    $('durumAnaliz').textContent = '✓ ' + sayiTR(adet) + ' ' +
+      D.siniflar[hedefTurIdx()].ad.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim() + ' işaretlendi';
     $('durumAnaliz').classList.add('tamam');
     $('adimAnaliz').open = false;
     $('adim4').open = true;
@@ -3072,6 +3073,7 @@ function sinifListesiCiz(){
     const sil = el.querySelector('.sil');
     if (sil) sil.addEventListener('click', () => sinifSil(i));
     el.addEventListener('dblclick', async () => {
+      if (D.mesgul) return;                // eğitim sürerken ad değişirse sunucu anlık görüntüsü şaşar
       const yeni = await sor('Sınıf adı:', s.ad);
       if (yeni && yeni.trim()){ s.ad = yeni.trim(); sinifListesiCiz(); lejantCiz(); }
     });
@@ -4750,7 +4752,7 @@ async function sunucuModeliniKullan(sessiz){
     etiketleriSiniflaraUydur();
   }
   sonucuGecersizKil();
-  const yama = (d.havuz && d.havuz.yama) || parseInt($('secYama').value, 10) || 24;
+  const yama = d.modelYama || (d.havuz && d.havuz.yama) || parseInt($('secYama').value, 10) || 24;
   $('secYama').value = String(yama);
   let rapor = null;
   try{ rapor = await (await fetch(cppKok() + '/rapor')).json(); }catch(_e){}
@@ -4914,9 +4916,19 @@ async function projeIceAktar(proje){
         ' havuz kaynağı öznitelik sayısı değiştiği için atlandı — o görüntüleri yeniden etiketleyip ekleyin.';
   }
   if (proje.model && proje.model.bicim === 'cam-ai-cpp-model'){
-    if (await sunucuModeliniKullan(true)) mesaj += '\nSunucudaki kayıtlı C++ modeli de bağlandı.';
-    else mesaj += '\nProjenin modeli C++ sunucusundadır — Adım 0\'dan bağlanınca ' +
-      '"Sunucudaki kayıtlı modeli kullan" ile geri gelir.';
+    /* kimlik denetimi: sunucudaki model, projenin kaydettiği modelle aynı mı? */
+    const d = await cppBaglan();
+    const projeAdlar = (proje.model.siniflar || []).map(s2 => s2.ad);
+    const ayni = d && d.modelHazir &&
+      (!proje.model.parametre || d.parametre === proje.model.parametre) &&
+      d.siniflar.length === projeAdlar.length &&
+      d.siniflar.every((ad, i) => ad === projeAdlar[i]);
+    if (ayni && await sunucuModeliniKullan(true)){
+      mesaj += '\nSunucudaki kayıtlı C++ modeli de bağlandı.';
+    } else {
+      mesaj += '\nProjenin C++ modeli sunucudakiyle eşleşmiyor ya da sunucu kapalı — ' +
+        'Adım 3 ile yeniden eğitin ya da doğru .bin dosyasını "📥 C++ modeli yükle" ile getirin.';
+    }
   } else if (proje.model){
     try{ await modelIceAktar(proje.model, true); mesaj += '\nKayıtlı model de yüklendi.'; }
     catch(_e){ /* model açılamadıysa etiketlerle devam */ }
