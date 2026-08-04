@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Çam-AI C++ Eğitim Köprüsü (10M parametre)</title>
+<style>
+:root{
+  color-scheme:light dark;
+  --bg:#f6f7f3; --surface:#fff; --line:#dde3d8; --ink:#20261f; --ink2:#5a6656;
+  --accent:#2e6b3f; --accent-ink:#fff; --ok:#2e6b3f; --err:#a03636; --warn:#9a5a1a;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#141813; --surface:#1b201a; --line:#313a2e; --ink:#e4e8df; --ink2:#a7b19d;
+    --accent:#7fbe8f; --accent-ink:#0f130e; --ok:#7fbe8f; --err:#e08a8a; --warn:#e0aa72; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.55 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.kap{max-width:760px;margin:0 auto;padding:18px 14px 60px}
+h1{font-size:19px;margin:8px 0 2px}
+.alt{font-size:12px;color:var(--ink2);margin-bottom:14px}
+.kart{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px;margin-bottom:12px}
+.kart h2{font-size:14px;margin:0 0 8px}
+.satir{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0}
+label{font-size:12.5px;color:var(--ink2)}
+input[type=number],input[type=text]{font:inherit;padding:5px 7px;border:1px solid var(--line);
+  border-radius:7px;background:var(--surface);color:var(--ink);max-width:110px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--line);
+  border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;font:inherit}
+.btn:hover:not(:disabled){filter:brightness(.96)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.birincil{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.durum{font-size:12.5px;padding:7px 10px;border-radius:8px;background:var(--bg)}
+.durum.ok{color:var(--ok)} .durum.hata{color:var(--err)} .durum.uyari{color:var(--warn)}
+.birak{border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;
+  cursor:pointer;color:var(--ink2);font-size:12.5px}
+.birak.ustunde{border-color:var(--accent);color:var(--ink)}
+canvas{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:8px}
+.kutu{border:1px solid var(--line);border-radius:9px;padding:8px;text-align:center;background:var(--bg)}
+.kutu b{font-size:17px;display:block}
+.kutu small{font-size:10.5px;color:var(--ink2)}
+code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+.gizli{display:none}
+</style>
+</head>
+<body>
+<div class="kap">
+  <h1>🌲 Çam-AI — C++ Eğitim Köprüsü</h1>
+  <div class="alt">~10 milyon parametreli derin YSA, bilgisayarınızdaki <code>cam_ai.exe</code> içinde eğitilir;
+    bu sayfa yalnızca kumanda ve grafik panelidir. Veri bilgisayarınızdan çıkmaz.</div>
+
+  <div class="kart">
+    <h2>1 · Sunucuya bağlan</h2>
+    <div class="satir">
+      <label>Adres:</label>
+      <input type="text" id="adres" value="http://localhost:8787" style="max-width:210px">
+      <button class="btn" id="btnBaglan">🔌 Bağlan</button>
+      <span id="baglanti" class="durum">bağlı değil</span>
+    </div>
+    <div class="satir" style="font-size:11.5px;color:var(--ink2)">
+      Önce <code>cam_ai.exe</code>'yi çalıştırın (derleme: <code>DERLEME.md</code>). Sunucu yalnız
+      <code>localhost</code>'u dinler; dışarıya kapalıdır.
+    </div>
+  </div>
+
+  <div class="kart">
+    <h2>2 · Eğitim verisini yükle</h2>
+    <div class="birak" id="birak">📂 Çam-AI <b>proje dosyasını</b> (<code>*_proje.json</code> — veri havuzlu)
+      buraya bırakın ya da tıklayın.<br>
+      <small>Alternatif: <code>{"d":36,"K":N,"siniflar":[...],"X":[n·d sayı],"y":[n]}</code> biçiminde düz JSON.</small>
+    </div>
+    <input type="file" id="dosya" accept=".json,application/json" class="gizli">
+    <div id="veriBilgi" class="durum gizli" style="margin-top:8px"></div>
+  </div>
+
+  <div class="kart">
+    <h2>3 · Eğit</h2>
+    <div class="satir">
+      <label>Hedef parametre:</label><input type="number" id="hedef" value="10000000" step="1000000">
+      <label>En çok epoch:</label><input type="number" id="devir" value="120" min="5" max="1000">
+      <label>Parti:</label><input type="number" id="parti" value="128" min="16" max="1024">
+      <label>Öğrenme hızı:</label><input type="number" id="hiz" value="0.001" step="0.0005">
+    </div>
+    <div class="satir">
+      <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat</button>
+      <button class="btn" id="btnDurdur" disabled>⏹ Durdur</button>
+      <span id="egitimDurum" class="durum"></span>
+    </div>
+    <canvas id="grafik" width="720" height="230" class="gizli"></canvas>
+    <div class="izgara gizli" id="ozet">
+      <div class="kutu"><b id="oEpoch">–</b><small>epoch</small></div>
+      <div class="kutu"><b id="oKayip">–</b><small>eğitim kaybı</small></div>
+      <div class="kutu"><b id="oF1">–</b><small>doğrulama makro-F1</small></div>
+      <div class="kutu"><b id="oParam">–</b><small>parametre</small></div>
+      <div class="kutu"><b id="oMimari" style="font-size:10px;line-height:1.3">–</b><small>katmanlar</small></div>
+    </div>
+  </div>
+
+  <div class="kart">
+    <h2>4 · Model ve tahmin</h2>
+    <div class="satir">
+      <button class="btn" id="btnModelIndir" disabled>💾 Modeli indir (.bin)</button>
+      <button class="btn" id="btnModelYukle">📥 Model yükle (.bin)…</button>
+      <input type="file" id="modelDosya" accept=".bin" class="gizli">
+      <button class="btn" id="btnHizliTest" disabled>🧪 Hızlı doğrulama testi</button>
+    </div>
+    <div id="testSonuc" class="durum gizli" style="margin-top:6px"></div>
+    <div class="satir" style="font-size:11.5px;color:var(--ink2)">
+      Tahmin ucu: <code>POST /tahmin {"X":[m·d ham öznitelik]}</code> → olasılıklar + sınıf.
+      Kendi HTML'inizden aynı uca <code>fetch</code> ile bağlanabilirsiniz (CORS açık).
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let VERI = null;                                   // {d,K,siniflar,X,y}
+let BAGLI = false, IZLEYICI = null, GECMIS = [];
+
+function durumYaz(el, metin, tur){
+  el.textContent = metin;
+  el.className = 'durum' + (tur ? ' ' + tur : '');
+  el.classList.remove('gizli');
+}
+const adres = () => $('adres').value.replace(/\/+$/, '');
+
+async function baglan(){
+  try{
+    const d = await (await fetch(adres() + '/durum')).json();
+    BAGLI = true;
+    durumYaz($('baglanti'), '✓ bağlı — sunucu hazır' +
+      (d.modelHazir ? ' (yüklü model: ' + Number(d.parametre).toLocaleString('tr-TR') + ' parametre)' : ''), 'ok');
+    guncelleDugmeler();
+    if (d.egitimde) izlemeyeBasla();
+  }catch(e){
+    BAGLI = false;
+    durumYaz($('baglanti'), '✗ bağlanılamadı — cam_ai.exe çalışıyor mu?', 'hata');
+    guncelleDugmeler();
+  }
+}
+$('btnBaglan').addEventListener('click', baglan);
+
+function guncelleDugmeler(){
+  $('btnEgit').disabled = !(BAGLI && VERI);
+  $('btnDurdur').disabled = !BAGLI;
+  $('btnModelIndir').disabled = !BAGLI;
+  $('btnHizliTest').disabled = !(BAGLI && VERI);
+}
+
+/* ---- veri yükleme: Çam-AI proje dosyası ya da düz {d,K,X,y} ---- */
+const birak = $('birak');
+birak.addEventListener('click', () => $('dosya').click());
+birak.addEventListener('dragover', e => { e.preventDefault(); birak.classList.add('ustunde'); });
+birak.addEventListener('dragleave', () => birak.classList.remove('ustunde'));
+birak.addEventListener('drop', e => {
+  e.preventDefault(); birak.classList.remove('ustunde');
+  if (e.dataTransfer.files.length) veriOku(e.dataTransfer.files[0]);
+});
+$('dosya').addEventListener('change', e => {
+  if (e.target.files.length) veriOku(e.target.files[0]);
+  e.target.value = '';
+});
+
+async function veriOku(dosya){
+  try{
+    const j = JSON.parse(await dosya.text());
+    if (j.bicim === 'cam-ai-proje'){
+      if (!Array.isArray(j.havuz) || !j.havuz.length)
+        throw new Error('Proje dosyasında veri havuzu boş. Çam-AI\'de etiketleyip "➕ Örnekleri havuza ekle" deyin, projeyi yeniden kaydedin.');
+      const d = j.havuz[0].ozellik || 24;
+      if (j.havuz.some(h => (h.ozellik || 24) !== d))
+        throw new Error('Havuz kaynakları farklı öznitelik sayısında — hepsini aynı sürümle yeniden ekleyin.');
+      const X = [], yTum = [];
+      for (const h of j.havuz){ X.push(...h.X24); yTum.push(...h.y); }
+      /* yalnız örneği olan sınıflar */
+      const tumSiniflar = (j.siniflar || []).map(s => s.ad || String(s));
+      const gorulen = [...new Set(yTum)].sort((a, b) => a - b);
+      const esle = new Map(gorulen.map((c, i) => [c, i]));
+      const y = yTum.map(c => esle.get(c));
+      const siniflar = gorulen.map(c => tumSiniflar[c] || ('Sınıf ' + c));
+      VERI = { d, K: gorulen.length, siniflar, X, y };
+    } else if (Array.isArray(j.X) && Array.isArray(j.y)){
+      VERI = { d: j.d || 36, K: j.K || Math.max(...j.y) + 1,
+        siniflar: j.siniflar || [], X: j.X, y: j.y };
+    } else throw new Error('Tanınmayan biçim — Çam-AI proje dosyası ya da {d,K,X,y} bekleniyor.');
+    if (VERI.K < 2) throw new Error('En az 2 sınıf gerekir (havuzda tek sınıf var).');
+    const sayim = new Array(VERI.K).fill(0);
+    VERI.y.forEach(c => sayim[c]++);
+    durumYaz($('veriBilgi'),
+      '✓ ' + dosya.name + ' — ' + VERI.y.length.toLocaleString('tr-TR') + ' örnek · ' +
+      VERI.d + ' öznitelik · ' + VERI.K + ' sınıf: ' +
+      VERI.siniflar.map((s, c) => s + ' (' + sayim[c] + ')').join(' · '), 'ok');
+    guncelleDugmeler();
+  }catch(h){
+    VERI = null;
+    durumYaz($('veriBilgi'), '✗ ' + h.message, 'hata');
+    guncelleDugmeler();
+  }
+}
+
+/* ---- eğitim ---- */
+$('btnEgit').addEventListener('click', async () => {
+  if (!VERI) return;
+  GECMIS = [];
+  try{
+    const y = await (await fetch(adres() + '/egit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        d: VERI.d, K: VERI.K, siniflar: VERI.siniflar, X: VERI.X, y: VERI.y,
+        ayarlar: {
+          hedefParam: +$('hedef').value || 1e7,
+          enCokDevir: +$('devir').value || 120,
+          parti: +$('parti').value || 128,
+          hiz: +$('hiz').value || 1e-3
+        }
+      })
+    })).json();
+    if (y.hata) throw new Error(y.hata);
+    durumYaz($('egitimDurum'), 'eğitim başladı…', 'ok');
+    izlemeyeBasla();
+  }catch(h){
+    durumYaz($('egitimDurum'), '✗ ' + h.message, 'hata');
+  }
+});
+$('btnDurdur').addEventListener('click', () =>
+  fetch(adres() + '/durdur', { method: 'POST' }).catch(() => {}));
+
+function izlemeyeBasla(){
+  clearInterval(IZLEYICI);
+  $('grafik').classList.remove('gizli');
+  $('ozet').classList.remove('gizli');
+  IZLEYICI = setInterval(async () => {
+    try{
+      const d = await (await fetch(adres() + '/durum')).json();
+      if (d.epoch > 0 && (!GECMIS.length || GECMIS[GECMIS.length - 1].epoch !== d.epoch))
+        GECMIS.push({ epoch: d.epoch, kayip: d.kayip, valF1: d.valF1 });
+      $('oEpoch').textContent = d.epoch + '/' + d.enCokDevir;
+      $('oKayip').textContent = d.kayip.toFixed(3);
+      $('oF1').textContent = (d.valF1 * 100).toFixed(1) + '%';
+      $('oParam').textContent = Number(d.parametre).toLocaleString('tr-TR');
+      $('oMimari').textContent = (d.boyut || []).join('→');
+      grafikCiz();
+      if (!d.egitimde && d.epoch > 0){
+        clearInterval(IZLEYICI);
+        durumYaz($('egitimDurum'), '✓ eğitim bitti — en iyi doğrulama makro-F1: ' +
+          (d.enIyiF1 * 100).toFixed(2) + '% (epoch ' + d.enIyiEpoch + ')', 'ok');
+        guncelleDugmeler();
+      } else if (d.egitimde){
+        durumYaz($('egitimDurum'), 'eğitiliyor… epoch ' + d.epoch, '');
+      }
+    }catch(e){ /* geçici ağ hatası — sonraki turda dener */ }
+  }, 800);
+}
+
+function grafikCiz(){
+  const knv = $('grafik'), ctx = knv.getContext('2d');
+  const W = knv.width, H = knv.height;
+  const stil = getComputedStyle(document.documentElement);
+  ctx.clearRect(0, 0, W, H);
+  if (!GECMIS.length) return;
+  const kb = { sol: 40, sag: 12, ust: 18, alt: 22 };
+  const n = GECMIS.length;
+  const enK = Math.max(...GECMIS.map(g => g.kayip), 1e-6);
+  const ex = i => kb.sol + (n <= 1 ? 0 : i / (n - 1)) * (W - kb.sol - kb.sag);
+  const eyK = v => H - kb.alt - (v / enK) * (H - kb.alt - kb.ust);
+  const eyF = v => H - kb.alt - v * (H - kb.alt - kb.ust);
+  ctx.strokeStyle = stil.getPropertyValue('--line');
+  ctx.strokeRect(kb.sol, kb.ust, W - kb.sol - kb.sag, H - kb.alt - kb.ust);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#c4553f';
+  ctx.beginPath();
+  GECMIS.forEach((g, i) => i ? ctx.lineTo(ex(i), eyK(g.kayip)) : ctx.moveTo(ex(0), eyK(g.kayip)));
+  ctx.stroke();
+  ctx.strokeStyle = stil.getPropertyValue('--accent');
+  ctx.beginPath();
+  GECMIS.forEach((g, i) => i ? ctx.lineTo(ex(i), eyF(g.valF1)) : ctx.moveTo(ex(0), eyF(g.valF1)));
+  ctx.stroke();
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#c4553f';
+  ctx.fillText('eğitim kaybı', kb.sol + 6, kb.ust + 13);
+  ctx.fillStyle = stil.getPropertyValue('--accent');
+  ctx.fillText('doğrulama makro-F1', kb.sol + 92, kb.ust + 13);
+}
+
+/* ---- model + hızlı test ---- */
+$('btnModelIndir').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = adres() + '/model';
+  a.download = 'cam_ai_10m.bin';
+  a.click();
+});
+$('btnModelYukle').addEventListener('click', () => $('modelDosya').click());
+$('modelDosya').addEventListener('change', async e => {
+  if (!e.target.files.length) return;
+  const buf = await e.target.files[0].arrayBuffer();
+  e.target.value = '';
+  try{
+    const y = await (await fetch(adres() + '/model', { method: 'POST', body: buf })).json();
+    if (y.hata) throw new Error(y.hata);
+    durumYaz($('testSonuc'), '✓ model yüklendi (' + Number(y.parametre).toLocaleString('tr-TR') + ' parametre)', 'ok');
+    guncelleDugmeler();
+  }catch(h){
+    durumYaz($('testSonuc'), '✗ ' + h.message, 'hata');
+  }
+});
+$('btnHizliTest').addEventListener('click', async () => {
+  if (!VERI) return;
+  /* deterministik örneklem: her 7. örnekten en çok 300 tanesi */
+  const idx = [];
+  for (let i = 0; i < VERI.y.length && idx.length < 300; i += 7) idx.push(i);
+  const X = [];
+  for (const i of idx)
+    for (let j = 0; j < VERI.d; j++) X.push(VERI.X[i * VERI.d + j]);
+  try{
+    const y = await (await fetch(adres() + '/tahmin', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ X })
+    })).json();
+    if (y.hata) throw new Error(y.hata);
+    let dogru = 0;
+    idx.forEach((i, s) => { if (y.sinif[s] === VERI.y[i]) dogru++; });
+    durumYaz($('testSonuc'), '🧪 ' + idx.length + ' örnekte doğruluk: ' +
+      (100 * dogru / idx.length).toFixed(1) + '% (eğitim verisinden deterministik örneklem)', 'ok');
+  }catch(h){
+    durumYaz($('testSonuc'), '✗ ' + h.message, 'hata');
+  }
+});
+
+baglan();
+</script>
+</body>
+</html>

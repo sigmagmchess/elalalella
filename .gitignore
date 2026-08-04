@@ -18,3 +18,9 @@ venv/
 .DS_Store
 Thumbs.db
 node_modules/
+
+# C++ yerel derleme çıktıları
+cpp/cam_ai
+cpp/cam_ai.exe
+cpp/*.bin
+cpp/*.log
