@@ -39,6 +39,11 @@
 #include <random>
 #include <algorithm>
 #include <sstream>
+#include <fstream>
+
+// Öğrenilenler exe'nin yanındaki bu dosyalara kalıcı yazılır:
+static const char* HAVUZ_DOSYA = "cam_ai_havuz.json";   // birikimli eğitim verisi
+static const char* MODEL_DOSYA = "cam_ai_model.bin";    // en son eğitilen model
 
 #ifdef _WIN32
   #include <winsock2.h>
@@ -274,24 +279,31 @@ struct DerinYsa {
     for (int c = 0; c < K; c++) probs[c] /= top;
   }
 
-  bool kaydet(std::vector<uint8_t>& cikti) const {
+  // v2 (CAMAI11M): sınıf adları da dosyada saklanır; v1 (CAMAI10M) okunmaya devam eder
+  bool kaydet(std::vector<uint8_t>& cikti, const std::vector<std::string>& siniflar) const {
     if (boyut.empty()) return false;
     auto yaz32 = [&](int32_t v){ cikti.insert(cikti.end(), (uint8_t*)&v, (uint8_t*)&v + 4); };
     auto yazF = [&](const std::vector<float>& v){
       cikti.insert(cikti.end(), (const uint8_t*)v.data(), (const uint8_t*)v.data() + v.size() * 4);
     };
     cikti.clear();
-    const char* imza = "CAMAI10M";
+    const char* imza = "CAMAI11M";
     cikti.insert(cikti.end(), imza, imza + 8);
     yaz32((int32_t)boyut.size());
     for (int b : boyut) yaz32(b);
+    yaz32((int32_t)siniflar.size());
+    for (const auto& s : siniflar){
+      yaz32((int32_t)s.size());
+      cikti.insert(cikti.end(), s.begin(), s.end());
+    }
     int L = (int)boyut.size() - 2;
     for (int l = 0; l < L; l++){ yazF(W[l]); yazF(gamma[l]); yazF(beta[l]); yazF(runM[l]); yazF(runV[l]); }
     yazF(Ws); yazF(bs);
     return true;
   }
-  bool yukle(const uint8_t* veri, size_t boy){
-    if (boy < 12 || memcmp(veri, "CAMAI10M", 8) != 0) return false;
+  bool yukle(const uint8_t* veri, size_t boy, std::vector<std::string>* siniflarCikti = nullptr){
+    bool v2 = boy >= 12 && memcmp(veri, "CAMAI11M", 8) == 0;
+    if (!v2 && (boy < 12 || memcmp(veri, "CAMAI10M", 8) != 0)) return false;
     size_t p = 8;
     auto oku32 = [&]() -> int32_t { int32_t v; memcpy(&v, veri + p, 4); p += 4; return v; };
     int nb = oku32();
@@ -299,6 +311,18 @@ struct DerinYsa {
     boyut.resize(nb);
     for (int i = 0; i < nb; i++) boyut[i] = oku32();
     d = boyut.front(); K = boyut.back();
+    if (v2){
+      int adSayi = oku32();
+      if (adSayi < 0 || adSayi > 64) return false;
+      if (siniflarCikti) siniflarCikti->clear();
+      for (int i = 0; i < adSayi; i++){
+        int uz = oku32();
+        if (uz < 0 || p + (size_t)uz > boy) return false;
+        std::string ad((const char*)veri + p, uz);
+        p += uz;
+        if (siniflarCikti) siniflarCikti->push_back(ad);
+      }
+    }
     int L = nb - 2;
     auto okuF = [&](std::vector<float>& v, size_t adet) -> bool {
       if (p + adet * 4 > boy) return false;
@@ -322,18 +346,98 @@ struct DerinYsa {
 };
 
 // ============================ eğitim durumu ===========================
+struct Havuz {                            // bilgisayarda birikimli eğitim verisi
+  int d = 0;
+  std::vector<std::string> siniflar;
+  std::vector<float> X;
+  std::vector<int> y;
+  std::vector<long long> sayimlar() const {
+    std::vector<long long> s(siniflar.size(), 0);
+    for (int c : y) if (c >= 0 && c < (int)s.size()) s[c]++;
+    return s;
+  }
+};
+
 struct Durum {
   std::atomic<bool> egitimde{false}, durdurIstek{false}, modelHazir{false};
+  std::atomic<bool> modelDosyadan{false};
   std::atomic<int> epoch{0}, enCokDevir{0}, enIyiEpoch{0};
   std::atomic<double> kayip{0}, valKayip{0}, valF1{0}, enIyiF1{0}, lr{0};
   std::atomic<long long> parametre{0};
-  std::mutex kilit;                      // model + gecmis + siniflar erişimi
+  std::mutex kilit;                      // model + gecmis + siniflar + havuz erişimi
   DerinYsa model;
   std::vector<std::string> siniflar;
+  Havuz havuz;
   std::string gecmisJson = "[]";
   std::string sonHata;
   int nE = 0, nV = 0;
 } G;
+
+// ---- havuz kalıcılığı (kilit çağıran tarafta tutulur) ----
+static void havuzKaydet(){
+  std::ofstream f(HAVUZ_DOSYA, std::ios::binary);
+  if (!f) return;
+  f << "{\"d\":" << G.havuz.d << ",\"siniflar\":[";
+  for (size_t i = 0; i < G.havuz.siniflar.size(); i++)
+    f << (i ? "," : "") << '"' << jsonKacis(G.havuz.siniflar[i]) << '"';
+  f << "],\"y\":[";
+  for (size_t i = 0; i < G.havuz.y.size(); i++)
+    f << (i ? "," : "") << G.havuz.y[i];
+  f << "],\"X\":[";
+  char sayi[32];
+  for (size_t i = 0; i < G.havuz.X.size(); i++){
+    snprintf(sayi, sizeof(sayi), "%.6g", (double)G.havuz.X[i]);
+    f << (i ? "," : "") << sayi;
+  }
+  f << "]}";
+}
+static void havuzYukle(){
+  std::ifstream f(HAVUZ_DOSYA, std::ios::binary);
+  if (!f) return;
+  std::string icerik((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+  JsonAyristirici ja(icerik);
+  Json j = ja.coz();
+  const Json* jX = j.al("X");
+  const Json* jy = j.al("y");
+  const Json* js = j.al("siniflar");
+  if (ja.hata || !jX || !jy || !js) return;
+  G.havuz.d = (int)j.sayiAl("d", 36);
+  G.havuz.siniflar.clear();
+  for (auto& sj : js->dizi) G.havuz.siniflar.push_back(sj.dizgi);
+  G.havuz.y.clear();
+  for (auto& v : jy->dizi) G.havuz.y.push_back((int)v.sayi);
+  G.havuz.X.resize(jX->dizi.size());
+  for (size_t i = 0; i < jX->dizi.size(); i++) G.havuz.X[i] = (float)jX->dizi[i].sayi;
+  if (G.havuz.X.size() != G.havuz.y.size() * (size_t)G.havuz.d){
+    G.havuz = Havuz{};                    // bozuk dosya — sıfırla
+  }
+}
+// yeni örnekleri sınıf ADINA göre birleştirerek havuza ekler; eklenen örnek sayısını döndürür
+static int havuzaEkle(int d, const std::vector<std::string>& adlar,
+                      const std::vector<float>& X, const std::vector<int>& y){
+  if (G.havuz.d == 0) G.havuz.d = d;
+  if (G.havuz.d != d) return -1;          // öznitelik sayısı uyuşmalı
+  std::vector<int> esle(adlar.size());
+  for (size_t i = 0; i < adlar.size(); i++){
+    auto it = std::find(G.havuz.siniflar.begin(), G.havuz.siniflar.end(), adlar[i]);
+    if (it == G.havuz.siniflar.end()){
+      G.havuz.siniflar.push_back(adlar[i]);
+      esle[i] = (int)G.havuz.siniflar.size() - 1;
+    } else esle[i] = (int)(it - G.havuz.siniflar.begin());
+  }
+  for (size_t i = 0; i < y.size(); i++){
+    G.havuz.y.push_back(esle[y[i]]);
+    G.havuz.X.insert(G.havuz.X.end(), X.begin() + i * d, X.begin() + (i + 1) * d);
+  }
+  havuzKaydet();
+  return (int)y.size();
+}
+static void modelDosyayaKaydet(){
+  std::vector<uint8_t> ikili;
+  if (!G.model.kaydet(ikili, G.siniflar)) return;
+  std::ofstream f(MODEL_DOSYA, std::ios::binary);
+  if (f) f.write((const char*)ikili.data(), ikili.size());
+}
 
 static double makroF1(const std::vector<long long>& M, int K){
   double toplam = 0;
@@ -693,8 +797,10 @@ static void egitimCalistir(std::vector<float> X, std::vector<int> y, int n, int 
   {
     std::lock_guard<std::mutex> kilit(G.kilit);
     G.gecmisJson += "]";
+    modelDosyayaKaydet();                 // öğrenilen model bilgisayara kalıcı yazılır
   }
   G.modelHazir = true;
+  G.modelDosyadan = false;
   G.egitimde = false;
 }
 
@@ -729,7 +835,16 @@ static std::string durumJson(){
     << ",\"valF1\":" << G.valF1 << ",\"enIyiF1\":" << G.enIyiF1
     << ",\"enIyiEpoch\":" << G.enIyiEpoch << ",\"lr\":" << G.lr
     << ",\"parametre\":" << G.parametre
+    << ",\"modelDosyadan\":" << (G.modelDosyadan ? "true" : "false")
     << ",\"nEgitim\":" << G.nE << ",\"nDogrulama\":" << G.nV
+    << ",\"havuz\":{\"n\":" << G.havuz.y.size() << ",\"d\":" << G.havuz.d << ",\"siniflar\":[";
+  {
+    auto sayim = G.havuz.sayimlar();
+    for (size_t i = 0; i < G.havuz.siniflar.size(); i++)
+      o << (i ? "," : "") << "{\"ad\":\"" << jsonKacis(G.havuz.siniflar[i])
+        << "\",\"n\":" << sayim[i] << "}";
+  }
+  o << "]}"
     << ",\"boyut\":[";
   for (size_t i = 0; i < G.model.boyut.size(); i++)
     o << (i ? "," : "") << G.model.boyut[i];
@@ -781,54 +896,103 @@ static void istemciIsle(soket_t s){
       Json j = ja.coz();
       const Json* jX = j.al("X");
       const Json* jy = j.al("y");
-      int d = (int)j.sayiAl("d", 36);
-      int K = (int)j.sayiAl("K", 0);
-      if (ja.hata || !jX || !jy || jX->tip != Json::DIZI || jy->tip != Json::DIZI ||
-          K < 2 || d < 1 || jy->dizi.empty() ||
-          jX->dizi.size() != jy->dizi.size() * (size_t)d){
-        yanit(s, 400, "application/json",
-          "{\"hata\":\"Geçersiz istek: d, K, X (n*d) ve y (n) alanları gerekli; X uzunluğu n*d olmalı.\"}");
-      } else {
-        int n = (int)jy->dizi.size();
-        std::vector<float> X((size_t)n * d);
-        std::vector<int> y(n);
-        for (size_t i = 0; i < jX->dizi.size(); i++) X[i] = (float)jX->dizi[i].sayi;
-        bool yOk = true;
-        for (int i = 0; i < n; i++){
-          y[i] = (int)jy->dizi[i].sayi;
-          if (y[i] < 0 || y[i] >= K) yOk = false;
-        }
-        if (!yOk){
-          yanit(s, 400, "application/json", "{\"hata\":\"y değerleri 0..K-1 aralığında olmalı.\"}");
-        } else {
-          const Json* ja2 = j.al("ayarlar");
-          long long hedef = ja2 ? (long long)ja2->sayiAl("hedefParam", 1e7) : 10000000LL;
-          int devir = ja2 ? (int)ja2->sayiAl("enCokDevir", 120) : 120;
-          float hiz = ja2 ? (float)ja2->sayiAl("hiz", 1e-3) : 1e-3f;
-          float l2 = ja2 ? (float)ja2->sayiAl("l2", 1e-4) : 1e-4f;
-          int parti = ja2 ? (int)ja2->sayiAl("parti", 128) : 128;
-          float dropout = ja2 ? (float)ja2->sayiAl("dropout", 0.2) : 0.2f;
-          int sabir = ja2 ? (int)ja2->sayiAl("sabir", 12) : 12;
-          {
-            std::lock_guard<std::mutex> kilit(G.kilit);
-            G.siniflar.clear();
+      const Json* jb = j.al("sadeceBu");
+      bool sadeceBu = jb && jb->tip == Json::BOOL && jb->dogru;
+      std::string hata;
+      std::vector<float> X;
+      std::vector<int> y;
+      std::vector<std::string> adlar;
+      int d = 0, K = 0, eklenen = 0;
+      {
+        std::lock_guard<std::mutex> kilit(G.kilit);
+        if (jX && jy && jX->tip == Json::DIZI && jy->tip == Json::DIZI && !jy->dizi.empty()){
+          int dGelen = (int)j.sayiAl("d", 36);
+          int KGelen = (int)j.sayiAl("K", 0);
+          if (ja.hata || KGelen < 2 || dGelen < 1 ||
+              jX->dizi.size() != jy->dizi.size() * (size_t)dGelen){
+            hata = "Geçersiz istek: d, K, X (n*d) ve y (n) tutarlı olmalı.";
+          } else {
+            int n = (int)jy->dizi.size();
+            std::vector<float> Xg((size_t)n * dGelen);
+            std::vector<int> yg(n);
+            for (size_t i = 0; i < jX->dizi.size(); i++) Xg[i] = (float)jX->dizi[i].sayi;
+            for (int i = 0; i < n; i++){
+              yg[i] = (int)jy->dizi[i].sayi;
+              if (yg[i] < 0 || yg[i] >= KGelen) hata = "y değerleri 0..K-1 aralığında olmalı.";
+            }
+            std::vector<std::string> adGelen;
             const Json* js = j.al("siniflar");
             if (js && js->tip == Json::DIZI)
-              for (auto& sj : js->dizi) G.siniflar.push_back(sj.dizgi);
-            G.sonHata.clear();
+              for (auto& sj : js->dizi) adGelen.push_back(sj.dizgi);
+            while ((int)adGelen.size() < KGelen)
+              adGelen.push_back("Sınıf " + std::to_string(adGelen.size() + 1));
+            if (hata.empty()){
+              if (sadeceBu){
+                X = std::move(Xg); y = std::move(yg); adlar = adGelen;
+                d = dGelen; K = KGelen; eklenen = n;
+              } else {
+                eklenen = havuzaEkle(dGelen, adGelen, Xg, yg);   // bilgisayara kalıcı yazılır
+                if (eklenen < 0)
+                  hata = "Öznitelik sayısı havuzla uyuşmuyor (havuz d=" +
+                         std::to_string(G.havuz.d) + ", gelen d=" + std::to_string(dGelen) + ").";
+              }
+            }
           }
-          G.durdurIstek = false;
-          G.modelHazir = false;
-          G.epoch = 0; G.valF1 = 0; G.enIyiF1 = 0; G.enIyiEpoch = 0;
-          G.enCokDevir = devir;
-          G.egitimde = true;
-          std::thread(egitimCalistir, std::move(X), std::move(y), n, d, K,
-                      hedef, devir, hiz, l2, parti, dropout, sabir).detach();
-          yanit(s, 200, "application/json",
-            "{\"tamam\":true,\"n\":" + std::to_string(n) + "}");
+        }
+        if (hata.empty() && !sadeceBu){
+          // birikimli havuzdan eğit (yeni veri geldiyse az önce eklendi)
+          if (G.havuz.y.empty()) hata = "Havuz boş — önce eğitim verisi gönderin.";
+          else if (G.havuz.siniflar.size() < 2) hata = "Havuzda en az 2 sınıf olmalı.";
+          else {
+            X = G.havuz.X; y = G.havuz.y; adlar = G.havuz.siniflar;
+            d = G.havuz.d; K = (int)adlar.size();
+          }
+        }
+        if (hata.empty()){
+          G.siniflar = adlar;
+          G.sonHata.clear();
         }
       }
+      if (!hata.empty()){
+        yanit(s, 400, "application/json", "{\"hata\":\"" + jsonKacis(hata) + "\"}");
+      } else {
+        const Json* ja2 = j.al("ayarlar");
+        long long hedef = ja2 ? (long long)ja2->sayiAl("hedefParam", 1e7) : 10000000LL;
+        int devir = ja2 ? (int)ja2->sayiAl("enCokDevir", 120) : 120;
+        float hiz = ja2 ? (float)ja2->sayiAl("hiz", 1e-3) : 1e-3f;
+        float l2 = ja2 ? (float)ja2->sayiAl("l2", 1e-4) : 1e-4f;
+        int parti = ja2 ? (int)ja2->sayiAl("parti", 128) : 128;
+        float dropout = ja2 ? (float)ja2->sayiAl("dropout", 0.2) : 0.2f;
+        int sabir = ja2 ? (int)ja2->sayiAl("sabir", 12) : 12;
+        int n = (int)y.size();
+        G.durdurIstek = false;
+        G.modelHazir = false;
+        G.epoch = 0; G.valF1 = 0; G.enIyiF1 = 0; G.enIyiEpoch = 0;
+        G.enCokDevir = devir;
+        G.egitimde = true;
+        std::thread(egitimCalistir, std::move(X), std::move(y), n, d, K,
+                    hedef, devir, hiz, l2, parti, dropout, sabir).detach();
+        yanit(s, 200, "application/json",
+          "{\"tamam\":true,\"n\":" + std::to_string(n) +
+          ",\"eklenen\":" + std::to_string(eklenen) +
+          ",\"havuzdan\":" + (sadeceBu ? "false" : "true") + "}");
+      }
     }
+  } else if (basliyorMu("GET /havuz")){
+    std::lock_guard<std::mutex> kilit(G.kilit);
+    auto sayim = G.havuz.sayimlar();
+    std::ostringstream o;
+    o << "{\"n\":" << G.havuz.y.size() << ",\"d\":" << G.havuz.d << ",\"siniflar\":[";
+    for (size_t i = 0; i < G.havuz.siniflar.size(); i++)
+      o << (i ? "," : "") << "{\"ad\":\"" << jsonKacis(G.havuz.siniflar[i])
+        << "\",\"n\":" << sayim[i] << "}";
+    o << "]}";
+    yanit(s, 200, "application/json", o.str());
+  } else if (basliyorMu("POST /havuz/bosalt")){
+    std::lock_guard<std::mutex> kilit(G.kilit);
+    G.havuz = Havuz{};
+    havuzKaydet();
+    yanit(s, 200, "application/json", "{\"tamam\":true}");
   } else if (basliyorMu("POST /tahmin")){
     if (!G.modelHazir){
       yanit(s, 400, "application/json", "{\"hata\":\"Önce model eğitin ya da yükleyin.\"}");
@@ -859,14 +1023,17 @@ static void istemciIsle(soket_t s){
           o << "]";
           sinifDizi += (i ? "," : "") + std::to_string(enC);
         }
-        o << "]" << sinifDizi << "]}";
+        o << "]" << sinifDizi << "],\"sinifAdlari\":[";
+        for (size_t i = 0; i < G.siniflar.size(); i++)
+          o << (i ? "," : "") << '"' << jsonKacis(G.siniflar[i]) << '"';
+        o << "]}";
         yanit(s, 200, "application/json", o.str());
       }
     }
   } else if (basliyorMu("GET /model")){
     std::lock_guard<std::mutex> kilit(G.kilit);
     std::vector<uint8_t> ikili;
-    if (!G.modelHazir || !G.model.kaydet(ikili)){
+    if (!G.modelHazir || !G.model.kaydet(ikili, G.siniflar)){
       yanit(s, 400, "application/json", "{\"hata\":\"Kaydedilecek model yok.\"}");
     } else {
       std::string govdeB((char*)ikili.data(), ikili.size());
@@ -885,9 +1052,11 @@ static void istemciIsle(soket_t s){
     }
   } else if (basliyorMu("POST /model")){
     std::lock_guard<std::mutex> kilit(G.kilit);
-    if (G.model.yukle((const uint8_t*)govde.data(), govde.size())){
+    if (G.model.yukle((const uint8_t*)govde.data(), govde.size(), &G.siniflar)){
       G.modelHazir = true;
+      G.modelDosyadan = true;
       G.parametre = G.model.parametre;
+      modelDosyayaKaydet();               // yüklenen model de kalıcı olsun
       yanit(s, 200, "application/json",
         "{\"tamam\":true,\"parametre\":" + std::to_string(G.model.parametre) + "}");
     } else {
@@ -917,7 +1086,26 @@ int main(int argc, char** argv){
     return 1;
   }
   listen(dinleyici, 16);
+  /* önceki oturumda öğrenilenleri diskten geri yükle */
+  {
+    std::lock_guard<std::mutex> kilit(G.kilit);
+    havuzYukle();
+    std::ifstream f(MODEL_DOSYA, std::ios::binary);
+    if (f){
+      std::vector<uint8_t> ikili((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+      if (G.model.yukle(ikili.data(), ikili.size(), &G.siniflar)){
+        G.modelHazir = true;
+        G.modelDosyadan = true;
+        G.parametre = G.model.parametre;
+      }
+    }
+  }
   printf("🌲 Çam-AI yerel eğitim sunucusu hazır: http://localhost:%d\n", port);
+  if (G.modelHazir)
+    printf("   Kayıtlı model yüklendi (%s, %lld parametre).\n", MODEL_DOSYA, (long long)G.parametre);
+  if (!G.havuz.y.empty())
+    printf("   Kayıtlı veri havuzu: %zu örnek, %zu sınıf (%s).\n",
+           G.havuz.y.size(), G.havuz.siniflar.size(), HAVUZ_DOSYA);
   printf("   kopru.html dosyasını tarayıcıda açıp bağlanın. Kapatmak: Ctrl+C\n");
   fflush(stdout);
   for (;;){

@@ -53,7 +53,22 @@ const y = await (await fetch('http://localhost:8787/tahmin', {
 ```
 
 Uçlar: `GET /durum` · `POST /egit` · `POST /durdur` · `POST /tahmin` ·
-`GET /model` (bin indir) · `POST /model` (bin yükle).
+`GET /model` (bin indir) · `POST /model` (bin yükle) ·
+`GET /havuz` (kayıtlı havuz özeti) · `POST /havuz/bosalt`.
+
+## Kalıcı öğrenme (yeni)
+
+Sunucu, öğrendiklerini **exe'nin yanındaki iki dosyaya** kaydeder ve her
+açılışta otomatik geri yükler:
+
+| Dosya | İçerik |
+|---|---|
+| `cam_ai_havuz.json` | Birikimli eğitim verisi — `/egit`'e gönderilen her yeni veri, **sınıf adına göre** öncekilerle birleştirilir |
+| `cam_ai_model.bin` | En son eğitilen model (sınıf adları dahil) — açılışta yüklenir, `/tahmin` hemen çalışır |
+
+`/egit` varsayılan olarak **tüm havuzla** eğitir (yeni gönderilen veri önce
+havuza eklenir). Yalnızca gönderdiğiniz veriyle eğitmek için gövdeye
+`"sadeceBu": true` ekleyin.
 
 `POST /egit` gövdesi:
 
