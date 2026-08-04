@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Çam-AI · C++ Eğitim Köprüsü (10M parametre)</title>
+<title>Çam-AI · C++ Derin Eğitim (10M) — Yerel Sunucu Köprüsü</title>
+</head>
+<body>
 <style>
 :root{
   color-scheme:light;
@@ -26,78 +28,117 @@
   }
 }
 *{box-sizing:border-box}
+html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);
-  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-header.app{display:flex;align-items:center;gap:12px;padding:10px 16px;
-  background:var(--surface);border-bottom:1px solid var(--line)}
-header.app .logo{font-size:24px}
-header.app h1{font-size:15px;margin:0;line-height:1.2}
-header.app .alt{font-size:11.5px;color:var(--ink2)}
-.kap{max-width:720px;margin:0 auto;padding:14px 12px 60px;display:flex;flex-direction:column;gap:10px}
-details.adim{border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
-details.adim[open]{box-shadow:var(--shadow)}
-details.adim>summary{list-style:none;cursor:pointer;padding:10px 13px;display:flex;
-  align-items:center;gap:9px;font-weight:600;font-size:13.5px;background:var(--surface2)}
-details.adim>summary::-webkit-details-marker{display:none}
-details.adim>summary .no{display:inline-flex;align-items:center;justify-content:center;
-  width:23px;height:23px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
-  font-size:12px;font-weight:700;flex:0 0 23px}
-details.adim>summary .durum{margin-left:auto;font-size:11px;font-weight:500;color:var(--ink3)}
-details.adim>summary .durum.tamam{color:var(--ok)}
-details.adim .icerik{padding:11px 13px;display:flex;flex-direction:column;gap:9px}
-.satir{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.satir label{font-size:12.5px;color:var(--ink2)}
-input[type=number],input[type=text]{font:inherit;font-size:12.5px;padding:5px 7px;
-  border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);max-width:120px}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--line);
-  border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;font:inherit;font-size:13px}
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit}
+h1,h2,h3{margin:0;font-weight:650}
+small{color:var(--ink2)}
+code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:12px}
+header.app{display:flex;align-items:center;gap:12px;padding:8px 14px;
+  background:var(--surface);border-bottom:1px solid var(--line);flex:0 0 auto}
+header.app .logo{font-size:22px}
+header.app .baslik h1{font-size:15px;line-height:1.2}
+header.app .baslik .alt{font-size:11.5px;color:var(--ink2)}
+header.app .bosluk{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);
+  border-radius:8px;background:var(--surface);cursor:pointer;font-size:13px;
+  transition:background .15s;-webkit-user-select:none;user-select:none;white-space:nowrap}
 .btn:hover:not(:disabled){background:var(--surface2)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.birincil{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-.btn.kucuk{padding:4px 9px;font-size:12px}
+.btn.kucuk{padding:3px 8px;font-size:12px;border-radius:6px}
+main.app{flex:1;display:flex;min-height:0}
+aside.panel{width:340px;flex:0 0 340px;overflow-y:auto;background:var(--surface);
+  border-right:1px solid var(--line);padding:10px}
+@media (max-width:900px){
+  main.app{flex-direction:column;overflow-y:auto}
+  aside.panel{width:auto;flex:0 0 auto;border-right:none;border-bottom:1px solid var(--line)}
+  section.sahne{min-height:60vh}
+  body{overflow:auto}
+}
+details.adim{border:1px solid var(--line);border-radius:10px;background:var(--surface);
+  margin-bottom:8px;overflow:hidden}
+details.adim[open]{box-shadow:var(--shadow)}
+details.adim>summary{list-style:none;cursor:pointer;padding:9px 12px;display:flex;
+  align-items:center;gap:9px;font-weight:600;font-size:13.5px;background:var(--surface2)}
+details.adim>summary::-webkit-details-marker{display:none}
+details.adim>summary .no{display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
+  font-size:12px;font-weight:700;flex:0 0 22px}
+details.adim>summary .durum{margin-left:auto;font-size:11px;font-weight:500;color:var(--ink3)}
+details.adim>summary .durum.tamam{color:var(--ok)}
+details.adim .icerik{padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+.satir{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.satir label{font-size:12.5px;color:var(--ink2)}
+.satir select,.satir input[type=number],.satir input[type=text]{
+  font:inherit;font-size:12.5px;padding:4px 6px;border:1px solid var(--line);
+  border-radius:6px;background:var(--surface);color:var(--ink);max-width:130px}
 .ipucu{font-size:11.5px;color:var(--ink2);background:var(--surface2);border-radius:7px;padding:7px 9px;line-height:1.45}
 .basari{font-size:12px;color:var(--ok);background:var(--ok-soft);border-radius:7px;padding:7px 9px}
 .hata{font-size:12px;color:var(--err);background:var(--err-soft);border-radius:7px;padding:7px 9px;white-space:pre-wrap}
-.birak{border:2px dashed var(--line);border-radius:10px;padding:16px 10px;text-align:center;
-  cursor:pointer;color:var(--ink2);font-size:12.5px;transition:border-color .15s}
+.gizli{display:none !important}
+.birak{border:2px dashed var(--line);border-radius:10px;padding:18px 10px;text-align:center;
+  cursor:pointer;transition:border-color .15s,background .15s;color:var(--ink2);font-size:12.5px}
 .birak:hover,.birak.ustunde{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
-.birak .buyuk{font-size:24px;display:block;margin-bottom:4px}
+.birak .buyuk{font-size:26px;display:block;margin-bottom:4px}
 table.istat{width:100%;border-collapse:collapse;font-size:12px}
 table.istat th{text-align:left;padding:3px 5px;border-bottom:2px solid var(--line);color:var(--ink2);font-weight:600}
 table.istat td{padding:3px 5px;border-bottom:1px solid var(--line)}
-canvas{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-.izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:7px}
-.stat-kart{border:1px solid var(--line);border-radius:9px;padding:8px 6px;text-align:center;background:var(--surface2)}
-.stat-kart .deger{font-size:17px;font-weight:700;line-height:1.2}
-.stat-kart .ad{font-size:10px;color:var(--ink2);margin-top:2px}
-code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:12px}
-.gizli{display:none!important}
 .ilerleme{height:8px;background:var(--surface2);border-radius:5px;overflow:hidden}
 .ilerleme>div{height:100%;width:0%;background:var(--accent);transition:width .3s;border-radius:5px}
+.ilerleme-yazi{font-size:11.5px;color:var(--ink2);margin-top:3px}
+.kazanan-kart{border:1.5px solid var(--accent);border-radius:10px;padding:9px 11px;
+  background:var(--accent-soft);font-size:12.5px;line-height:1.5}
+section.sahne{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;overflow-y:auto}
+.sahne-ic{padding:14px;display:flex;flex-direction:column;gap:12px;max-width:860px;width:100%;margin:0 auto}
+.sahne-bos{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;color:var(--ink3);text-align:center;padding:30px}
+.sahne-bos .dev{font-size:52px;opacity:.5}
+.kart{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.kart h3{font-size:13.5px;margin-bottom:8px}
+canvas.grafik{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stat-kart{border:1px solid var(--line);border-radius:9px;padding:8px 6px;text-align:center;background:var(--surface2)}
+.stat-kart .deger{font-size:18px;font-weight:700;line-height:1.2}
+.stat-kart .ad{font-size:10px;color:var(--ink2);margin-top:2px;letter-spacing:.2px}
+table.matris{border-collapse:collapse;font-size:11px;min-width:100%}
+table.matris th,table.matris td{padding:4px 7px;border:1px solid var(--line);text-align:center}
+table.matris th{background:var(--surface2);color:var(--ink2);font-weight:600}
+table.matris td.kose{font-weight:700;color:var(--ok);background:var(--accent-soft)}
+table.matris td.hatali{color:var(--err)}
+footer.durum{display:flex;align-items:center;gap:14px;padding:4px 12px;font-size:11.5px;
+  color:var(--ink2);background:var(--surface);border-top:1px solid var(--line);flex:0 0 auto;
+  flex-wrap:wrap;min-height:26px}
+footer.durum .bosluk{flex:1}
 </style>
-</head>
-<body>
+
 <header class="app">
   <span class="logo">🌲</span>
-  <div>
-    <h1>Çam-AI · C++ Eğitim Köprüsü</h1>
-    <div class="alt">~10 milyon parametreli derin YSA bilgisayarınızdaki <code>cam_ai.exe</code> içinde eğitilir —
-      öğrendikleri diske kaydedilir, program kapansa bile kaybolmaz. Veri dışarı gitmez.</div>
+  <div class="baslik">
+    <h1>Çam-AI · C++ Derin Eğitim Sunucusu</h1>
+    <div class="alt">~10 milyon parametreli derin YSA — bilgisayarınızdaki <code>cam_ai.exe</code> içinde eğitilir,
+      öğrendikleri diske kaydedilir, veri dışarı gitmez</div>
   </div>
+  <div class="bosluk"></div>
+  <span id="ustModel" class="btn kucuk" style="cursor:default">model: yok</span>
 </header>
-<div class="kap">
+
+<main class="app">
+<aside class="panel">
 
   <details class="adim" id="adim1" open>
     <summary><span class="no">1</span> Sunucuya Bağlan <span class="durum" id="durum1">bekliyor</span></summary>
     <div class="icerik">
       <div class="satir">
         <label>Adres:</label>
-        <input type="text" id="adres" value="http://localhost:8787" style="max-width:200px">
-        <button class="btn birincil" id="btnBaglan">🔌 Bağlan</button>
+        <input type="text" id="adres" value="http://localhost:8787" style="max-width:180px">
+        <button class="btn birincil kucuk" id="btnBaglan">🔌 Bağlan</button>
       </div>
-      <div id="baglantiBilgi" class="ipucu">Önce <code>cam_ai.exe</code>'yi çalıştırın; sunucu yalnız bu
-        bilgisayarı (<code>localhost</code>) dinler. Önceki oturumların modeli ve veri havuzu varsa
-        açılışta otomatik geri yüklenir.</div>
+      <div id="baglantiBilgi" class="ipucu">Önce <code>cam_ai.exe</code>'yi çalıştırın (derleme: DERLEME.md).
+        Sunucu yalnız bu bilgisayarı dinler; önceki oturumların modeli ve veri havuzu açılışta
+        otomatik geri yüklenir.</div>
     </div>
   </details>
 
@@ -106,14 +147,14 @@ code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:12px}
     <div class="icerik">
       <div class="birak" id="birak">
         <span class="buyuk">📂</span>
-        Çam-AI <b>proje dosyasını</b> (<code>*_proje.json</code>, veri havuzlu) buraya bırakın<br>
-        <small>ya da <code>{"d":36,"K":N,"siniflar":[...],"X":[n·d],"y":[n]}</code> biçiminde düz JSON</small>
+        <b>Çam-AI proje dosyasını buraya bırakın</b> ya da tıklayıp seçin<br>
+        <small><code>*_proje.json</code> (veri havuzlu) ya da <code>{"d","K","siniflar","X","y"}</code> düz JSON</small>
       </div>
       <input type="file" id="dosya" accept=".json,application/json" class="gizli">
       <div id="veriBilgi" class="basari gizli"></div>
-      <div class="ipucu">Bıraktığınız veriler eğitim başlarken sunucunun <b>kalıcı havuzuna</b> eklenir
-        (<code>cam_ai_havuz.json</code>, exe'nin yanında) ve <b>sınıf adına göre</b> öncekilerle birleşir —
-        her oturumda model biraz daha çok şey öğrenir.</div>
+      <div class="ipucu">Bıraktığınız veriler eğitim başlarken sunucunun <b>kalıcı havuzuna</b>
+        (<code>cam_ai_havuz.json</code>) eklenir ve <b>sınıf adına göre</b> öncekilerle birleşir —
+        model her oturumda birikimli öğrenir.</div>
       <div id="havuzKutu" class="gizli">
         <div style="font-size:12.5px;font-weight:600;margin-bottom:4px">💾 Bilgisayardaki kayıtlı havuz</div>
         <table class="istat" id="havuzTablo"></table>
@@ -125,55 +166,96 @@ code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:12px}
   </details>
 
   <details class="adim" id="adim3">
-    <summary><span class="no">3</span> Eğit <span class="durum" id="durum3">bekliyor</span></summary>
+    <summary><span class="no">3</span> Eğit — Derin YSA <span class="durum" id="durum3">bekliyor</span></summary>
     <div class="icerik">
       <div class="satir">
-        <label>Hedef parametre:</label><input type="number" id="hedef" value="10000000" step="1000000">
-        <label>En çok epoch:</label><input type="number" id="devir" value="120" min="5" max="1000">
+        <label>Hedef parametre:</label>
+        <select id="hedef">
+          <option value="2000000">2 milyon (hızlı)</option>
+          <option value="5000000">5 milyon</option>
+          <option value="10000000" selected>10 milyon (tez)</option>
+          <option value="20000000">20 milyon (yavaş)</option>
+        </select>
       </div>
       <div class="satir">
+        <label>En çok epoch:</label><input type="number" id="devir" value="120" min="5" max="1000">
         <label>Parti:</label><input type="number" id="parti" value="128" min="16" max="1024">
+      </div>
+      <div class="satir">
         <label>Öğrenme hızı:</label><input type="number" id="hiz" value="0.001" step="0.0005">
       </div>
-      <div class="satir">
-        <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat (havuzdaki her şeyle)</button>
-        <button class="btn gizli" id="btnDurdur">⏹ Durdur</button>
-      </div>
+      <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat (havuzdaki her şeyle)</button>
+      <button class="btn gizli" id="btnDurdur">⏹ Durdur (en iyi ağırlıklar korunur)</button>
       <div id="egitIlerlemeKutu" class="gizli">
         <div class="ilerleme"><div id="egitCubuk"></div></div>
-        <div style="font-size:11.5px;color:var(--ink2);margin-top:3px" id="egitYazi"></div>
+        <div class="ilerleme-yazi" id="egitYazi"></div>
       </div>
-      <canvas id="grafik" width="660" height="210" class="gizli"></canvas>
-      <div class="izgara gizli" id="ozet">
-        <div class="stat-kart"><div class="deger" id="oEpoch">–</div><div class="ad">epoch</div></div>
-        <div class="stat-kart"><div class="deger" id="oKayip">–</div><div class="ad">eğitim kaybı</div></div>
-        <div class="stat-kart"><div class="deger" id="oF1">–</div><div class="ad">doğrulama makro-F1</div></div>
-        <div class="stat-kart"><div class="deger" id="oParam">–</div><div class="ad">parametre</div></div>
-      </div>
-      <div id="mimari" class="ipucu gizli" style="font-size:11px"></div>
-      <div id="egitSonuc" class="basari gizli"></div>
+      <div id="egitSonuc" class="kazanan-kart gizli"></div>
       <div id="egitHata" class="hata gizli"></div>
     </div>
   </details>
 
   <details class="adim" id="adim4">
-    <summary><span class="no">4</span> Model &amp; Tahmin <span class="durum" id="durum4">bekliyor</span></summary>
+    <summary><span class="no">4</span> Model &amp; Dışa Aktar <span class="durum" id="durum4">bekliyor</span></summary>
     <div class="icerik">
       <div class="satir">
         <button class="btn kucuk" id="btnModelIndir" disabled>💾 Modeli indir (.bin)</button>
         <button class="btn kucuk" id="btnModelYukle">📥 Model yükle (.bin)…</button>
         <input type="file" id="modelDosya" accept=".bin" class="gizli">
+      </div>
+      <div class="satir">
         <button class="btn kucuk" id="btnHizliTest" disabled>🧪 Hızlı doğrulama testi</button>
+        <button class="btn kucuk" id="btnTezRapor" disabled>🎓 Tez raporu (TXT)</button>
       </div>
       <div id="testSonuc" class="basari gizli"></div>
-      <div class="ipucu">Model her eğitim sonunda otomatik olarak <code>cam_ai_model.bin</code> dosyasına
-        (exe'nin yanına) kaydedilir ve bir sonraki açılışta kendiliğinden yüklenir — indirme yalnızca
-        yedeklemek/paylaşmak içindir. Kendi HTML'inizden tahmin:
-        <code>POST /tahmin {"X":[m·36 ham öznitelik]}</code> (CORS açık).</div>
+      <div class="ipucu">Model her eğitim sonunda <code>cam_ai_model.bin</code>'e otomatik kaydedilir
+        ve sonraki açılışta kendiliğinden yüklenir. Kendi HTML'inizden tahmin:
+        <code>POST /tahmin {"X":[m·36]}</code> (CORS açık).</div>
     </div>
   </details>
 
-</div>
+</aside>
+
+<section class="sahne">
+  <div class="sahne-bos" id="sahneBos">
+    <span class="dev">🧠</span>
+    <b>Henüz eğitim yok</b>
+    <span style="max-width:420px">Soldan sunucuya bağlanın, Çam-AI proje dosyanızı bırakın ve eğitimi
+      başlatın — canlı grafik, karışıklık matrisi ve tür metrikleri burada görünecek.</span>
+  </div>
+  <div class="sahne-ic gizli" id="sahneIc">
+    <div class="kart">
+      <h3>📈 Eğitim eğrisi — <span style="color:#c4553f">eğitim kaybı</span> ·
+        <span style="color:var(--accent)">doğrulama makro-F1</span></h3>
+      <canvas id="grafik" class="grafik" width="820" height="260"></canvas>
+      <div class="izgara" style="margin-top:10px">
+        <div class="stat-kart"><div class="deger" id="oEpoch">–</div><div class="ad">epoch</div></div>
+        <div class="stat-kart"><div class="deger" id="oKayip">–</div><div class="ad">eğitim kaybı</div></div>
+        <div class="stat-kart"><div class="deger" id="oF1">–</div><div class="ad">doğrulama makro-F1</div></div>
+        <div class="stat-kart"><div class="deger" id="oParam">–</div><div class="ad">parametre</div></div>
+        <div class="stat-kart"><div class="deger" id="oSure">–</div><div class="ad">süre</div></div>
+      </div>
+      <div id="mimari" class="ipucu" style="margin-top:8px;font-size:11px"></div>
+    </div>
+    <div class="kart gizli" id="matrisKart">
+      <h3>🎯 Karışıklık matrisi — doğrulama dilimi (%15, katmanlı) <small>satır: gerçek · sütun: tahmin</small></h3>
+      <div style="overflow-x:auto"><table class="matris" id="matrisTablo"></table></div>
+    </div>
+    <div class="kart gizli" id="metrikKart">
+      <h3>🌳 Tür bazlı başarım</h3>
+      <table class="istat" id="metrikTablo"></table>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="durum">
+  <span id="altBaglanti">bağlı değil</span>
+  <span id="altHavuz"></span>
+  <span class="bosluk"></span>
+  <span id="altNot">tohum=42 · veriler bilgisayarınızda kalır</span>
+</footer>
+
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -185,8 +267,9 @@ function durumYaz(no, metin, tamam){
 }
 const adres = () => $('adres').value.replace(/\/+$/, '');
 const sayiTR = x => Number(x).toLocaleString('tr-TR');
+const yuzde = x => (x * 100).toFixed(1).replace('.', ',') + '%';
 
-let BAGLI = false, VERI = null, IZLEYICI = null, GECMIS = [];
+let BAGLI = false, VERI = null, IZLEYICI = null, GECMIS = [], RAPOR = null;
 
 async function baglan(){
   try{
@@ -195,40 +278,46 @@ async function baglan(){
     durumYaz(1, '✓ bağlı', true);
     let bilgi = '✓ Sunucu hazır.';
     if (d.modelHazir)
-      bilgi += ' Kayıtlı model yüklü: <b>' + sayiTR(d.parametre) + ' parametre</b>' +
-        (d.siniflar && d.siniflar.length ? ' (' + d.siniflar.join(' · ') + ')' : '') + '.';
-    if (d.havuz && d.havuz.n)
-      bilgi += ' Kayıtlı havuz: <b>' + sayiTR(d.havuz.n) + ' örnek</b>.';
+      bilgi += ' Kayıtlı model: <b>' + sayiTR(d.parametre) + ' parametre</b>' +
+        (d.siniflar.length ? ' (' + d.siniflar.join(' · ') + ')' : '') + '.';
     $('baglantiBilgi').innerHTML = bilgi;
     $('baglantiBilgi').className = 'basari';
+    $('ustModel').textContent = d.modelHazir
+      ? 'model: ' + sayiTR(d.parametre) + ' parametre' : 'model: yok';
+    $('altBaglanti').textContent = '🔌 ' + adres();
+    $('altHavuz').textContent = d.havuz && d.havuz.n
+      ? '💾 havuz: ' + sayiTR(d.havuz.n) + ' örnek / ' + d.havuz.siniflar.length + ' sınıf' : '';
     $('adim2').open = true;
     havuzGoster(d.havuz);
     guncelle(d);
     if (d.egitimde) izlemeyeBasla();
+    else if (d.modelHazir) raporYukle();
   }catch(e){
     BAGLI = false;
     durumYaz(1, 'bağlanamadı');
-    $('baglantiBilgi').textContent = '✗ Bağlanılamadı — cam_ai.exe çalışıyor mu? Konsol penceresi açık kalmalı.';
+    $('baglantiBilgi').textContent = '✗ Bağlanılamadı — cam_ai.exe çalışıyor mu? (Konsol penceresi açık kalmalı.)';
     $('baglantiBilgi').className = 'hata';
+    $('altBaglanti').textContent = 'bağlı değil';
     guncelle(null);
   }
 }
 $('btnBaglan').addEventListener('click', baglan);
 
 function havuzGoster(h){
-  if (!h) return;
-  const var_ = h.n > 0;
-  goster($('havuzKutu'), var_ || true);
-  if (!var_){
+  goster($('havuzKutu'), true);
+  if (!h || !h.n){
     $('havuzTablo').innerHTML = '<tr><td style="color:var(--ink2)">Havuz henüz boş — ilk verinizi bırakın.</td></tr>';
-  } else {
-    $('havuzTablo').innerHTML = '<tr><th>Sınıf</th><th>Örnek</th></tr>' +
-      h.siniflar.map(s => '<tr><td></td><td>' + sayiTR(s.n) + '</td></tr>').join('');
-    [...$('havuzTablo').querySelectorAll('td:first-child')].slice(0).forEach((td, i) => {
-      if (h.siniflar[i]) td.textContent = h.siniflar[i].ad;
-    });
-    durumYaz(2, '✓ ' + sayiTR(h.n) + ' örnek kayıtlı', true);
+    return;
   }
+  const toplam = h.n;
+  $('havuzTablo').innerHTML = '<tr><th>Sınıf</th><th>Örnek</th><th>Pay</th></tr>' +
+    h.siniflar.map(() => '<tr><td></td><td></td><td></td></tr>').join('');
+  [...$('havuzTablo').querySelectorAll('tr')].slice(1).forEach((tr, i) => {
+    tr.children[0].textContent = h.siniflar[i].ad;
+    tr.children[1].textContent = sayiTR(h.siniflar[i].n);
+    tr.children[2].textContent = yuzde(h.siniflar[i].n / toplam);
+  });
+  durumYaz(2, '✓ ' + sayiTR(h.n) + ' örnek kayıtlı', true);
 }
 
 function guncelle(d){
@@ -236,10 +325,11 @@ function guncelle(d){
   $('btnEgit').disabled = !(BAGLI && (VERI || havuzDolu));
   $('btnModelIndir').disabled = !(BAGLI && d && d.modelHazir);
   $('btnHizliTest').disabled = !(BAGLI && VERI && d && d.modelHazir);
+  $('btnTezRapor').disabled = !RAPOR;
   if (d && d.modelHazir) durumYaz(4, '✓ model hazır', true);
 }
 
-/* ---- veri: Çam-AI proje dosyası ya da düz {d,K,X,y} ---- */
+/* ---- veri ---- */
 const birak = $('birak');
 birak.addEventListener('click', () => $('dosya').click());
 birak.addEventListener('dragover', e => { e.preventDefault(); birak.classList.add('ustunde'); });
@@ -280,8 +370,8 @@ async function veriOku(dosya){
     VERI.y.forEach(c => sayim[c]++);
     vb.className = 'basari';
     vb.innerHTML = '✓ <b>' + dosya.name + '</b> — ' + sayiTR(VERI.y.length) + ' örnek · ' +
-      VERI.d + ' öznitelik · ' + VERI.siniflar.map((s, c) => s + ' (' + sayim[c] + ')').join(' · ') +
-      '<br><small>Eğitim başlayınca bu örnekler kalıcı havuza eklenecek.</small>';
+      VERI.d + ' öznitelik<br>' + VERI.siniflar.map((s, c) => s + ' (' + sayim[c] + ')').join(' · ') +
+      '<br><small>Eğitim başlayınca kalıcı havuza eklenecek.</small>';
     goster(vb, true);
     $('adim3').open = true;
     durumYaz(2, '✓ yeni veri hazır', true);
@@ -293,7 +383,6 @@ async function veriOku(dosya){
   }
   baglan();
 }
-
 $('btnHavuzBosalt').addEventListener('click', async () => {
   if (!confirm('Bilgisayardaki kayıtlı eğitim havuzu (cam_ai_havuz.json) silinsin mi?')) return;
   await fetch(adres() + '/havuz/bosalt', { method: 'POST' }).catch(() => {});
@@ -301,9 +390,13 @@ $('btnHavuzBosalt').addEventListener('click', async () => {
 });
 
 /* ---- eğitim ---- */
+let egitimBaslangici = 0;
 $('btnEgit').addEventListener('click', async () => {
   goster($('egitHata'), false);
   goster($('egitSonuc'), false);
+  goster($('matrisKart'), false);
+  goster($('metrikKart'), false);
+  RAPOR = null;
   GECMIS = [];
   const govde = {
     ayarlar: {
@@ -322,6 +415,7 @@ $('btnEgit').addEventListener('click', async () => {
       body: JSON.stringify(govde)
     })).json();
     if (y.hata) throw new Error(y.hata);
+    egitimBaslangici = performance.now();
     durumYaz(3, 'eğitiliyor…');
     izlemeyeBasla();
   }catch(h){
@@ -334,10 +428,10 @@ $('btnDurdur').addEventListener('click', () =>
 
 function izlemeyeBasla(){
   clearInterval(IZLEYICI);
+  goster($('sahneBos'), false);
+  goster($('sahneIc'), true);
   goster($('btnDurdur'), true);
   goster($('egitIlerlemeKutu'), true);
-  goster($('grafik'), true);
-  goster($('ozet'), true);
   IZLEYICI = setInterval(async () => {
     try{
       const d = await (await fetch(adres() + '/durum')).json();
@@ -345,31 +439,77 @@ function izlemeyeBasla(){
         GECMIS.push({ epoch: d.epoch, kayip: d.kayip, valF1: d.valF1 });
       $('egitCubuk').style.width = Math.round(100 * d.epoch / Math.max(1, d.enCokDevir)) + '%';
       $('egitYazi').textContent = 'epoch ' + d.epoch + '/' + d.enCokDevir +
-        ' · kayıp ' + d.kayip.toFixed(3) + ' · doğrulama F1 ' + (d.valF1 * 100).toFixed(1) + '%';
+        ' · kayıp ' + d.kayip.toFixed(3) + ' · doğrulama F1 ' + yuzde(d.valF1);
       $('oEpoch').textContent = d.epoch;
       $('oKayip').textContent = d.kayip.toFixed(3);
-      $('oF1').textContent = (d.valF1 * 100).toFixed(1) + '%';
+      $('oF1').textContent = yuzde(d.valF1);
       $('oParam').textContent = sayiTR(d.parametre);
+      $('oSure').textContent = egitimBaslangici
+        ? Math.round((performance.now() - egitimBaslangici) / 1000) + ' sn' : '–';
       $('mimari').textContent = '🧠 Katmanlar: ' + (d.boyut || []).join(' → ') +
+        ' · ReLU + BatchNorm + Dropout 0,2 · Adam + kosinüs çizelge · erken durdurma' +
         ' · eğitim ' + d.nEgitim + ' / doğrulama ' + d.nDogrulama + ' örnek · tohum=42';
-      goster($('mimari'), true);
       grafikCiz();
       if (!d.egitimde && d.epoch > 0){
         clearInterval(IZLEYICI);
         goster($('btnDurdur'), false);
         goster($('egitIlerlemeKutu'), false);
-        durumYaz(3, '✓ F1 ' + (d.enIyiF1 * 100).toFixed(1) + '%', true);
+        durumYaz(3, '✓ F1 ' + yuzde(d.enIyiF1), true);
         $('egitSonuc').innerHTML = '🏆 Eğitim bitti — en iyi doğrulama makro-F1: <b>' +
-          (d.enIyiF1 * 100).toFixed(2) + '%</b> (epoch ' + d.enIyiEpoch + ').<br>' +
-          '💾 Öğrenilenler bilgisayara kaydedildi: <code>cam_ai_model.bin</code> + ' +
-          '<code>cam_ai_havuz.json</code> (exe\'nin yanında). Sunucuyu kapatıp açsanız bile ' +
-          'model ve havuz otomatik geri yüklenir.';
+          yuzde(d.enIyiF1) + '</b> (epoch ' + d.enIyiEpoch + ').' +
+          '<br>💾 Öğrenilenler kaydedildi: <code>cam_ai_model.bin</code> + <code>cam_ai_havuz.json</code>.';
         goster($('egitSonuc'), true);
         $('adim4').open = true;
+        await raporYukle();
         baglan();
       }
     }catch(e){ /* geçici ağ hatası — sonraki turda dener */ }
   }, 800);
+}
+
+async function raporYukle(){
+  try{
+    const r = await (await fetch(adres() + '/rapor')).json();
+    if (!r || !r.siniflar) return;
+    RAPOR = r;
+    goster($('sahneBos'), false);
+    goster($('sahneIc'), true);
+    if (!GECMIS.length && Array.isArray(r.gecmis)) GECMIS = r.gecmis;
+    $('oEpoch').textContent = r.gecmis.length;
+    $('oKayip').textContent = r.gecmis.length ? r.gecmis[r.gecmis.length - 1].kayip.toFixed(3) : '–';
+    $('oF1').textContent = yuzde(r.makroF1);
+    $('oParam').textContent = sayiTR(r.parametre);
+    $('oSure').textContent = Math.round(r.sureSn) + ' sn';
+    $('mimari').textContent = '🧠 Katmanlar: ' + r.boyut.join(' → ') +
+      ' · eğitim ' + r.nEgitim + ' / doğrulama ' + r.nDogrulama + ' örnek · tohum=' + r.tohum +
+      ' · ' + r.zaman;
+    grafikCiz();
+    /* karışıklık matrisi */
+    const K = r.siniflar.length;
+    const kisa = s => s.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim().slice(0, 9);
+    let html = '<tr><th></th>' + r.siniflar.map(s => '<th title="' + s + '">' + kisa(s) + '</th>').join('') + '</tr>';
+    for (let c = 0; c < K; c++){
+      html += '<tr><th style="text-align:left" title="' + r.siniflar[c] + '">' + kisa(r.siniflar[c]) + '</th>';
+      for (let c2 = 0; c2 < K; c2++){
+        const v = r.matris[c][c2];
+        html += '<td class="' + (c === c2 ? 'kose' : (v ? 'hatali' : '')) + '">' + v + '</td>';
+      }
+      html += '</tr>';
+    }
+    $('matrisTablo').innerHTML = html;
+    goster($('matrisKart'), true);
+    /* tür metrikleri */
+    $('metrikTablo').innerHTML = '<tr><th>Tür</th><th>Precision</th><th>Recall</th><th>F1</th><th>Örnek</th></tr>' +
+      r.siniflar.map((s, c) => {
+        const m = r.sinifMetrik[c];
+        return '<tr><td>' + s + '</td><td>' + yuzde(m.p) + '</td><td>' + yuzde(m.r) +
+          '</td><td><b>' + yuzde(m.f1) + '</b></td><td>' + m.destek + '</td></tr>';
+      }).join('') +
+      '<tr><td><b>Makro ortalama</b></td><td colspan="2"></td><td><b>' + yuzde(r.makroF1) +
+      '</b></td><td>doğruluk ' + yuzde(r.dogruluk) + '</td></tr>';
+    goster($('metrikKart'), true);
+    $('btnTezRapor').disabled = false;
+  }catch(e){ /* rapor yoksa sessiz geç */ }
 }
 
 function grafikCiz(){
@@ -378,7 +518,7 @@ function grafikCiz(){
   const stil = getComputedStyle(document.documentElement);
   ctx.clearRect(0, 0, W, H);
   if (!GECMIS.length) return;
-  const kb = { sol: 38, sag: 10, ust: 18, alt: 20 };
+  const kb = { sol: 42, sag: 12, ust: 12, alt: 24 };
   const n = GECMIS.length;
   const enK = Math.max(...GECMIS.map(g => g.kayip), 1e-6);
   const ex = i => kb.sol + (n <= 1 ? 0 : i / (n - 1)) * (W - kb.sol - kb.sag);
@@ -386,6 +526,14 @@ function grafikCiz(){
   const eyF = v => H - kb.alt - v * (H - kb.alt - kb.ust);
   ctx.strokeStyle = stil.getPropertyValue('--line');
   ctx.strokeRect(kb.sol, kb.ust, W - kb.sol - kb.sag, H - kb.alt - kb.ust);
+  ctx.fillStyle = stil.getPropertyValue('--ink2');
+  ctx.font = '10px sans-serif';
+  for (let t = 0; t <= 4; t++){
+    ctx.textAlign = 'right';
+    ctx.fillText((t * 25) + '%', kb.sol - 5, eyF(t / 4) + 3);
+  }
+  ctx.textAlign = 'center';
+  ctx.fillText('epoch (' + n + ')', (kb.sol + W - kb.sag) / 2, H - 6);
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#c4553f';
   ctx.beginPath();
@@ -395,12 +543,70 @@ function grafikCiz(){
   ctx.beginPath();
   GECMIS.forEach((g, i) => i ? ctx.lineTo(ex(i), eyF(g.valF1)) : ctx.moveTo(ex(0), eyF(g.valF1)));
   ctx.stroke();
-  ctx.font = '11px sans-serif';
-  ctx.fillStyle = '#c4553f';
-  ctx.fillText('eğitim kaybı', kb.sol + 6, kb.ust + 13);
-  ctx.fillStyle = stil.getPropertyValue('--accent');
-  ctx.fillText('doğrulama makro-F1', kb.sol + 92, kb.ust + 13);
 }
+
+/* ---- tez raporu (TXT) ---- */
+$('btnTezRapor').addEventListener('click', () => {
+  const r = RAPOR;
+  if (!r) return;
+  const m = [];
+  const hiza = (a, g) => (a + ' '.repeat(g)).slice(0, g);
+  m.push('ÇAM-AI C++ DERİN YSA — TEZ EĞİTİM RAPORU');
+  m.push('Tarih: ' + r.zaman + '   Süre: ' + Math.round(r.sureSn) + ' sn');
+  m.push('='.repeat(56));
+  m.push('');
+  m.push('MODEL');
+  m.push('  Mimari           : ' + r.boyut.join(' → ') + ' (MLP)');
+  m.push('  Parametre sayısı : ' + r.parametre.toLocaleString('tr-TR'));
+  m.push('  Bileşenler       : ReLU + BatchNorm + Dropout ' + r.ayarlar.dropout +
+    ' + Adam + kosinüs öğrenme çizelgesi + L2 ' + r.ayarlar.l2);
+  m.push('  Erken durdurma   : sabır ' + r.ayarlar.sabir + ' epoch, ölçüt doğrulama makro-F1' +
+    (r.durduruldu ? ' (elle durduruldu)' : ''));
+  m.push('  Tekrarlanabilirlik: tohum=' + r.tohum + ' (ağırlık başlatma + karıştırma + bölme)');
+  m.push('');
+  m.push('EĞİTİM AYARLARI');
+  m.push('  En çok epoch     : ' + r.ayarlar.enCokDevir + '   (gerçekleşen: ' + r.gecmis.length +
+    ', en iyi: ' + r.enIyiEpoch + ')');
+  m.push('  Parti boyu       : ' + r.ayarlar.parti);
+  m.push('  Öğrenme hızı     : ' + r.ayarlar.hiz);
+  m.push('');
+  m.push('VERİ (kalıcı havuz, sınıf adına göre birleşik)');
+  m.push('  Eğitim/Doğrulama : ' + r.nEgitim + ' / ' + r.nDogrulama + ' örnek (%15 katmanlı bölme)');
+  m.push('');
+  m.push('DOĞRULAMA SONUÇLARI');
+  m.push('  Makro-F1         : ' + (r.makroF1 * 100).toFixed(2) + '%');
+  m.push('  Doğruluk         : ' + (r.dogruluk * 100).toFixed(2) + '%');
+  m.push('');
+  m.push('  ' + hiza('Tür', 22) + hiza('Precision', 11) + hiza('Recall', 11) +
+    hiza('F1', 11) + 'Örnek');
+  m.push('  ' + '-'.repeat(58));
+  r.siniflar.forEach((s, c) => {
+    const k = r.sinifMetrik[c];
+    m.push('  ' + hiza(s, 22) + hiza((k.p * 100).toFixed(2) + '%', 11) +
+      hiza((k.r * 100).toFixed(2) + '%', 11) + hiza((k.f1 * 100).toFixed(2) + '%', 11) + k.destek);
+  });
+  m.push('');
+  m.push('KARIŞIKLIK MATRİSİ (satır: gerçek, sütun: tahmin)');
+  m.push('  ' + hiza('', 22) + r.siniflar.map(s => hiza(s.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim().slice(0, 9), 10)).join(''));
+  r.siniflar.forEach((s, c) => {
+    m.push('  ' + hiza(s.slice(0, 21), 22) + r.matris[c].map(v => hiza(String(v), 10)).join(''));
+  });
+  m.push('');
+  m.push('EPOCH GEÇMİŞİ (ilk 5 + son 5)');
+  const g = r.gecmis;
+  const secilenler = g.length <= 10 ? g : g.slice(0, 5).concat(g.slice(-5));
+  secilenler.forEach(e => m.push('  epoch ' + hiza(String(e.epoch), 5) +
+    ' kayıp ' + e.kayip.toFixed(4) + '   doğrulama F1 ' + (e.valF1 * 100).toFixed(2) + '%'));
+  m.push('');
+  m.push('NOT: Bu model, tarayıcı içi Çam-AI (klasik ML / küçük YSA) sonuçlarıyla ve');
+  m.push('YOLOv8-seg ile aynı tabloda "büyük kapasiteli MLP" karşılaştırması olarak kullanılabilir.');
+  const dosyaAdi = 'cam_ai_10m_tez_raporu.txt';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([m.join('\n')], { type: 'text/plain;charset=utf-8' }));
+  a.download = dosyaAdi;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+});
 
 /* ---- model + hızlı test ---- */
 $('btnModelIndir').addEventListener('click', () => {
@@ -441,7 +647,6 @@ $('btnHizliTest').addEventListener('click', async () => {
       body: JSON.stringify({ X })
     })).json();
     if (y.hata) throw new Error(y.hata);
-    /* sunucu sınıf ADLARIYLA eşleştir (havuz sırası yükleme sırasından farklı olabilir) */
     const adEsle = new Map((y.sinifAdlari || []).map((ad, i) => [ad, i]));
     let dogru = 0, esli = 0;
     idx.forEach((i, s) => {

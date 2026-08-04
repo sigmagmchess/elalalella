@@ -40,6 +40,8 @@
 #include <algorithm>
 #include <sstream>
 #include <fstream>
+#include <chrono>
+#include <ctime>
 
 // Öğrenilenler exe'nin yanındaki bu dosyalara kalıcı yazılır:
 static const char* HAVUZ_DOSYA = "cam_ai_havuz.json";   // birikimli eğitim verisi
@@ -369,6 +371,7 @@ struct Durum {
   std::vector<std::string> siniflar;
   Havuz havuz;
   std::string gecmisJson = "[]";
+  std::string raporJson = "null";        // son eğitimin tez raporu (JSON)
   std::string sonHata;
   int nE = 0, nV = 0;
 } G;
@@ -462,6 +465,7 @@ static double makroF1(const std::vector<long long>& M, int K){
 static void egitimCalistir(std::vector<float> X, std::vector<int> y, int n, int d, int K,
                            long long hedefParam, int enCokDevir, float hiz, float l2,
                            int parti, float dropout, int sabir){
+  const auto baslamaAni = std::chrono::steady_clock::now();
   std::mt19937 rng(42);
   std::mt19937 rngDrop(1042);
   {
@@ -794,11 +798,60 @@ static void egitimCalistir(std::vector<float> X, std::vector<int> y, int n, int 
     M.W = enIyi.W; M.gamma = enIyi.gamma; M.beta = enIyi.beta;
     M.runM = enIyi.runM; M.runV = enIyi.runV; M.Ws = enIyi.Ws; M.bs = enIyi.bs;
   }
+  /* en iyi ağırlıklarla son doğrulama ölçümü → tez raporu */
+  auto [sonValKayip, sonValF1] = valOlc(Mkar);
+  (void)sonValKayip;
+  double sureSn = std::chrono::duration<double>(
+    std::chrono::steady_clock::now() - baslamaAni).count();
   {
     std::lock_guard<std::mutex> kilit(G.kilit);
     G.gecmisJson += "]";
     modelDosyayaKaydet();                 // öğrenilen model bilgisayara kalıcı yazılır
+    /* rapor JSON */
+    char zaman[64];
+    time_t simdi = time(nullptr);
+    strftime(zaman, sizeof(zaman), "%Y-%m-%d %H:%M", localtime(&simdi));
+    std::ostringstream o;
+    o << "{\"zaman\":\"" << zaman << "\",\"sureSn\":" << sureSn
+      << ",\"tohum\":42,\"parametre\":" << M.parametre
+      << ",\"boyut\":[";
+    for (size_t i = 0; i < M.boyut.size(); i++) o << (i ? "," : "") << M.boyut[i];
+    o << "],\"ayarlar\":{\"hedefParam\":" << hedefParam << ",\"enCokDevir\":" << enCokDevir
+      << ",\"hiz\":" << hiz << ",\"l2\":" << l2 << ",\"parti\":" << parti
+      << ",\"dropout\":" << dropout << ",\"sabir\":" << sabir << "}"
+      << ",\"nEgitim\":" << G.nE << ",\"nDogrulama\":" << G.nV
+      << ",\"enIyiEpoch\":" << G.enIyiEpoch
+      << ",\"durduruldu\":" << (G.durdurIstek ? "true" : "false")
+      << ",\"siniflar\":[";
+    for (size_t i = 0; i < G.siniflar.size(); i++)
+      o << (i ? "," : "") << '"' << jsonKacis(G.siniflar[i]) << '"';
+    o << "],\"matris\":[";
+    for (int c = 0; c < K; c++){
+      o << (c ? ",[" : "[");
+      for (int c2 = 0; c2 < K; c2++) o << (c2 ? "," : "") << Mkar[(size_t)c * K + c2];
+      o << "]";
+    }
+    o << "],\"sinifMetrik\":[";
+    long long dogru = 0, toplam = 0;
+    for (int c = 0; c < K; c++){
+      long long tp = Mkar[(size_t)c * K + c], fp = 0, fn = 0;
+      for (int c2 = 0; c2 < K; c2++){
+        toplam += Mkar[(size_t)c * K + c2];
+        if (c2 != c){ fp += Mkar[(size_t)c2 * K + c]; fn += Mkar[(size_t)c * K + c2]; }
+      }
+      dogru += tp;
+      double p = tp + fp > 0 ? (double)tp / (tp + fp) : 0;
+      double r = tp + fn > 0 ? (double)tp / (tp + fn) : 0;
+      double f1 = p + r > 0 ? 2 * p * r / (p + r) : 0;
+      o << (c ? "," : "") << "{\"p\":" << p << ",\"r\":" << r << ",\"f1\":" << f1
+        << ",\"destek\":" << (tp + fn) << "}";
+    }
+    o << "],\"makroF1\":" << sonValF1
+      << ",\"dogruluk\":" << (toplam ? (double)dogru / toplam : 0)
+      << ",\"gecmis\":" << G.gecmisJson << "}";
+    G.raporJson = o.str();
   }
+  G.valF1 = sonValF1;
   G.modelHazir = true;
   G.modelDosyadan = false;
   G.egitimde = false;
@@ -978,6 +1031,9 @@ static void istemciIsle(soket_t s){
           ",\"havuzdan\":" + (sadeceBu ? "false" : "true") + "}");
       }
     }
+  } else if (basliyorMu("GET /rapor")){
+    std::lock_guard<std::mutex> kilit(G.kilit);
+    yanit(s, 200, "application/json", G.raporJson);
   } else if (basliyorMu("GET /havuz")){
     std::lock_guard<std::mutex> kilit(G.kilit);
     auto sayim = G.havuz.sayimlar();

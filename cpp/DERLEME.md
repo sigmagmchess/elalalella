@@ -34,8 +34,11 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
 3. Çam-AI uygulamasında etiketleyin → **📚 Örnekleri havuza ekle** →
    **💾 Projeyi kaydet** → çıkan `*_proje.json` dosyasını köprüye bırakın →
    **🧠 Eğitimi Başlat**. Canlı kayıp/F1 grafiği köprüde; ⏹ Durdur ile
-   erken kesebilirsiniz (en iyi ağırlıklar korunur). Bitince **💾 Modeli indir**
-   (`cam_ai_10m.bin`, ~38 MB).
+   erken kesebilirsiniz (en iyi ağırlıklar korunur). Bitince sahnede
+   **karışıklık matrisi** ve **tür bazlı Precision/Recall/F1** tablosu görünür;
+   **🎓 Tez raporu (TXT)** düğmesi tarihli, tekrarlanabilir (tohum=42) bir eğitim
+   raporu indirir. **💾 Modeli indir** (`cam_ai_10m.bin`, ~38 MB) yedek almak içindir —
+   model zaten diske otomatik kaydedilir.
 
 ## Kendi HTML'inizden bağlanmak
 
@@ -54,7 +57,9 @@ const y = await (await fetch('http://localhost:8787/tahmin', {
 
 Uçlar: `GET /durum` · `POST /egit` · `POST /durdur` · `POST /tahmin` ·
 `GET /model` (bin indir) · `POST /model` (bin yükle) ·
-`GET /havuz` (kayıtlı havuz özeti) · `POST /havuz/bosalt`.
+`GET /havuz` (kayıtlı havuz özeti) · `POST /havuz/bosalt` ·
+`GET /rapor` (son eğitimin tam tez raporu: ayarlar, epoch geçmişi,
+karışıklık matrisi, tür bazlı P/R/F1, makro-F1, süre — JSON).
 
 ## Kalıcı öğrenme (yeni)
 
