@@ -57,8 +57,25 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
 
 Model her eğitim sonunda `cam_ai_model.bin` olarak diske kaydedilir; sonraki
 açılışta **Adım 0 → "📥 Sunucudaki kayıtlı modeli kullan"** ile eğitimsiz devam
-edersiniz. Sunucu havuzu (`cam_ai_havuz.json`) her eğitimde o eğitimin
-verisiyle eşitlenir; etiketlerin/havuzun tam yedeği için 💾 Proje dosyasını kullanın.
+edersiniz.
+
+## Dosyalar arasında geçiş — hangi dosya ne işe yarar
+
+| Dosya | Nerede oluşur | Ne yapar |
+|---|---|---|
+| `*_proje.json` | Adım 5 → 💾 Projeyi kaydet | Etiketleriniz (fırça vuruşları), sınıflar, ayarlar ve **veri havuzunuz**. Yedek ve devam dosyanız budur. |
+| `cam_ai_havuz.json` | `cam_ai.exe`'nin yanında, kendiliğinden | Sunucuda biriken ham eğitim örnekleri. **Adım 5 → 📥 Proje yükle** ile bu dosyayı da açabilirsiniz: örnekler uygulamanın havuzuna gelir, görüntü yüklemeden bile yeniden eğitebilirsiniz. |
+| `cam_ai_model.bin` | `cam_ai.exe`'nin yanında, kendiliğinden | Eğitilmiş ağırlıklar (+ sınıf adları ve örnek penceresi). Açılışta otomatik yüklenir; taşımak için Adım 5'ten indirilebilir. |
+
+**Proje dosyasını açma sırası önemsizdir:** görüntüden önce açarsanız uygulama
+projeyi bekletir ve doğru görüntüyü yüklediğiniz anda etiketler kendiliğinden
+yerleşir (Adım 1'de turuncu bir not bunu hatırlatır). Kaydedilen işleme
+çözünürlüğü de geri yüklenir — etiketlerin piksel piksel oturması için bu şart.
+
+Not: "Sınıf başına örnek" sınırı nedeniyle eğitime yalnızca bir altörneklem
+gidiyorsa sunucudaki birikmiş havuza dokunulmaz (verileriniz korunur); tüm veri
+gönderiliyorsa sunucu havuzu onunla eşitlenir. Havuzun tamamıyla eğitmek için
+bu seçeneği **"Tümü"** yapın.
 
 ## Kendi HTML'inizden bağlanmak
 

@@ -304,6 +304,7 @@ textarea.rapor{
         <small>GeoTIFF ortomozaik (<code>.tif</code>), DSM/DTM (<code>.tif</code>), <code>.jpg</code>, <code>.png</code></small>
       </div>
       <input type="file" id="dosyaGirdi" accept=".tif,.tiff,.jpg,.jpeg,.png,image/tiff,image/jpeg,image/png" class="gizli">
+      <div id="bekleyenProjeNot" class="uyari gizli" style="font-size:12px"></div>
       <div class="satir">
         <label for="secCozunurluk">İşleme çözünürlüğü:</label>
         <select id="secCozunurluk">
@@ -397,8 +398,9 @@ textarea.rapor{
           <option value="500">500</option>
           <option value="1000" selected>1000</option>
           <option value="2000">2000</option>
-          <option value="4000">4000 (yavaş)</option>
-          <option value="8000">8000 (çok yavaş)</option>
+          <option value="4000">4000</option>
+          <option value="8000">8000</option>
+          <option value="100000000">Tümü (havuzun tamamı)</option>
         </select>
       </div>
       <div class="satir">
@@ -2733,6 +2735,7 @@ const D = {
   tacCalisPx: 12,
   gizliSiniflar: new Set(),
   havuz: [],               // çoklu eğitim: {ad, yama, n, sayimlar, X24, y, gsd}
+  bekleyenProje: null,     // görüntüden önce açılan proje — görüntü gelince etiketler yerleşir
   mesgul: false,
   imlec: null              // {ekranX, ekranY, imgX, imgY}
 };
@@ -3039,6 +3042,28 @@ function gorselKur(g){
   sinifListesiCiz();
   lejantCiz();
   sigdir();
+  bekleyenProjeyiUygula();     // görüntüden önce açılmış bir proje varsa etiketleri şimdi yerleşir
+}
+
+/* Proje görüntüden ÖNCE açıldıysa etiketler burada geri gelir (sıra artık önemsiz) */
+function bekleyenProjeyiUygula(){
+  const p = D.bekleyenProje;
+  if (!p || !D.gorsel) return;
+  const o = p.gorselOzet;
+  if (o && (D.gorsel.outW !== o.outW || D.gorsel.outH !== o.outH)){
+    $('durumBilgi').textContent = '⚠️ Bekleyen proje bu görüntüye uymuyor — proje ' +
+      o.outW + '×' + o.outH + ' px için kaydedilmiş, bu görüntü ' +
+      D.gorsel.outW + '×' + D.gorsel.outH + ' px. İşleme çözünürlüğünü ' +
+      (p.ayarlar && p.ayarlar.cozunurluk ? p.ayarlar.cozunurluk : '?') +
+      ' yapıp görüntüyü yeniden yükleyin.';
+    return;
+  }
+  D.vuruslar = (p.vuruslar || []).map(v =>
+    ({ ...v, noktalar: v.noktalar ? v.noktalar.slice() : undefined }));
+  maskeyiYenidenKur();
+  D.bekleyenProje = null;
+  goster($('bekleyenProjeNot'), false);
+  $('durumBilgi').textContent = '✓ Proje etiketleri yerleştirildi (' + D.vuruslar.length + ' vuruş).';
 }
 
 /* =====================================================================
@@ -3345,7 +3370,9 @@ function etiketDurumGuncelle(){
   for (let c = 0; c < D.siniflar.length; c++)
     if (sayim[c] >= 30 || (havuzSayim[c] || 0) >= 10) doluBirlesik++;
   const onceKapali = $('btnEgit').disabled;
-  $('btnEgit').disabled = !(D.gorsel && doluBirlesik >= 2) || D.mesgul;
+  /* görüntü olmadan da eğitilebilir: havuzda (ör. sunucudan içe aktarılan) yeterli veri varsa */
+  const havuzYeter = D.havuz.length && havuzSayim.filter(s => s >= 10).length >= 2;
+  $('btnEgit').disabled = !((D.gorsel && doluBirlesik >= 2) || havuzYeter) || D.mesgul;
   $('btnHavuzaEkle').disabled = !(D.gorsel && sayim.some(s => s >= 30)) || D.mesgul;
   if (onceKapali && !$('btnEgit').disabled && !D.egitim) $('adim3').open = true;
   if (doluSinif >= 2) durumYaz(2, '✓ ' + sayiTR(sayim.reduce((a, b) => a + b, 0)) + ' px', true);
@@ -3855,6 +3882,14 @@ async function cppBaglan(){
   }
 }
 $('btnCppBaglan').addEventListener('click', cppBaglan);
+/* adres tarayıcıda hatırlanır — özel port kullananlar her açılışta yeniden yazmasın */
+try{
+  const kayitli = localStorage.getItem('camAiAdres');
+  if (kayitli) $('cppAdres').value = kayitli;
+  $('cppAdres').addEventListener('change', () => {
+    try{ localStorage.setItem('camAiAdres', $('cppAdres').value.trim()); }catch(_e){}
+  });
+}catch(_e){ /* dosya:// kısıtlaması — sorun değil */ }
 
 function cppGrafikCiz(){
   const knv = $('cppGrafik'), ctx = knv.getContext('2d');
@@ -3915,7 +3950,7 @@ function cppMatrisGoster(r){
 }
 
 $('btnEgit').addEventListener('click', async () => {
-  if (D.mesgul || !D.gorsel) return;
+  if (D.mesgul || !(D.gorsel || D.havuz.length)) return;   // havuz doluysa görüntüsüz de eğitilir
   const K = D.siniflar.length;
   const hataEl = $('egitHata');
   goster(hataEl, false);
@@ -3945,7 +3980,7 @@ $('btnEgit').addEventListener('click', async () => {
   try{
     const baslangic = performance.now();
     const sayimSimdi = sinifSayimlari();
-    const guncel = sayimSimdi.some(s => s > 0)
+    const guncel = (D.gorsel && sayimSimdi.some(s => s > 0))
       ? ornekleriTopla(yama, sinifBasina)
       : { X24: new Float32Array(0), y: new Int32Array(0), n: 0, sayimlar: new Array(K).fill(0) };
     const veri = egitimVerisiBirlestir(guncel, sinifBasina, K);
@@ -3962,7 +3997,10 @@ $('btnEgit').addEventListener('click', async () => {
     goster($('kazananKart'), false);
     goster($('cppMatrisKutu'), false);
     ilerlemeKur(kutu, cubuk, yazi, 0.04, sayiTR(veri.n) + ' örnek sunucuya gönderiliyor…');
-    await fetch(kok + '/havuz/bosalt', { method: 'POST' });  // sunucu havuzu bu eğitimin verisiyle eşitlenir
+    /* Altörnekleme yapıldıysa sunucunun kalıcı havuzuna DOKUNMA (yoksa oradaki tam veri
+       altörneklemle değişir ve birikmiş örnekler kaybolur); tam veri gidiyorsa eşitle. */
+    const tamVeri = veri.n >= (havuzOzeti().n + (guncel.n || 0));
+    if (tamVeri) await fetch(kok + '/havuz/bosalt', { method: 'POST' });
     const enCokDevir = Math.max(5, Math.min(1000, parseInt($('cppDevir').value, 10) || 120));
     const yanit = await (await fetch(kok + '/egit', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3970,6 +4008,7 @@ $('btnEgit').addEventListener('click', async () => {
         d: OZELLIK_SAYISI, K, siniflar: D.siniflar.map(s => s.ad),
         X: Array.from(veri.X24, v => Math.round(v * 1e5) / 1e5),
         y: Array.from(veri.y), yama,
+        sadeceBu: !tamVeri,
         ayarlar: { hedefParam: +$('secCppHedef').value || 1e7, enCokDevir }
       })
     })).json();
@@ -4014,7 +4053,7 @@ $('btnEgit').addEventListener('click', async () => {
       parametre: d.parametre, boyut: (d.boyut || []).slice(),
       enIyi: { ad: 'C++ Derin YSA (' + sayiTR(d.parametre) + ' parametre)',
                kume: 'Tüm ipuçları (36)', yama, cv: null },
-      gsdCalisma: (D.gorsel.geo && !D.gorsel.geo.cografi)
+      gsdCalisma: (D.gorsel && D.gorsel.geo && !D.gorsel.geo.cografi)
         ? D.gorsel.geo.sx * D.gorsel.olcek
         : (D.havuz.length ? D.havuz[0].gsd : null)
     };
@@ -4044,7 +4083,7 @@ $('btnEgit').addEventListener('click', async () => {
     goster($('ozellikKutu'), true);
     durumYaz(3, '✓ F1 ' + yuzde(enF1), true);
     durumYaz(4, 'hazır');
-    $('btnSiniflandir').disabled = false;
+    $('btnSiniflandir').disabled = !D.gorsel;      // görüntüsüz eğitimde önce görüntü gerekir
     $('btnModelAktar').disabled = false;
     $('btnRapor').disabled = false;
     $('adim4').open = true;
@@ -4058,7 +4097,7 @@ $('btnEgit').addEventListener('click', async () => {
   }finally{
     D.mesgul = false;
     etiketDurumGuncelle();
-    if (D.egitim) $('btnSiniflandir').disabled = false;
+    if (D.egitim && D.gorsel) $('btnSiniflandir').disabled = false;
   }
 });
 $('btnEgitDurdur').addEventListener('click', () =>
@@ -4841,11 +4880,56 @@ $('iceAktarGirdi').addEventListener('change', async e => {
     const veri = JSON.parse(await dosya.text());
     if (veri.bicim === 'cam-ai-model') await modelIceAktar(veri);
     else if (veri.bicim === 'cam-ai-proje') await projeIceAktar(veri);
-    else throw new Error('Tanınmayan dosya biçimi. Çam-AI model veya proje .json dosyası seçin.');
+    else if (Array.isArray(veri.X) && Array.isArray(veri.y) && Array.isArray(veri.siniflar))
+      await sunucuHavuzIceAktar(veri, dosya.name);   // cam_ai_havuz.json (exe'nin yanındaki havuz)
+    else throw new Error('Tanınmayan dosya biçimi. Çam-AI proje (.json), model (.json) ' +
+      'ya da sunucunun cam_ai_havuz.json dosyasını seçin.');
   }catch(hata){
     await bilgi('İçe aktarma hatası: ' + (hata && hata.message ? hata.message : hata));
   }
 });
+/* Sunucunun kalıcı havuz dosyası (cam_ai_havuz.json) → uygulamanın veri havuzuna.
+   Böylece exe'de biriken eğitim verisiyle doğrudan yeniden eğitilebilir. */
+async function sunucuHavuzIceAktar(veri, dosyaAd){
+  const d = veri.d || OZELLIK_SAYISI;
+  if (d !== OZELLIK_SAYISI)
+    throw new Error('Havuz dosyası ' + d + ' öznitelikli; bu sürüm ' + OZELLIK_SAYISI +
+      ' öznitelik kullanıyor. Örnekleri yeniden etiketlemeniz gerekir.');
+  const n = veri.y.length;
+  if (!n || veri.X.length !== n * d)
+    throw new Error('Havuz dosyası bozuk: X uzunluğu (' + veri.X.length + ') örnek sayısıyla (' +
+      n + ' × ' + d + ') uyuşmuyor.');
+  const adlar = veri.siniflar.map(s => (s && s.ad) ? s.ad : String(s));
+  if (adlar.length < 2) throw new Error('Havuz dosyasında en az 2 sınıf olmalı.');
+  const sayimlar = new Array(adlar.length).fill(0);
+  for (const c of veri.y) if (c >= 0 && c < adlar.length) sayimlar[c]++;
+  /* sınıf listesi havuzla eşitlenir (renkler korunarak) */
+  const eskiRenk = new Map(D.siniflar.map(s => [s.ad, s.renk]));
+  D.siniflar = adlar.map((ad, i) => ({ ad, renk: eskiRenk.get(ad) || SINIF_RENKLERI[i % SINIF_RENKLERI.length] }));
+  D.seciliSinif = 0;
+  sonucuGecersizKil();
+  etiketleriSiniflaraUydur();
+  D.havuz = [{
+    ad: dosyaAd || 'cam_ai_havuz.json',
+    yama: veri.yama || parseInt($('secYama').value, 10) || 24,
+    ozellik: OZELLIK_SAYISI, n, gsd: null,
+    sayimlar,
+    y: Int32Array.from(veri.y),
+    X24: Float32Array.from(veri.X)
+  }];
+  if (veri.yama) $('secYama').value = String(veri.yama);
+  havuzGoster();
+  sinifListesiCiz();
+  lejantCiz();
+  etiketDurumGuncelle();
+  $('adim3').open = true;
+  await bilgi('💾 Sunucu havuzu içe aktarıldı: ' + sayiTR(n) + ' örnek · ' + adlar.length + ' sınıf (' +
+    adlar.map((a, c) => a + ': ' + sayimlar[c]).join(' · ') + ')' +
+    '\nYama boyu: ' + (veri.yama || '?') + ' px.' +
+    '\n\nArtık Adım 3\'ten "🧠 Eğitimi Başlat" ile bu birikmiş veriyle doğrudan eğitebilirsiniz; ' +
+    'görüntü yükleyip yeni etiketler eklerseniz onlar da bu havuza katılır.');
+}
+
 async function modelIceAktar(paket, sessiz){
   const acilan = modelAc(paket);
   const sinifDegisti = acilan.siniflar.length !== D.siniflar.length;
@@ -4889,8 +4973,14 @@ async function projeIceAktar(proje){
   if (proje.ayarlar){
     if (proje.ayarlar.yama) $('secYama').value = String(proje.ayarlar.yama);
     if (proje.ayarlar.ornekSiniri) $('secOrnekSiniri').value = String(proje.ayarlar.ornekSiniri);
+    /* çözünürlük de geri gelmeli: aksi halde görüntü farklı boyutta açılır ve etiketler tutmaz */
+    if (proje.ayarlar.cozunurluk &&
+        [...$('secCozunurluk').options].some(o => o.value === String(proje.ayarlar.cozunurluk)))
+      $('secCozunurluk').value = String(proje.ayarlar.cozunurluk);
   }
   let mesaj = 'Proje yüklendi.';
+  D.bekleyenProje = null;
+  goster($('bekleyenProjeNot'), false);
   if (D.gorsel && proje.gorselOzet &&
       D.gorsel.outW === proje.gorselOzet.outW && D.gorsel.outH === proje.gorselOzet.outH){
     D.vuruslar = (proje.vuruslar || []).map(v =>
@@ -4898,8 +4988,17 @@ async function projeIceAktar(proje){
     maskeyiYenidenKur();
     mesaj += ' ' + D.vuruslar.length + ' fırça vuruşu geri getirildi.';
   } else if (proje.vuruslar && proje.vuruslar.length){
-    mesaj += '\nEtiketler için önce aynı görüntüyü (' + (proje.gorselOzet ? proje.gorselOzet.ad : '?') +
-      ') aynı işleme çözünürlüğüyle yükleyin, sonra projeyi tekrar açın.';
+    /* görüntü yok ya da boyut tutmuyor → projeyi beklet, görüntü gelince kendiliğinden uygula */
+    D.bekleyenProje = proje;
+    const ad = proje.gorselOzet ? proje.gorselOzet.ad : 'aynı görüntü';
+    $('bekleyenProjeNot').innerHTML = '⏳ <b>Proje beklemede:</b> ' + kacHtml(ad) +
+      ' görüntüsünü Adım 1\'den yükleyin — ' + proje.vuruslar.length +
+      ' etiket vuruşu kendiliğinden yerleşecek. (İşleme çözünürlüğü: ' +
+      (proje.ayarlar && proje.ayarlar.cozunurluk ? proje.ayarlar.cozunurluk + ' px' : 'kayıtlı değer') + ')';
+    goster($('bekleyenProjeNot'), true);
+    $('adim1').open = true;
+    mesaj += '\nEtiketler beklemede: aynı görüntüyü (' + ad +
+      ') Adım 1\'den yükleyin — projeyi yeniden açmanıza gerek yok, etiketler kendiliğinden gelecek.';
   }
   if (Array.isArray(proje.havuz) && proje.havuz.length){
     const uyumlu = proje.havuz.filter(h => (h.ozellik || 24) === OZELLIK_SAYISI);
