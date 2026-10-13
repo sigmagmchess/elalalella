@@ -3560,13 +3560,20 @@ function havuzGoster(){
   D.havuz.forEach((h, i) => {
     const sat = document.createElement('div');
     sat.className = 'havuz-kaynak';
-    sat.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)';
-    const yazi = document.createElement('span');
-    yazi.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    sat.style.cssText = 'display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--ink2);' +
+      'padding:5px 7px;border:1px solid var(--line);border-radius:6px';
+    /* dosya adı TAM görünsün (kesilmesin, gerekirse alt satıra kırılsın) */
+    const ad = document.createElement('div');
+    ad.style.cssText = 'font-weight:600;color:var(--ink);word-break:break-all;line-height:1.3';
+    ad.textContent = (i + 1) + '. ' + h.ad;
+    const yazi = document.createElement('div');
+    yazi.style.cssText = 'color:var(--ink3)';
     const ozet = D.siniflar.map((s, c) => s.ad + ' ' + sayiTR(h.sayimlar[c] || 0)).join(' · ');
-    yazi.textContent = (i + 1) + '. ' + h.ad + ' — ' + sayiTR(h.n) + ' yama (' + ozet + ')';
-    yazi.title = h.ad + (h.cozunurluk ? ' · işleme çözünürlüğü ' + h.cozunurluk + ' px' : '') +
-      (h.vuruslar && h.vuruslar.length ? ' · ' + h.vuruslar.length + ' vuruş saklı' : ' · vuruş saklı değil');
+    yazi.textContent = sayiTR(h.n) + ' yama · ' + ozet +
+      (h.cozunurluk ? ' · ' + h.cozunurluk + ' px' : '') +
+      (h.vuruslar && h.vuruslar.length ? '' : ' · vuruş saklı değil');
+    const dugmeler = document.createElement('div');
+    dugmeler.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap';
     const duzenle = document.createElement('button');
     duzenle.className = 'btn kucuk'; duzenle.dataset.islem = 'duzenle';
     duzenle.textContent = '✏️ Düzenle';
@@ -3579,7 +3586,8 @@ function havuzGoster(){
     cikar.title = 'Yalnız bu fotoğrafı havuzdan çıkar';
     cikar.disabled = D.mesgul;
     cikar.addEventListener('click', () => havuzdanCikar(i));
-    sat.append(yazi, duzenle, cikar);
+    dugmeler.append(duzenle, cikar);
+    sat.append(ad, yazi, dugmeler);
     liste.append(sat);
   });
   goster(liste, D.havuz.length > 0);
