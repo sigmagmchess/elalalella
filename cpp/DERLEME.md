@@ -41,10 +41,16 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
    - **Adım 2** fırça/çokgen/değnekle etiketleyin; ＋ Sınıf ekle ile
      istediğiniz kadar tür tanımlayın (Çam, Dişbudak, …). Çoklu eğitim için
      **➕ Örnekleri havuza ekle** ile birden çok görüntü birleştirilebilir.
-     Havuz listesinde her fotoğrafın yanında **✏️ Düzenle** (aynı fotoğraf
-     yüklüyken etiket vuruşlarını görüntüye geri getirir; düzeltip yeniden
-     eklersiniz) ve **✕ Çıkar** (yalnız o fotoğrafı siler, diğerleri korunur)
+     Havuz listesinde her fotoğrafın yanında **✏️ Düzenle** (fotoğrafı
+     tarayıcıdaki kayıtlı kopyasından kendiliğinden açar ve etiket vuruşlarını
+     üzerine getirir; düzeltip yeniden eklersiniz — kopya yoksa dosya seçme
+     penceresi açılır, doğru dosya seçilince vuruşlar yine kendiliğinden
+     yerleşir) ve **✕ Çıkar** (yalnız o fotoğrafı siler, diğerleri korunur)
      bulunur. Vuruşlar havuz kaydıyla birlikte proje dosyasına da yazılır.
+     Yüklenen her görüntünün çalışma boyutundaki kopyası (JPEG q=0,95,
+     saydamlık varsa PNG; 20 MP üstü saydamlıklı ortomozaikler hariç) tarayıcıda
+     saklanır; kopyadan açılan görüntü bilgi tablosunda "kayıtlı kopya" olarak
+     görünür.
      **Sınıf eklemek havuzu boşaltmaz** (yeni sınıf sona eklenir); sınıf
      silmek yalnız o sınıfın örneklerini havuzdan çıkarır, kalan kaynaklar durur.
      **Otomatik yedek:** havuz ve ekrandaki etiketler her değişiklikten ~1,5 s

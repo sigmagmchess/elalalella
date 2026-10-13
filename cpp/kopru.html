@@ -2988,6 +2988,7 @@ async function dosyaYukle(dosya){
     await beklet();
     gorselKur(g);
     goster(kutu, false);
+    gorselKopyasiKaydet(g);          // arka planda: ✏️ Düzenle ve yedek geri yükleme fotoğrafı kendiliğinden açsın
     return true;
   }catch(hata){
     console.error(hata);
@@ -3184,6 +3185,7 @@ function gorselKur(g){
   lejantCiz();
   sigdir();
   bekleyenProjeyiUygula();     // görüntüden önce açılmış bir proje varsa etiketleri şimdi yerleşir
+  bekleyenDuzenlemeyiUygula(); // ✏️ Düzenle için beklenen fotoğraf buysa havuzdaki vuruşlar yerleşir
 }
 
 /* Proje görüntüden ÖNCE açıldıysa etiketler burada geri gelir (sıra artık önemsiz) */
@@ -3676,7 +3678,8 @@ async function havuzdanCikar(i){
   egitimGecersizKil();
   $('durumBilgi').textContent = '"' + h.ad + '" havuzdan çıkarıldı — ' + D.havuz.length + ' kaynak kaldı.';
 }
-/* kaynağın etiket vuruşlarını geri getirir: fotoğraf yüklüyse düzeltip yeniden eklenir */
+/* kaynağın etiket vuruşlarını geri getirir. Fotoğraf ekranda değilse önce tarayıcıdaki kayıtlı
+   kopyasından açılır; kopya yoksa dosya seçtirilir ve doğru dosya gelince vuruşlar kendiliğinden yerleşir */
 async function havuzdanDuzenle(i){
   if (D.mesgul || i >= D.havuz.length) return;
   const h = D.havuz[i];
@@ -3687,16 +3690,33 @@ async function havuzdanDuzenle(i){
     return;
   }
   const g = D.gorsel;
-  if (!g || g.outW !== h.outW || g.outH !== h.outH){
-    await bilgi('Önce "' + h.ad + '" fotoğrafını Adım 1\'den, işleme çözünürlüğü ' +
-      (h.cozunurluk || '?') + ' px ile yükleyin; sonra yeniden ✏️ Düzenle\'ye basın.' +
-      (g ? '\n\nŞu an yüklü: ' + (g.dosyaAd || '—') + ' (' + g.outW + '×' + g.outH + ' px), gereken ' +
-        h.outW + '×' + h.outH + ' px.' : ''));
+  if (g && g.outW === h.outW && g.outH === h.outH && g.dosyaAd === h.ad){
+    havuzVuruslariniUygula(h);
     return;
   }
-  if (g.dosyaAd !== h.ad && !(await onayla('Yüklü görüntünün adı farklı ("' + (g.dosyaAd || '—') +
-    '" ↔ "' + h.ad + '").\nVuruşlar yine de bu görüntüye getirilsin mi?'))) return;
-  if (D.mesgul || D.havuz[i] !== h) return;
+  D.bekleyenDuzenle = { ad: h.ad, outW: h.outW, outH: h.outH };
+  /* 1) tarayıcıdaki kayıtlı kopya */
+  let kopya = null;
+  try{ kopya = await yedekOku(gorselKopyaAnahtari(h.ad, h.outW, h.outH)); }catch(_e){}
+  if (kopya && kopya.blob){
+    if (D.mesgul) return;
+    $('durumBilgi').textContent = '"' + h.ad + '" kayıtlı kopyadan açılıyor…';
+    try{ await gorseliKopyadanAc(kopya); return; }   // gorselKur → bekleyenDuzenlemeyiUygula
+    catch(e){ console.warn('kopya açılamadı', e); }
+  }
+  /* 2) dosya seçtir — doğru dosya yüklenince vuruşlar kendiliğinden yerleşir */
+  if (h.cozunurluk && [...$('secCozunurluk').options].some(o => o.value === String(h.cozunurluk)))
+    $('secCozunurluk').value = String(h.cozunurluk);
+  await bilgi('Bu etiketler "' + h.ad + '" fotoğrafına ait. Uygulama fotoğrafın kendisini değil, etiketleri ' +
+    'saklar; bu fotoğrafın kayıtlı kopyası da yok.\n\nTamam\'a basınca dosya seçme penceresi açılır: "' + h.ad +
+    '" dosyasını seçin, etiketler kendiliğinden üzerine gelir. (İşleme çözünürlüğü ' +
+    (h.cozunurluk || '?') + ' px olarak ayarlandı.)');
+  $('dosyaGirdi').click();
+}
+/* havuz kaydındaki vuruşları ekrandaki (aynı) fotoğrafa yerleştirir ve kaydı havuzdan düşürür */
+function havuzVuruslariniUygula(h){
+  const i = D.havuz.indexOf(h);
+  if (i < 0 || D.mesgul) return;
   if (D.referansModu) elleDegerlendirBitir(false);
   D.havuz.splice(i, 1);
   sunucuHavuzunuTemizle();
@@ -3708,8 +3728,62 @@ async function havuzdanDuzenle(i){
   egitimGecersizKil();
   ciz();
   $('adim2').open = true;
-  $('durumBilgi').textContent = h.vuruslar.length + ' etiket vuruşu geri getirildi — düzeltip ' +
-    '"➕ Örnekleri havuza ekle" ile yeniden ekleyin.';
+  $('durumBilgi').textContent = '✓ "' + h.ad + '": ' + h.vuruslar.length +
+    ' etiket vuruşu geri getirildi — düzeltip "➕ Örnekleri havuza ekle" ile yeniden ekleyin.';
+}
+/* ✏️ Düzenle için beklenen fotoğraf yüklendiyse (kopyadan ya da dosyadan) vuruşları yerleştirir */
+function bekleyenDuzenlemeyiUygula(){
+  const b = D.bekleyenDuzenle;
+  if (!b || !D.gorsel) return;
+  D.bekleyenDuzenle = null;
+  if (D.gorsel.dosyaAd !== b.ad || D.gorsel.outW !== b.outW || D.gorsel.outH !== b.outH){
+    $('durumBilgi').textContent = '⚠️ "' + b.ad + '" bekleniyordu, "' + D.gorsel.dosyaAd +
+      '" yüklendi — etiketler havuzda kaldı. Doğru fotoğrafı yükleyip Adım 3\'ten yeniden ✏️ Düzenle\'ye basın.';
+    return;
+  }
+  const h = D.havuz.find(x => x.ad === b.ad && x.outW === b.outW && x.outH === b.outH &&
+    x.vuruslar && x.vuruslar.length);
+  if (h) havuzVuruslariniUygula(h);
+}
+/* ---- fotoğraf kopyası (IndexedDB): yüklenen her görüntünün çalışma boyutundaki kopyası saklanır ---- */
+const gorselKopyaAnahtari = (ad, outW, outH) => 'gorsel:' + ad + '|' + outW + 'x' + outH;
+async function gorselKopyasiKaydet(g){
+  try{
+    const N = g.outW * g.outH;
+    let nodata = false;
+    for (let i = 0; i < N; i++) if (!g.gecerli[i]){ nodata = true; break; }
+    if (nodata && N > 20e6) return;              // dev ortomozaik (saydamlıklı): kopya tutulmaz, dosyadan seçilir
+    const c = document.createElement('canvas');
+    c.width = g.outW; c.height = g.outH;
+    c.getContext('2d').putImageData(new ImageData(g.rgba, g.outW, g.outH), 0, 0);
+    /* saydamlık yoksa JPEG (q=0,95; fotoğraf başına ~1–2 MB), varsa PNG (alfa korunur) */
+    const blob = await new Promise(coz => c.toBlob(coz, nodata ? 'image/png' : 'image/jpeg', 0.95));
+    if (!blob) return;
+    await yedekYaz(gorselKopyaAnahtari(g.dosyaAd, g.outW, g.outH), {
+      ad: g.dosyaAd, w: g.w, h: g.h, outW: g.outW, outH: g.outH, olcek: g.olcek,
+      geo: g.geo || null, meta: g.meta || null, tur: g.tur || 'JPG', dosyaMB: g.dosyaMB || 0,
+      blob, zaman: Date.now() });
+  }catch(e){ console.warn('fotoğraf kopyası yazılamadı', e); }
+}
+async function gorseliKopyadanAc(k){
+  const bmp = await createImageBitmap(k.blob);
+  const c = document.createElement('canvas');
+  c.width = k.outW; c.height = k.outH;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close && bmp.close();
+  const gd = ctx.getImageData(0, 0, k.outW, k.outH);
+  const N = k.outW * k.outH;
+  const rgba = new Uint8ClampedArray(gd.data.buffer.slice(0));
+  const gecerli = new Uint8Array(N);
+  for (let i = 0; i < N; i++){
+    const ok = rgba[i * 4 + 3] > 16;
+    gecerli[i] = ok ? 1 : 0;
+    if (!ok) rgba[i * 4 + 3] = 0;
+  }
+  gorselKur({ w: k.w, h: k.h, outW: k.outW, outH: k.outH, olcek: k.olcek, rgba, gecerli,
+    geo: k.geo || null, meta: k.meta || { sikAd: '—', bit: 8, bantSayi: 4, gri: false },
+    dosyaAd: k.ad, dosyaMB: k.dosyaMB || 0, tur: (k.tur || 'JPG') + ' · kayıtlı kopya', kopyadan: true });
 }
 $('btnHavuzBosalt').addEventListener('click', async () => {
   if (D.mesgul || !D.havuz.length) return;
@@ -6684,13 +6758,24 @@ async function yedekGeriYukle(anahtar){
       D.bekleyenProje = { bicim: 'cam-ai-proje', siniflar: y.siniflar, vuruslar: y.vuruslar,
         gorselOzet: y.gorselOzet, ayarlar: y.ayarlar, havuz: [], model: null };
       const ad = y.gorselOzet ? y.gorselOzet.ad : 'aynı görüntü';
-      $('bekleyenProjeNot').innerHTML = '⏳ <b>Etiketler beklemede:</b> ' + kacHtml(ad) +
-        ' görüntüsünü Adım 1\'den yükleyin — ' + y.vuruslar.length +
-        ' etiket vuruşu kendiliğinden yerleşecek. (İşleme çözünürlüğü: ' +
-        (y.ayarlar && y.ayarlar.cozunurluk ? y.ayarlar.cozunurluk + ' px' : 'kayıtlı değer') + ')';
-      goster($('bekleyenProjeNot'), true);
-      mesaj += '\nSon fotoğrafın ' + y.vuruslar.length + ' etiket vuruşu beklemede: "' + ad +
-        '" fotoğrafını Adım 1\'den yükleyin, kendiliğinden yerleşir.';
+      /* fotoğrafın kayıtlı kopyası varsa kendiliğinden aç: gorselKur → bekleyenProjeyiUygula */
+      let kopya = null;
+      try{ if (y.gorselOzet) kopya = await yedekOku(gorselKopyaAnahtari(y.gorselOzet.ad, y.gorselOzet.outW, y.gorselOzet.outH)); }
+      catch(_e){}
+      if (kopya && kopya.blob && !D.mesgul){
+        try{ await gorseliKopyadanAc(kopya); }catch(e){ console.warn('kopya açılamadı', e); }
+      }
+      if (!D.bekleyenProje){
+        mesaj += '\n"' + ad + '" kayıtlı kopyadan açıldı, ' + D.vuruslar.length + ' etiket vuruşu üzerine yerleşti.';
+      } else {
+        $('bekleyenProjeNot').innerHTML = '⏳ <b>Etiketler beklemede:</b> ' + kacHtml(ad) +
+          ' görüntüsünü Adım 1\'den yükleyin — ' + y.vuruslar.length +
+          ' etiket vuruşu kendiliğinden yerleşecek. (İşleme çözünürlüğü: ' +
+          (y.ayarlar && y.ayarlar.cozunurluk ? y.ayarlar.cozunurluk + ' px' : 'kayıtlı değer') + ')';
+        goster($('bekleyenProjeNot'), true);
+        mesaj += '\nSon fotoğrafın ' + y.vuruslar.length + ' etiket vuruşu beklemede: "' + ad +
+          '" fotoğrafını Adım 1\'den yükleyin, kendiliğinden yerleşir.';
+      }
     }
   }
   YEDEK.bekleyen = null;
@@ -6702,9 +6787,18 @@ async function yedekGeriYukle(anahtar){
   await bilgi(mesaj + '\n\nBundan sonra yaptıklarınız yine otomatik yedeklenir. Yine de her fotoğraftan sonra ' +
     'Adım 5\'ten projeyi kaydedin; yedek yalnız bu tarayıcıda durur.');
 }
+async function yedekTemizle(){
+  const db = await yedekDb();
+  return new Promise((coz, red) => {
+    const t = db.transaction('kayit', 'readwrite');
+    t.objectStore('kayit').clear();
+    t.oncomplete = () => coz();
+    t.onerror = () => red(t.error);
+  });
+}
 async function yedekSil(){
-  if (!(await onayla('Tarayıcıdaki yedekler silinsin mi? Bu geri alınamaz.'))) return;
-  try{ await yedekYaz('son', null); await yedekYaz('onceki', null); }catch(_e){}
+  if (!(await onayla('Tarayıcıdaki yedekler ve fotoğraf kopyaları silinsin mi? Bu geri alınamaz.'))) return;
+  try{ await yedekTemizle(); }catch(_e){}
   YEDEK.bekleyen = null;
   goster($('yedekNot'), false);
   YEDEK.hazir = true;
