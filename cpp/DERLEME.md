@@ -51,6 +51,16 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      saydamlık varsa PNG; 20 MP üstü saydamlıklı ortomozaikler hariç) tarayıcıda
      saklanır; kopyadan açılan görüntü bilgi tablosunda "kayıtlı kopya" olarak
      görünür.
+   - **Adım 4 → Taç içi boşluk doldurma:** çam taçları bütün alan olarak (dallar
+     ve küçük boşluklar dahil) etiketlense bile model dal/gölge aralıklarını yer
+     yer "Çam değil" diyebilir. Bu seçenek hedef sınıf maskesinde taç İÇİNDE
+     kalan delikleri doldurur: görüntü kenarına değmeyen, veri-yok içermeyen ve
+     alanı seçilen sınırı (≤0,5 / 2 / 5 m²) aşmayan arka plan adacıkları çam
+     sayılır. Özgün hücreler silinmez ve komşu taçlar birleştirilmez (morfolojik
+     kapamadan farkı budur; kapama denendi, kümeleri birleştirip tespiti
+     bozduğu için kullanılmadı). Seyrek taçlı çamlar parçalanmaz, ağaç başına
+     tek nokta kalır, taç poligonu referans taç gibi bütün çıkar. Ayar taraması
+     ve rapor bu ayarı kullanır/yazar; proje dosyasında saklanır.
    - **Doğruluk Analizi → 🎓 Eğitim ağaçları (değerlendirme dışı):** eğitimde
      kullandığınız çamları nokta dosyasının `fid` kimlikleriyle (örn. `3,4,7,10-14`)
      ya da ayrı bir GeoJSON ile verin. Bu ağaçlar referanstan çıkarılır;

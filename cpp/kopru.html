@@ -529,6 +529,13 @@ textarea.rapor{
         <label for="tacCapi">Ort. taç çapı:</label>
         <input type="number" id="tacCapi" min="0.5" step="0.5" value="3" style="max-width:64px">
         <span id="tacBirim" style="font-size:11.5px;color:var(--ink2)">m</span>
+        <label for="secTacKapat" title="Taç içinde kalan dal/gölge deliklerini doldurur: seyrek taçlı çamlar parçalanmaz, poligon referans taç gibi bütün çıkar. Komşu taçları birleştirmez.">Taç içi boşluk doldurma:</label>
+        <select id="secTacKapat" style="max-width:130px">
+          <option value="0">Kapalı</option>
+          <option value="0.5">Hafif (≤0,5 m²)</option>
+          <option value="2" selected>Orta (≤2 m²)</option>
+          <option value="5">Güçlü (≤5 m²)</option>
+        </select>
         <button class="btn kucuk birincil" id="btnAgacIsaretle">📍 Ağaçları İşaretle</button>
       </div>
       <div class="satir gizli" id="agacGosterSatir">
@@ -2248,6 +2255,55 @@ async function haritaSiniflandir(ayar){
   return { gw, gh, adim, yari, probs, sinif };
 }
 
+/* TAÇ İÇİ BOŞLUK DOLDURMA: maskenin içinde kalan (görüntü kenarına değmeyen, veri-yok içermeyen)
+   ve alanı enCokAlan bloğu aşmayan arka plan adacıkları doldurulur — dal/gölge boşlukları kapanır.
+   Morfolojik kapamadan farkı: komşu taçları ASLA birleştirmez, yalnız kapalı delikleri doldurur. */
+function maskeDelikDoldur(maske, gw, gh, enCokAlan, gecerli){
+  if (!(enCokAlan > 0)) return 0;
+  const N = gw * gh;
+  const gorulen = new Uint8Array(N);
+  const kuyruk = new Int32Array(N);
+  let eklenen = 0;
+  for (let b = 0; b < N; b++){
+    if (maske[b] || gorulen[b]) continue;
+    /* 4-komşuluklu arka plan bileşeni (ön plan 8-komşuluklu olduğu için tutarlı) */
+    let bas = 0, son = 0, kenar = false, gecersiz = false;
+    kuyruk[son++] = b; gorulen[b] = 1;
+    while (bas < son){
+      const i = kuyruk[bas++];
+      const x = i % gw, y = (i / gw) | 0;
+      if (x === 0 || y === 0 || x === gw - 1 || y === gh - 1) kenar = true;
+      if (gecerli && !gecerli(i)) gecersiz = true;
+      if (son > enCokAlan + 1 && (kenar || gecersiz)) break;     // delik değil: erken çık
+      const kom = [i - 1, i + 1, i - gw, i + gw];
+      for (let k = 0; k < 4; k++){
+        const j = kom[k];
+        if (j < 0 || j >= N) continue;
+        if ((k === 0 && x === 0) || (k === 1 && x === gw - 1)) continue;
+        if (maske[j] || gorulen[j]) continue;
+        gorulen[j] = 1; kuyruk[son++] = j;
+      }
+    }
+    /* kuyruk yarım kaldıysa bileşenin kalanını da "görüldü" işaretle (yeniden taranmasın) */
+    while (bas < son){
+      const i = kuyruk[bas++];
+      const x = i % gw;
+      const kom = [i - 1, i + 1, i - gw, i + gw];
+      for (let k = 0; k < 4; k++){
+        const j = kom[k];
+        if (j < 0 || j >= N) continue;
+        if ((k === 0 && x === 0) || (k === 1 && x === gw - 1)) continue;
+        if (maske[j] || gorulen[j]) continue;
+        gorulen[j] = 1; kuyruk[son++] = j;
+      }
+    }
+    if (!kenar && !gecersiz && son <= enCokAlan){
+      for (let q = 0; q < son; q++){ maske[kuyruk[q]] = 1; eklenen++; }
+    }
+  }
+  return eklenen;
+}
+
 function probYumusat(probs, gw, gh, K){
   const yeni = new Float32Array(probs.length);
   for (let y = 0; y < gh; y++){
@@ -2563,6 +2619,12 @@ async function tacPoligonlariCikar(ayar){
       maske[i] = 1;
       p[i] = probs[taban + camIdx];
     }
+  }
+  /* taç içi delikleri doldur: taç poligonu referans taç gibi bütün çıksın (doldurulan hücreler en düşük öncelikle) */
+  if (ayar.delik > 0){
+    const onceki = maske.slice();
+    maskeDelikDoldur(maske, gw, gh, ayar.delik, i => sinif[i] !== 255);
+    for (let i = 0; i < N; i++) if (maske[i] && !onceki[i]) p[i] = esik;
   }
   const etiket = new Int32Array(N);
   /* öncelik kuyruğu: yüksek olasılık önce, eşitlikte küçük indeks önce */
@@ -4740,6 +4802,8 @@ function agacTespitAdaptif(ayar){
     for (let c = 1; c < K; c++) if (probs[t + c] > probs[t + enC]) enC = c;
     if (enC === camIdx && probs[t + camIdx] >= esik) maske[i] = 1;
   }
+  /* taç içi dal/gölge deliklerini doldur → seyrek taçlar parçalanmasın (komşu taçlar birleşmez) */
+  if (ayar.delik > 0) maskeDelikDoldur(maske, gw, gh, ayar.delik, i => sinif[i] !== 255);
   /* bağlı bileşenler (8-komşuluk) */
   const etiket = new Int32Array(N);
   const kuyruk = new Int32Array(N);
@@ -4874,7 +4938,8 @@ function agaclariHesapla(sessiz){
   const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
   const dBlok = Math.max(1, Math.round(tacCalisPx / s.adim));
   const agaclar = agacTespitAdaptif({
-    probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik, tacBlok: tacCalisPx / s.adim
+    probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik, tacBlok: tacCalisPx / s.adim,
+    delik: tacDelikBlok()
   });
   const maske = new Uint8Array(s.gw * s.gh);
   for (let i = 0; i < s.gw * s.gh; i++){
@@ -4963,7 +5028,7 @@ async function poligonlariCikarUI(){
     const sonuc = await tacPoligonlariCikar({
       probs: aktifProbs(), sinif: s.sinif, gw: s.gw, gh: s.gh, K,
       camIdx: hedefTurIdx(), esik: parseInt($('esik').value, 10) / 100,
-      tohumlar: D.agaclar,
+      tohumlar: D.agaclar, delik: tacDelikBlok(),
       onProgress: (oran, mesaj) => ilerlemeKur(kutu, cubuk, yazi, oran, mesaj + '…')
     });
     goster(kutu, false);
@@ -5077,6 +5142,21 @@ function poligonBaloncukGoster(ekranX, ekranY, imgX, imgY){
 $('tacCapi').addEventListener('input', e => { e.target.dataset.elleDegisti = '1'; });
 $('tacCapi').addEventListener('change', () => { if (D.agaclar) agaclariHesapla(true); });
 $('chkIsaretGoster').addEventListener('change', ciz);
+/* taç içi boşluk doldurma: seçilen en büyük delik alanı (m²) → blok sayısı */
+function tacDelikBlok(){
+  const sec = parseFloat($('secTacKapat').value);
+  if (!(sec > 0) || !D.sonuc || !D.gorsel) return 0;
+  const s = D.sonuc, g = D.gorsel;
+  const geoVar = !!(g.geo && !g.geo.cografi);
+  /* bir bloğun yer kenarı (m); coğrafi bilgi yoksa P1 fotoğrafı varsayımı: çalışma pikseli ≈ 2,5 cm */
+  const blokM = s.adim * (geoVar ? g.olcek * g.geo.sx : 0.025);
+  return Math.max(1, Math.min(400, Math.round(sec / (blokM * blokM))));
+}
+$('secTacKapat').addEventListener('change', () => {
+  if (!D.sonuc) return;
+  poligonlariGecersizKil();                              // taç poligonları yeni kapatmayla yeniden çıkarılmalı
+  if (D.agaclar) agaclariHesapla(true);
+});
 
 function isaretKnvOlustur(){
   const g = D.gorsel, s = D.sonuc;
@@ -5422,7 +5502,8 @@ $('btnProjeAktar').addEventListener('click', () => {
     ayarlar: {
       yama: parseInt($('secYama').value, 10),
       ornekSiniri: parseInt($('secOrnekSiniri').value, 10),
-      cozunurluk: parseInt($('secCozunurluk').value, 10)
+      cozunurluk: parseInt($('secCozunurluk').value, 10),
+      tacDelik: $('secTacKapat').value
     },
     gorselOzet: { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
       outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek },
@@ -5605,6 +5686,9 @@ async function projeIceAktar(proje){
     if (proje.ayarlar.cozunurluk &&
         [...$('secCozunurluk').options].some(o => o.value === String(proje.ayarlar.cozunurluk)))
       $('secCozunurluk').value = String(proje.ayarlar.cozunurluk);
+    if (proje.ayarlar.tacDelik !== undefined &&
+        [...$('secTacKapat').options].some(o => o.value === String(proje.ayarlar.tacDelik)))
+      $('secTacKapat').value = String(proje.ayarlar.tacDelik);
   }
   let mesaj = 'Proje yüklendi.';
   D.bekleyenProje = null;
@@ -6655,7 +6739,7 @@ async function enIyiAyariBul(){
     for (const e of esikler) for (const c of carpanlar){
       const tac = tacGirdi * c;
       const tacPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
-      const ag = agacTespitAdaptif({ probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik: e, tacBlok: tacPx / s.adim });
+      const ag = agacTespitAdaptif({ probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik: e, tacBlok: tacPx / s.adim, delik: tacDelikBlok() });
       const o = noktaDogrulukOlc(ag, yr.px);
       sonuclar.push({ esik: e, tac, f1: o.f1, precision: o.precision, recall: o.recall, tp: o.tp, fp: o.fp, fn: o.fn, n: ag.length });
       btn.textContent = '🔎 taranıyor… ' + (++i) + '/' + (esikler.length * carpanlar.length);
@@ -6805,6 +6889,8 @@ $('btnRapor').addEventListener('click', () => {
     m.push('SINIFLANDIRMA');
     m.push('  Kayan pencere    : ' + e.yama + ' px yama, ' + s.adim + ' px adım → ' + s.gw + ' × ' + s.gh + ' blok');
     m.push('  Yumuşatma        : ' + ($('chkYumusat').checked ? '3×3 komşuluk ortalaması' : 'kapalı'));
+    m.push('  Taç içi boşluk doldurma: ' + (parseFloat($('secTacKapat').value) > 0
+      ? '≤' + $('secTacKapat').value.replace('.', ',') + ' m² delikler dolduruldu (' + tacDelikBlok() + ' blok)' : 'kapalı'));
     m.push('  Güven eşiği      : %' + $('esik').value);
     const rows = $('tabloIstat').querySelectorAll('tr');
     rows.forEach((tr, i) => {
