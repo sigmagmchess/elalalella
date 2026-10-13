@@ -550,14 +550,19 @@ textarea.rapor{
   <details class="adim" id="adimDogruluk">
     <summary><span class="no">🎯</span> Doğruluk Analizi <span class="durum" id="durumDogruluk">bekliyor</span></summary>
     <div class="icerik">
-      <div class="ipucu">Referansınızı <b>iki yoldan</b> verebilirsiniz: <b>(A)</b> QGIS'te çizdiğiniz GeoJSON'u
-        yükleyin ya da <b>(B)</b> ✍️ <b>Elle değerlendir</b> deyip görüntüyü tertemiz açın, çam taçlarını
-        kendiniz işaretleyin (en hızlısı 🪄 Değnek; tek tıkla bütün tacı seçer). İki durumda da
-        <b>🎯 Değerlendir</b>, uygulamanın taç poligonlarıyla sizin işaretlerinizi <b>IoU tabanlı</b>
-        eşleştirir. Sonuçlar YOLOv8-seg karşılaştırma tablonuza doğrudan girer.</div>
+      <div class="ipucu">Referansınızı <b>üç biçimde</b> verebilirsiniz; hepsi birlikte de yüklenebilir:
+        <b>🌿 taç poligonları</b> (alansal, IoU), <b>📍 ağaç noktaları</b> (noktasal — her ağaç için
+        merkeze en yakın tek tespit aranır) ve <b>🌳 küme poligonları</b> (sınırları ayrılamayan ağaç
+        grupları: içine en az bir tespit düşen küme <i>bulundu</i> sayılır, içindeki fazladan tespitler
+        yanlış alarm sayılmaz). Ya da ✍️ <b>Elle değerlendir</b> ile tuvalde işaretleyin.
+        <b>🎯 Değerlendir</b> yüklü olan her referans türü için ayrı sonuç üretir.</div>
       <div class="arac-grup">
-        <button class="btn kucuk" id="btnReferansYukle">📥 Referans GeoJSON yükle…</button>
+        <button class="btn kucuk" id="btnReferansYukle">🌿 Taç poligonları (GeoJSON)…</button>
         <input type="file" id="referansGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
+        <button class="btn kucuk" id="btnReferansNokta">📍 Ağaç noktaları (GeoJSON)…</button>
+        <input type="file" id="referansNoktaGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
+        <button class="btn kucuk" id="btnReferansKume">🌳 Küme poligonları (GeoJSON)…</button>
+        <input type="file" id="referansKumeGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
         <button class="btn kucuk birincil" id="btnElleDegerlendir">✍️ Elle değerlendir (tuvalde işaretle)</button>
       </div>
       <div id="elleIpucu" class="ipucu gizli"></div>
@@ -567,10 +572,20 @@ textarea.rapor{
         <input type="range" id="iouEsik" min="30" max="80" value="50" style="flex:1">
         <span id="iouEsikYazi" style="font-size:11.5px;color:var(--ink2)">0,50</span>
       </div>
-      <button class="btn birincil" id="btnDogrulukHesapla" disabled>🎯 Değerlendir</button>
+      <div class="satir">
+        <label for="eslesmeYaricap">Nokta eşleşme yarıçapı:</label>
+        <input type="number" id="eslesmeYaricap" min="0.2" step="0.5" value="3" style="max-width:64px">
+        <span id="eslesmeBirim" style="font-size:11.5px;color:var(--ink2)">m</span>
+        <small style="font-size:11px;color:var(--ink2)">(≈ taç yarıçapı; tespit bu mesafe içindeyse "bulundu")</small>
+      </div>
+      <div class="arac-grup">
+        <button class="btn birincil" id="btnDogrulukHesapla" disabled>🎯 Değerlendir</button>
+        <button class="btn kucuk" id="btnAyarTara" disabled title="Güven eşiği × taç çapı ızgarasını tarar, nokta-F1'i en yüksek ayarı uygular">🔎 En iyi ayarı bul</button>
+      </div>
       <div id="dogrulukHata" class="hata gizli"></div>
       <div id="dogrulukOzet" class="gizli"></div>
       <div id="dogrulukKartlar" class="gizli" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+      <div id="noktaOzet" class="gizli"></div>
       <canvas id="sacilimKnv" class="gizli" width="320" height="250"
         style="width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface)"></canvas>
       <div id="sacilimNot" class="ipucu gizli"></div>
@@ -2839,6 +2854,10 @@ const D = {
   poligonlar: null,        // {liste, etiket, gw, gh, adim, yari, geoVar}
   poligonKnv: null,
   referans: null,          // {ad, halkalarPx:[[x,y,...]], sayi}
+  referansNokta: null,     // {ad, noktalarPx:[[x,y]...], sayi, toplam, disarida} — noktasal referans
+  referansKume: null,      // {ad, halkalarPx, sayi, toplam, disarida} — küme poligonları
+  dogrulukNokta: null,     // nokta bazlı değerlendirme sonucu
+  ayarTarama: null,        // en iyi ayar taramasının özeti (rapor için)
   dogruluk: null,          // {tp,fp,fn,precision,recall,f1,r2,ciftler,esik,zaman}
   tacCalisPx: 12,
   gizliSiniflar: new Set(),
@@ -3079,6 +3098,8 @@ async function resimYukle(dosya, maxDim, safNodata){
 function gorselKur(g){
   D.gorsel = g;
   D.vuruslar = [];
+  /* referanslar görüntü pikseline çevrilmişti — yeni görüntüde geçersiz */
+  D.referansNokta = null; D.referansKume = null; D.dogrulukNokta = null; D.ayarTarama = null;
   D.cokgen = [];
   D.dikTaslak = null;
   const aktarilan = D.egitim || null;   // eğitilmiş/içe aktarılmış model yeni görüntüde korunur
@@ -4447,6 +4468,147 @@ function sonucKatmaniGuncelle(){
 /* =====================================================================
    4b) TEK TEK AĞAÇ İŞARETLEME + EN YOĞUN BÖLGE
    ===================================================================== */
+/* =====================================================================
+   UYARLANABİLİR AĞAÇ TESPİTİ — ağaç başına TEK nokta
+   Sabit yarıçaplı NMS yerine: hedef sınıf maskesi → bağlı bileşenler →
+   her bileşende uzaklık dönüşümü (kenara uzaklık) tepeleri sayılır.
+   Tek tepe = tek ağaç (olasılık ağırlıklı merkez). Birden çok tepe = küme;
+   hücreler en yakın tepeye paylaştırılır, her parçanın merkezi bir ağaçtır.
+   Taç boyu değişkenliğinden (2–12 m) etkilenmez: büyük yuvarlak tek taç tek
+   tepe verir, birleşmiş iki taç boyun yerinden iki tepeye ayrılır.
+   ===================================================================== */
+function agacTespitAdaptif(ayar){
+  const { probs, sinif, gw, gh, K, camIdx, esik, tacBlok } = ayar;
+  const N = gw * gh;
+  const maske = new Uint8Array(N);
+  for (let i = 0; i < N; i++){
+    if (sinif[i] === 255) continue;
+    const t = i * K;
+    let enC = 0;
+    for (let c = 1; c < K; c++) if (probs[t + c] > probs[t + enC]) enC = c;
+    if (enC === camIdx && probs[t + camIdx] >= esik) maske[i] = 1;
+  }
+  /* bağlı bileşenler (8-komşuluk) */
+  const etiket = new Int32Array(N);
+  const kuyruk = new Int32Array(N);
+  const bilesenler = [];
+  for (let i = 0; i < N; i++){
+    if (!maske[i] || etiket[i]) continue;
+    const id = bilesenler.length + 1;
+    let bas = 0, son = 0;
+    kuyruk[son++] = i; etiket[i] = id;
+    const hucreler = [];
+    while (bas < son){
+      const h = kuyruk[bas++];
+      hucreler.push(h);
+      const x = h % gw, y = (h / gw) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+        if (!dx && !dy) continue;
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= gw || yy >= gh) continue;
+        const k = yy * gw + xx;
+        if (maske[k] && !etiket[k]){ etiket[k] = id; kuyruk[son++] = k; }
+      }
+    }
+    bilesenler.push(hucreler);
+  }
+  const A1 = Math.PI * (tacBlok / 2) * (tacBlok / 2);          // bir tacın blok alanı
+  const enAzAlan = Math.max(1, 0.10 * A1);                      // gürültü: tacın %10'undan küçük
+  const tepeAyrim = Math.max(1.5, 0.7 * tacBlok);               // iki tepe arası en az mesafe (blok)
+  const uzak = new Int32Array(N);
+  const sonuc = [];
+  let kumeNo = 0;
+  for (const h of bilesenler){
+    if (h.length < enAzAlan) continue;
+    /* uzaklık dönüşümü: kenar hücrelerden içeri BFS (Chebyshev) */
+    let bas = 0, son = 0;
+    for (const i of h){
+      const x = i % gw, y = (i / gw) | 0;
+      let kenar = false;
+      for (let dy = -1; dy <= 1 && !kenar; dy++) for (let dx = -1; dx <= 1; dx++){
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= gw || yy >= gh || !maske[yy * gw + xx]){ kenar = true; break; }
+      }
+      uzak[i] = kenar ? 1 : 0;
+      if (kenar) kuyruk[son++] = i;
+    }
+    while (bas < son){
+      const i = kuyruk[bas++];
+      const x = i % gw, y = (i / gw) | 0, d = uzak[i];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){
+        if (!dx && !dy) continue;
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= gw || yy >= gh) continue;
+        const k = yy * gw + xx;
+        if (maske[k] && etiket[k] === etiket[i] && !uzak[k]){ uzak[k] = d + 1; kuyruk[son++] = k; }
+      }
+    }
+    /* yerel tepeler */
+    let enUzak = 0;
+    for (const i of h) if (uzak[i] > enUzak) enUzak = uzak[i];
+    const adaylar = [];
+    for (const i of h){
+      const d = uzak[i];
+      if (d < Math.max(1, 0.45 * enUzak)) continue;         // sığ yan loblar tepe sayılmaz
+      const x = i % gw, y = (i / gw) | 0;
+      let tepe = true;
+      for (let dy = -1; dy <= 1 && tepe; dy++) for (let dx = -1; dx <= 1; dx++){
+        if (!dx && !dy) continue;
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= gw || yy >= gh) continue;
+        const k = yy * gw + xx;
+        if (maske[k] && uzak[k] > d){ tepe = false; break; }
+      }
+      if (tepe) adaylar.push({ i, x, y, d, p: probs[i * K + camIdx] });
+    }
+    adaylar.sort((a, b) => b.d - a.d || b.p - a.p || a.i - b.i);
+    const tepeler = [];
+    for (const a of adaylar){
+      if (tepeler.some(t => Math.hypot(t.x - a.x, t.y - a.y) < tepeAyrim)) continue;  // plato/komşu tepe
+      tepeler.push(a);
+    }
+    if (tepeler.length <= 1){
+      /* tek ağaç: olasılık ağırlıklı merkez */
+      let sx = 0, sy = 0, sw = 0, enP = 0;
+      for (const i of h){
+        const w = probs[i * K + camIdx];
+        sx += (i % gw) * w; sy += ((i / gw) | 0) * w; sw += w;
+        if (w > enP) enP = w;
+      }
+      sonuc.push({ x: sx / sw, y: sy / sw, p: enP, kume: 0, kumeAdet: 1, alanBlok: h.length });
+    } else {
+      /* küme: hücreler en yakın tepeye, her parçanın ağırlıklı merkezi bir ağaç */
+      kumeNo++;
+      const top = tepeler.map(() => ({ sx: 0, sy: 0, sw: 0, enP: 0, n: 0 }));
+      for (const i of h){
+        const x = i % gw, y = (i / gw) | 0;
+        let enK = 0, enM = Infinity;
+        for (let t = 0; t < tepeler.length; t++){
+          const m = (tepeler[t].x - x) ** 2 + (tepeler[t].y - y) ** 2;
+          if (m < enM){ enM = m; enK = t; }
+        }
+        const w = probs[i * K + camIdx], g2 = top[enK];
+        g2.sx += x * w; g2.sy += y * w; g2.sw += w; g2.n++;
+        if (w > g2.enP) g2.enP = w;
+      }
+      top.forEach(g2 => {
+        if (g2.n >= enAzAlan * 0.5 && g2.sw > 0)
+          sonuc.push({ x: g2.sx / g2.sw, y: g2.sy / g2.sw, p: g2.enP, kume: kumeNo,
+                       kumeAdet: tepeler.length, alanBlok: g2.n });
+      });
+    }
+  }
+  /* emniyet: hâlâ çok yakın iki merkez varsa güçlü olan kalır */
+  const dMin2 = (0.5 * tacBlok) ** 2;
+  sonuc.sort((a, b) => b.p - a.p);
+  const kabul = [];
+  for (const a of sonuc){
+    if (kabul.some(b => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 < dMin2)) continue;
+    kabul.push(a);
+  }
+  return kabul;
+}
+
 function agaclariHesapla(sessiz){
   const s = D.sonuc, g = D.gorsel;
   if (!s || !g) return;
@@ -4459,8 +4621,8 @@ function agaclariHesapla(sessiz){
   if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
   const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
   const dBlok = Math.max(1, Math.round(tacCalisPx / s.adim));
-  const agaclar = agacIsaretle({
-    probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik, minMesafe: dBlok
+  const agaclar = agacTespitAdaptif({
+    probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik, tacBlok: tacCalisPx / s.adim
   });
   const maske = new Uint8Array(s.gw * s.gh);
   for (let i = 0; i < s.gw * s.gh; i++){
@@ -4478,9 +4640,13 @@ function agaclariHesapla(sessiz){
   isaretKnvOlustur();
 
   const kutu = $('agacSonucKutu');
+  const kumeSayi = new Set(agaclar.filter(a => a.kume).map(a => a.kume)).size;
+  const tekSayi = agaclar.filter(a => !a.kume).length;
   let metin = '📍 <b>' + sayiTR(agaclar.length) + ' ' + kacHtml(D.siniflar[camIdx].ad) +
-    ' ağacı</b> işaretlendi (taç çapı ~' +
-    String(tac).replace('.', ',') + (geoVar ? ' m' : ' px') + ', eşik %' + $('esik').value + ').';
+    ' ağacı</b> işaretlendi — ' + sayiTR(tekSayi) + ' tek ağaç' +
+    (kumeSayi ? ' + ' + kumeSayi + ' kümede ' + sayiTR(agaclar.length - tekSayi) + ' gövde' : '') +
+    ' (taç çapı ~' + String(tac).replace('.', ',') + (geoVar ? ' m' : ' px') + ', eşik %' + $('esik').value + ').' +
+    '<br><small>Her ağaç için tek nokta: taç bileşenlerinin merkezi; birleşik taçlar tepe sayısına göre bölünür.</small>';
   if (D.enYogun){
     const wx = s.yari + D.enYogun.gx * s.adim, wy = s.yari + D.enYogun.gy * s.adim;
     const ozX = wx * g.olcek, ozY = wy * g.olcek;
@@ -4514,7 +4680,7 @@ function poligonKutuTemizle(){
   D.dogruluk = null;
   if (D.referans && D.referans.elle) elleDegerlendirBitir(false);
   $('btnPoligonGeojson').disabled = true;
-  $('btnDogrulukHesapla').disabled = true;
+  $('btnDogrulukHesapla').disabled = !(D.sonuc && (D.referansNokta || D.referansKume));
   goster($('poligonKutu'), false);
   goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false); goster($('sacilimKnv'), false);
   goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
@@ -4588,7 +4754,7 @@ async function poligonlariCikarUI(){
       : '🚫 Poligon çıkarılamadı — eşik üstünde çam alanı yok.';
     goster($('poligonKutu'), true);
     $('btnPoligonGeojson').disabled = !n;
-    $('btnDogrulukHesapla').disabled = !(n && D.referans);
+    $('btnDogrulukHesapla').disabled = !((n && D.referans) || (D.sonuc && (D.referansNokta || D.referansKume)));
     if (n && D.referans) durumYaz('Dogruluk', 'değerlendirmeye hazır');
     $('adimDogruluk').open = !!(n && D.referans);
     ciz();
@@ -4683,6 +4849,13 @@ function isaretKnvOlustur(){
     ctx.beginPath(); ctx.arc(x, y, Math.max(2, kalin * 1.3), 0, 2 * Math.PI); ctx.fill();
     ctx.fillStyle = turRenk;
     ctx.beginPath(); ctx.arc(x, y, Math.max(1, kalin * 0.7), 0, 2 * Math.PI); ctx.fill();
+    if (a.kume){                                          // küme üyesi: kesikli ikinci halka
+      ctx.setLineDash([kalin * 2, kalin * 1.6]);
+      ctx.lineWidth = Math.max(1, kalin * 0.8);
+      ctx.strokeStyle = turRenk;
+      ctx.beginPath(); ctx.arc(x, y, r * 1.35, 0, 2 * Math.PI); ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
   if (D.enYogun){
     const x = s.yari + D.enYogun.gx * s.adim, y = s.yari + D.enYogun.gy * s.adim;
@@ -4812,7 +4985,7 @@ $('btnAgacGeojson').addEventListener('click', () => {
     geometry: { type: 'Point', coordinates: koordinat(a.x, a.y) },
     properties: { no: i + 1,
       tur: D.siniflar[hedefTurIdx()].ad.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim() || 'agac',
-      guven: +a.p.toFixed(4) }
+      guven: +a.p.toFixed(4), kume_id: a.kume || 0, kume_adet: a.kume ? (a.kumeAdet || 0) : 1 }
   }));
   if (D.enYogun)
     ozellikler.push({
@@ -5400,102 +5573,58 @@ window.addEventListener('beforeunload', e => {
 $('btnReferansYukle').addEventListener('click', () => $('referansGirdi').click());
 $('referansGirdi').addEventListener('change', async e => {
   if (!e.target.files.length) return;
-  const dosya = e.target.files[0];
-  e.target.value = '';
-  const hataEl = $('dogrulukHata');
-  goster(hataEl, false);
-  try{
-    if (!D.gorsel) throw new Error('Önce görüntüyü yükleyin (koordinat dönüşümü için gerekli).');
-    const gj = JSON.parse(await dosya.text());
-    const halkalar = [];
-    const halkaEkle = koordinatlar => {
-      if (!Array.isArray(koordinatlar) || !koordinatlar.length) return;
-      const g = D.gorsel;
-      const geoVar = !!g.geo;
-      const px = [];
-      for (const nokta of koordinatlar){
-        if (!Array.isArray(nokta) || nokta.length < 2) return;
-        if (geoVar){
-          px.push((nokta[0] - g.geo.ox) / (g.geo.sx * g.olcek),
-                  (g.geo.oy - nokta[1]) / (g.geo.sy * g.olcek));
-        } else {
-          px.push(nokta[0] / g.olcek, -nokta[1] / g.olcek);
-        }
-      }
-      if (px.length >= 6) halkalar.push(px);
-    };
-    const geometriler = gj.type === 'FeatureCollection'
-      ? gj.features.map(f => f && f.geometry).filter(Boolean)
-      : (gj.type === 'Feature' ? [gj.geometry] : [gj]);
-    for (const geom of geometriler){
-      if (!geom) continue;
-      if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0]);
-      else if (geom.type === 'MultiPolygon')
-        for (const poli of geom.coordinates) halkaEkle(poli[0]);
-    }
-    if (!halkalar.length)
-      throw new Error('Dosyada Polygon/MultiPolygon bulunamadı. QGIS\'ten poligon katmanını GeoJSON olarak dışa aktarın.');
-    /* Görüntü kapsamı: dışarıda kalan referanslar değerlendirmeye ALINMAZ.
-       (Aksi halde tüm sahanın referansını küçük bir parçada kullanınca dışarıdaki
-        taçlar "kaçırıldı" sayılır ve recall/F1 haksız yere düşer.) */
-    const icerdekiler = [], disardakiler = [];
-    for (const h of halkalar){
-      let mx = 0, my = 0;
-      const n = h.length >> 1;
-      for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; }
-      mx /= n; my /= n;
-      (mx >= 0 && my >= 0 && mx < D.gorsel.outW && my < D.gorsel.outH ? icerdekiler : disardakiler).push(h);
-    }
-    const icerde = icerdekiler.length;
-    if (!icerde)
-      throw new Error('Referans poligonların hiçbiri bu görüntünün kapsamına düşmüyor (' +
-        halkalar.length + ' poligon). Koordinat sistemi uyuşmuyor olabilir — QGIS\'ten EPSG:' +
-        (D.gorsel.geo && D.gorsel.geo.epsg ? D.gorsel.geo.epsg : '(ortomozaikle aynı)') +
-        ' olarak yeniden dışa aktarın.');
-    if (D.referans && D.referans.elle) elleDegerlendirBitir(false);
-    D.referans = { ad: dosya.name, halkalarPx: icerdekiler, sayi: icerde, elle: false,
-                   toplam: halkalar.length, disarida: disardakiler.length };
-    D.dogruluk = null;
-    goster($('elleIpucu'), false);
-    goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false); goster($('sacilimKnv'), false);
-    goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
-    $('referansBilgi').innerHTML = '📥 <b>' + kacHtml(dosya.name) + '</b> — ' + halkalar.length +
-      ' referans poligon okundu' +
-      (disardakiler.length
-        ? '<br>📐 <b>' + icerde + ' tanesi bu görüntünün kapsamında</b>; ' + disardakiler.length +
-          ' poligon görüntü dışında kaldığı için değerlendirmeye alınmadı. ' +
-          '(Tüm sahanın referansını bir parça üzerinde kullanıyorsanız bu normaldir; ' +
-          'hiçbiri içeri düşmüyorsa CRS uyumunu — EPSG:' +
-          (D.gorsel.geo && D.gorsel.geo.epsg ? D.gorsel.geo.epsg : '?') + ' — kontrol edin.)'
-        : '<br>✓ Hepsi görüntü kapsamında.');
-    goster($('referansBilgi'), true);
-    $('btnDogrulukHesapla').disabled = !(D.poligonlar && D.poligonlar.liste.length);
-    durumYaz('Dogruluk', D.poligonlar ? 'değerlendirmeye hazır' : 'önce poligon çıkarın');
-    if (D.poligonlar) $('adimDogruluk').open = true;
-  }catch(hata){
-    hataEl.textContent = '⚠️ ' + (hata && hata.message ? hata.message : hata);
-    goster(hataEl, true);
-  }
+  const dosya = e.target.files[0]; e.target.value = '';
+  await referansDosyaOku(dosya, 'tac');
 });
+$('btnReferansNokta').addEventListener('click', () => $('referansNoktaGirdi').click());
+$('referansNoktaGirdi').addEventListener('change', async e => {
+  if (!e.target.files.length) return;
+  const dosya = e.target.files[0]; e.target.value = '';
+  await referansDosyaOku(dosya, 'nokta');
+});
+$('btnReferansKume').addEventListener('click', () => $('referansKumeGirdi').click());
+$('referansKumeGirdi').addEventListener('change', async e => {
+  if (!e.target.files.length) return;
+  const dosya = e.target.files[0]; e.target.value = '';
+  await referansDosyaOku(dosya, 'kume');
+});
+$('btnAyarTara').addEventListener('click', () => enIyiAyariBul());
 $('iouEsik').addEventListener('input', () => {
   $('iouEsikYazi').textContent = (parseInt($('iouEsik').value, 10) / 100).toFixed(2).replace('.', ',');
 });
 $('iouEsik').addEventListener('change', () => { if (D.dogruluk) dogrulukHesapla(); });
 $('btnDogrulukHesapla').addEventListener('click', async () => {
   if (D.mesgul) return;
-  /* model taç poligonları henüz yoksa otomatik üret — kullanıcıyı yorma */
-  if ((!D.poligonlar || !D.poligonlar.liste.length) && D.sonuc){
-    await poligonlariCikarUI();
-    if (!D.poligonlar || !D.poligonlar.liste.length){
-      const hataEl = $('dogrulukHata');
-      hataEl.textContent = '⚠️ Model bu görüntüde taç poligonu üretemedi — güven eşiğini düşürüp ' +
-        'Adım 4\u2019ten yeniden sınıflandırmayı deneyin.';
-      goster(hataEl, true);
-      return;
-    }
-  }
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
   if (D.referansModu) elleDegerlendirBitir(false);
-  dogrulukHesapla();
+  const alansal = !!D.referans;
+  const noktasal = !!(D.referansNokta || D.referansKume);
+  if (!alansal && !noktasal){
+    hataEl.textContent = '⚠️ Önce referans yükleyin (taç poligonu, ağaç noktası ya da küme) ya da elle işaretleyin.';
+    goster(hataEl, true);
+    return;
+  }
+  if (!D.sonuc){
+    hataEl.textContent = '⚠️ Önce Adım 4’ten görüntüyü sınıflandırın.';
+    goster(hataEl, true);
+    return;
+  }
+  if (noktasal && !D.agaclar) agaclariHesapla(true);   // nokta/küme ölçümü ağaç noktalarına dayanır
+  if (alansal){
+    if (!D.poligonlar || !D.poligonlar.liste.length){   // taç poligonu yoksa otomatik üret
+      await poligonlariCikarUI();
+      if (!D.poligonlar || !D.poligonlar.liste.length){
+        hataEl.textContent = '⚠️ Model bu görüntüde taç poligonu üretemedi — güven eşiğini düşürüp ' +
+          'Adım 4’ten yeniden sınıflandırmayı deneyin.';
+        goster(hataEl, true);
+        if (!noktasal) return;
+      }
+    }
+    if (D.poligonlar && D.poligonlar.liste.length) dogrulukHesapla();
+  }
+  if (noktasal) noktaDogrulukHesapla();
+  if (!alansal){ goster($('sacilimKnv'), false); goster($('sacilimNot'), false); }
 });
 
 function dogrulukHesapla(){
@@ -5710,49 +5839,341 @@ function sacilimCiz(xs, ys, r2){
 
 $('btnDogrulukRapor').addEventListener('click', () => {
   const d = D.dogruluk;
-  if (!d) return;
+  if (!d && !D.dogrulukNokta) return;
   const birim = D.poligonlar && D.poligonlar.geoVar ? 'm²' : 'px²';
   const m = [];
-  m.push('ÇAM-AI DOĞRULUK RAPORU — ' + d.zaman);
+  m.push('ÇAM-AI DOĞRULUK RAPORU — ' + (d ? d.zaman : D.dogrulukNokta.zaman));
   m.push('='.repeat(50));
-  m.push('Referans kaynağı : ' + d.refAd + ' (' + d.refSayi + ' poligon)');
-  if (D.referans && D.referans.disarida)
-    m.push('                   (dosyada ' + D.referans.toplam + ' poligon vardı; ' +
-      D.referans.disarida + ' tanesi görüntü kapsamı dışında kaldığı için değerlendirmeye alınmadı)');
-  if (d.referansTahminli)
-    m.push('NOT: Bu rapordaki referans ile değerlendirilen tahmin poligonları AYNI işaretlemeye dayanır ' +
-      '(tuvaldeki etiket katmanından türetildi). Özyineli tutarlılık denetimidir; gerçek genelleme ' +
-      'performansı için bağımsız referans (QGIS GeoJSON veya ayrı oturumda elle işaretleme) kullanın.');
-  m.push('Tahmin poligonu  : ' + (D.poligonlar ? D.poligonlar.liste.length : 0));
-  m.push('IoU eşiği        : ' + d.esik.toFixed(2) + ' (blok çözünürlüğünde)');
-  m.push('');
-  if (d.kapsamBazli){
-    m.push('Yöntem    : GÖRÜNTÜ GENELİ İKİLİ DOĞRULUK (işaretlenen çamlar pozitif,');
-    m.push('            geri kalan bloklar "Çam değil" negatif — blok düzeyinde)');
-    m.push('TP (doğru çam)   = ' + d.tp + '   FP (yanlış alarm) = ' + d.fp);
-    m.push('FN (kaçan çam)   = ' + d.fn + '   TN (doğru çam-değil) = ' + d.tn);
-    m.push('Doğruluk  = ' + (d.dogruluk * 100).toFixed(2) + '%');
-    m.push('İsabet    = ' + (d.precision * 100).toFixed(2) + '%');
-    m.push('Yakalama  = ' + (d.recall * 100).toFixed(2) + '%');
-    m.push('Bölgedeki ağaç noktası: ' + d.agacTahmin);
-  } else {
-    m.push('Yöntem    : IoU tabanlı eşleştirme (GeoJSON referans)');
-    m.push('TP = ' + d.tp + '   FP = ' + d.fp + '   FN = ' + d.fn);
-    m.push('Precision = ' + (d.precision * 100).toFixed(2) + '%');
-    m.push('Recall    = ' + (d.recall * 100).toFixed(2) + '%');
-    m.push('F1        = ' + (d.f1 * 100).toFixed(2) + '%');
+  if (d){
+    m.push('Referans kaynağı : ' + d.refAd + ' (' + d.refSayi + ' poligon)');
+    if (D.referans && D.referans.disarida)
+      m.push('                   (dosyada ' + D.referans.toplam + ' poligon vardı; ' +
+        D.referans.disarida + ' tanesi görüntü kapsamı dışında kaldığı için değerlendirmeye alınmadı)');
+    if (d.referansTahminli)
+      m.push('NOT: Bu rapordaki referans ile değerlendirilen tahmin poligonları AYNI işaretlemeye dayanır ' +
+        '(tuvaldeki etiket katmanından türetildi). Özyineli tutarlılık denetimidir; gerçek genelleme ' +
+        'performansı için bağımsız referans (QGIS GeoJSON veya ayrı oturumda elle işaretleme) kullanın.');
+    m.push('Tahmin poligonu  : ' + (D.poligonlar ? D.poligonlar.liste.length : 0));
+    m.push('IoU eşiği        : ' + d.esik.toFixed(2) + ' (blok çözünürlüğünde)');
+    m.push('');
+    if (d.kapsamBazli){
+      m.push('Yöntem    : GÖRÜNTÜ GENELİ İKİLİ DOĞRULUK (işaretlenen çamlar pozitif,');
+      m.push('            geri kalan bloklar "Çam değil" negatif — blok düzeyinde)');
+      m.push('TP (doğru çam)   = ' + d.tp + '   FP (yanlış alarm) = ' + d.fp);
+      m.push('FN (kaçan çam)   = ' + d.fn + '   TN (doğru çam-değil) = ' + d.tn);
+      m.push('Doğruluk  = ' + (d.dogruluk * 100).toFixed(2) + '%');
+      m.push('İsabet    = ' + (d.precision * 100).toFixed(2) + '%');
+      m.push('Yakalama  = ' + (d.recall * 100).toFixed(2) + '%');
+      m.push('Bölgedeki ağaç noktası: ' + d.agacTahmin);
+    } else {
+      m.push('Yöntem    : IoU tabanlı eşleştirme (GeoJSON referans)');
+      m.push('TP = ' + d.tp + '   FP = ' + d.fp + '   FN = ' + d.fn);
+      m.push('Precision = ' + (d.precision * 100).toFixed(2) + '%');
+      m.push('Recall    = ' + (d.recall * 100).toFixed(2) + '%');
+      m.push('F1        = ' + (d.f1 * 100).toFixed(2) + '%');
+    }
+    m.push('Alan R²   = ' + d.r2.toFixed(4) + ' (eşleşen ' + d.tp + ' çift)');
+    m.push('');
+    if (!d.kapsamBazli){
+      m.push('EŞLEŞEN ÇİFTLER (tahmin id, referans no, IoU, tahmin alan, referans alan [' + birim + '])');
+      for (const c of d.ciftDokum)
+        m.push('  #' + String(c.tahminId).padStart(4) + '  ref ' + String(c.refNo).padStart(4) +
+          '  IoU ' + c.iou.toFixed(3) + '  ' + c.alanTahmin.toFixed(2).padStart(10) +
+          '  ' + c.alanRef.toFixed(2).padStart(10));
+    }
   }
-  m.push('Alan R²   = ' + d.r2.toFixed(4) + ' (eşleşen ' + d.tp + ' çift)');
-  m.push('');
-  if (!d.kapsamBazli){
-    m.push('EŞLEŞEN ÇİFTLER (tahmin id, referans no, IoU, tahmin alan, referans alan [' + birim + '])');
-    for (const c of d.ciftDokum)
-      m.push('  #' + String(c.tahminId).padStart(4) + '  ref ' + String(c.refNo).padStart(4) +
-        '  IoU ' + c.iou.toFixed(3) + '  ' + c.alanTahmin.toFixed(2).padStart(10) +
-        '  ' + c.alanRef.toFixed(2).padStart(10));
+  if (D.dogrulukNokta){
+    const n = D.dogrulukNokta;
+    const fmt = v => (n.birim === 'm' ? v.toFixed(2) : Math.round(v)) + ' ' + n.birim;
+    m.push('');
+    m.push('NOKTA BAZLI DEĞERLENDİRME (ağaç başına tek nokta; eşleşme yarıçapı ' + n.yaricap + ' ' + n.birim + ')');
+    m.push('Referans        : ' + n.refSayi + ' tek ağaç' + (n.refAd ? ' (' + n.refAd + ')' : '') +
+      (n.kumeSayi ? ' + ' + n.kumeSayi + ' küme (' + n.kumeAd + ')' : '') + ' = ' + (n.refSayi + n.kumeSayi) + ' birim');
+    if (D.referansNokta && D.referansNokta.disarida)
+      m.push('                  (' + D.referansNokta.disarida + ' nokta görüntü kapsamı dışında, alınmadı)');
+    if (D.referansKume && D.referansKume.disarida)
+      m.push('                  (' + D.referansKume.disarida + ' küme görüntü kapsamı dışında, alınmadı)');
+    m.push('Tespit          : ' + n.tespit + ' nokta' + (n.kumeIciTespit ? ' (' + n.kumeIciTespit + ' tanesi küme içinde)' : ''));
+    m.push('TP = ' + n.tp + ' (tek ' + n.tpB + ' + küme ' + n.tpK + ')   FP = ' + n.fp + '   FN = ' + n.fn + ' (tek ' + n.fnB + ' + küme ' + n.fnK + ')');
+    m.push('Precision = ' + (n.precision * 100).toFixed(2) + '%');
+    m.push('Recall    = ' + (n.recall * 100).toFixed(2) + '%');
+    m.push('F1        = ' + (n.f1 * 100).toFixed(2) + '%');
+    if (n.tpB) m.push('Konum hatası (eşleşen ' + n.tpB + ' ağaç): ort ' + fmt(n.ortHata) + ' · medyan ' + fmt(n.medHata) + ' · en büyük ' + fmt(n.enBuyukHata));
+    m.push('Protokol  : küme poligonuna düşen tespitler kümeyi "bulundu" sayar; kümedeki fazla tespit FP sayılmaz;');
+    m.push('            tek ağaçlar yarıçap içinde artan mesafeyle bire bir eşlenir.');
+    if (n.kumeSayi){
+      m.push('Kümeler   : ' + n.kumeTespit.map((k, i) => '#' + (i + 1) + ': ' + k + ' tespit').join(' · '));
+    }
+    if (n.eslesen.length){
+      m.push('');
+      m.push('EŞLEŞEN AĞAÇLAR (referans no, tespit no, mesafe)');
+      for (const c of n.eslesen) m.push('  ref ' + String(c.r + 1).padStart(4) + '  tespit ' + String(c.t + 1).padStart(4) + '  ' + fmt(c.m * n.mBirim));
+    }
+  }
+  if (D.ayarTarama){
+    const t = D.ayarTarama;
+    m.push('');
+    m.push('PARAMETRE TARAMASI (' + t.zaman + '): ' + t.denenen + ' ayar denendi; seçilen eşik %' +
+      Math.round(t.enIyi.esik * 100) + ', taç çapı ' + (+t.enIyi.tac.toFixed(2)) + ' ' + t.birim + ' (girilen ' + t.tacGirdi + ')');
+    m.push('  ' + 'Eşik'.padEnd(7) + 'Taç'.padEnd(8) + 'TP'.padStart(4) + 'FP'.padStart(4) + 'FN'.padStart(4) + 'F1'.padStart(9));
+    for (const r of t.ilkBes)
+      m.push('  ' + ('%' + Math.round(r.esik * 100)).padEnd(7) + String(+r.tac.toFixed(2)).padEnd(8) + String(r.tp).padStart(4) +
+        String(r.fp).padStart(4) + String(r.fn).padStart(4) + ((r.f1 * 100).toFixed(2) + '%').padStart(9));
+    m.push('  NOT: Parametreler bu referansa göre seçildi; bağımsız test alanı sonuçları ayrıca raporlanmalıdır.');
   }
   indir(dosyaKok() + '_dogruluk_raporu.txt', m.join('\n'), 'text/plain;charset=utf-8');
 });
+
+
+/* =====================================================================
+   NOKTASAL + KÜMELİ DOĞRULUK — üçlü referans (taç poligonu / ağaç noktası / küme)
+   ===================================================================== */
+/* GeoJSON → çalışma pikseli; görüntü kapsamı dışındakiler ayrılır */
+function geojsonCoz(gj){
+  const g = D.gorsel, geoVar = !!g.geo;
+  const px = n => geoVar
+    ? [(n[0] - g.geo.ox) / (g.geo.sx * g.olcek), (g.geo.oy - n[1]) / (g.geo.sy * g.olcek)]
+    : [n[0] / g.olcek, -n[1] / g.olcek];
+  const halkalar = [], noktalar = [];
+  const halkaEkle = k => {
+    if (!Array.isArray(k) || k.length < 3) return;
+    const h = [];
+    for (const n of k){ if (!Array.isArray(n) || n.length < 2) return; const [x, y] = px(n); h.push(x, y); }
+    halkalar.push(h);
+  };
+  const noktaEkle = n => { if (Array.isArray(n) && n.length >= 2 && isFinite(n[0]) && isFinite(n[1])) noktalar.push(px(n)); };
+  const geometriler = gj.type === 'FeatureCollection'
+    ? (gj.features || []).map(f => f && f.geometry).filter(Boolean)
+    : (gj.type === 'Feature' ? [gj.geometry] : [gj]);
+  for (const geom of geometriler){
+    if (!geom) continue;
+    if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0]);
+    else if (geom.type === 'MultiPolygon') for (const p of geom.coordinates) halkaEkle(p[0]);
+    else if (geom.type === 'Point') noktaEkle(geom.coordinates);
+    else if (geom.type === 'MultiPoint') for (const n of geom.coordinates) noktaEkle(n);
+  }
+  const icinde = (x, y) => x >= 0 && y >= 0 && x < g.outW && y < g.outH;
+  const halkaIc = [], halkaDis = [];
+  for (const h of halkalar){
+    let mx = 0, my = 0; const n = h.length >> 1;
+    for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; }
+    (icinde(mx / n, my / n) ? halkaIc : halkaDis).push(h);
+  }
+  const noktaIc = noktalar.filter(n => icinde(n[0], n[1]));
+  return { halkalar: halkaIc, halkaDisarida: halkaDis.length, halkaToplam: halkalar.length,
+           noktalar: noktaIc, noktaDisarida: noktalar.length - noktaIc.length, noktaToplam: noktalar.length };
+}
+async function referansDosyaOku(dosya, tur){
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
+  try{
+    if (!D.gorsel) throw new Error('Önce görüntüyü yükleyin (koordinat dönüşümü için gerekli).');
+    const gj = JSON.parse(await dosya.text());
+    const c = geojsonCoz(gj);
+    const epsg = D.gorsel.geo && D.gorsel.geo.epsg ? 'EPSG:' + D.gorsel.geo.epsg : '(ortomozaikle aynı CRS)';
+    /* yanlış düğmeye hoşgörü: içerik ne ise ona göre yükle */
+    if (tur !== 'nokta' && !c.halkaToplam && c.noktaToplam) tur = 'nokta';
+    if (tur === 'nokta' && !c.noktaToplam && c.halkaToplam) tur = 'tac';
+    if (tur === 'nokta'){
+      if (!c.noktaToplam) throw new Error('Dosyada Point/MultiPoint bulunamadı — QGIS\'ten nokta katmanını GeoJSON olarak dışa aktarın.');
+      if (!c.noktalar.length) throw new Error('Noktaların hiçbiri (' + c.noktaToplam + ') görüntü kapsamına düşmüyor — ' + epsg + ' olarak yeniden dışa aktarın.');
+      D.referansNokta = { ad: dosya.name, noktalarPx: c.noktalar, sayi: c.noktalar.length,
+                          toplam: c.noktaToplam, disarida: c.noktaDisarida };
+    } else {
+      if (!c.halkaToplam) throw new Error('Dosyada Polygon/MultiPolygon bulunamadı — QGIS\'ten poligon katmanını GeoJSON olarak dışa aktarın.');
+      if (!c.halkalar.length) throw new Error('Poligonların hiçbiri (' + c.halkaToplam + ') görüntü kapsamına düşmüyor — ' + epsg + ' olarak yeniden dışa aktarın.');
+      const kayit = { ad: dosya.name, halkalarPx: c.halkalar, sayi: c.halkalar.length,
+                      toplam: c.halkaToplam, disarida: c.halkaDisarida, elle: false };
+      if (tur === 'kume') D.referansKume = kayit;
+      else { if (D.referans && D.referans.elle) elleDegerlendirBitir(false); D.referans = kayit; }
+    }
+    D.dogruluk = null; D.dogrulukNokta = null;
+    goster($('elleIpucu'), false);
+    goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false); goster($('noktaOzet'), false);
+    goster($('sacilimKnv'), false); goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
+    referansOzetiYaz();
+    $('adimDogruluk').open = true;
+  }catch(h){
+    hataEl.textContent = '⚠️ ' + (h && h.message ? h.message : h);
+    goster(hataEl, true);
+  }
+}
+function referansOzetiYaz(){
+  const geoVar = !!(D.gorsel && D.gorsel.geo && !D.gorsel.geo.cografi);
+  $('eslesmeBirim').textContent = geoVar ? 'm' : 'px';
+  const parca = [];
+  const satir = (ikon, r, birimAd) => ikon + ' <b>' + kacHtml(r.ad) + '</b> — ' + r.toplam + ' ' + birimAd +
+    ' okundu' + (r.disarida ? ', <b>' + r.sayi + '</b> tanesi kapsamda (' + r.disarida +
+    ' görüntü dışında, değerlendirmeye alınmaz)' : ', hepsi kapsamda');
+  if (D.referans && !D.referans.elle) parca.push(satir('🌿', D.referans, 'taç poligonu'));
+  if (D.referans && D.referans.elle) parca.push('✍️ Elle işaretleme — ' + D.referans.sayi + ' taç');
+  if (D.referansNokta) parca.push(satir('📍', D.referansNokta, 'ağaç noktası'));
+  if (D.referansKume) parca.push(satir('🌳', D.referansKume, 'küme poligonu'));
+  const varMi = parca.length > 0;
+  $('referansBilgi').innerHTML = parca.join('<br>') +
+    ((D.referansNokta || D.referansKume)
+      ? '<br><small>Noktasal protokol: her referans ağaç için eşleşme yarıçapı içindeki en yakın tespit ' +
+        'bire bir eşlenir; küme poligonuna düşen tespitler kümeyi "bulundu" sayar, kümedeki fazla ' +
+        'tespitler yanlış alarm sayılmaz.</small>' : '');
+  goster($('referansBilgi'), varMi);
+  $('btnDogrulukHesapla').disabled = !(varMi && D.sonuc);
+  $('btnAyarTara').disabled = !(D.sonuc && (D.referansNokta || D.referansKume));
+  durumYaz('Dogruluk', varMi ? (D.sonuc ? 'değerlendirmeye hazır' : 'önce sınıflandırın') : 'bekliyor');
+}
+function noktaHalkaIcinde(x, y, h){
+  let ic = false;
+  for (let i = 0, j = h.length - 2; i < h.length; j = i, i += 2){
+    const xi = h[i], yi = h[i + 1], xj = h[j], yj = h[j + 1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ic = !ic;
+  }
+  return ic;
+}
+function eslesmeYaricapPx(){
+  const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
+  let r = parseFloat(String($('eslesmeYaricap').value || '').replace(',', '.'));
+  if (!isFinite(r) || r <= 0) r = geoVar ? 3 : 40;
+  return { px: Math.max(1, geoVar ? r / (g.geo.sx * g.olcek) : r / g.olcek), deger: r, birim: geoVar ? 'm' : 'px' };
+}
+/* Protokol: tespitler önce küme poligonlarına atanır (küme ≥1 tespit → bulundu);
+   kalan tespitler referans noktalarla yarıçap içinde, artan mesafeyle bire bir eşlenir. */
+function noktaDogrulukOlc(agaclar, yaricapPx){
+  const s = D.sonuc;
+  const tesp = agaclar.map((a, i) => ({ i, x: s.yari + a.x * s.adim, y: s.yari + a.y * s.adim, p: a.p, kume: a.kume || 0 }));
+  const refN = D.referansNokta ? D.referansNokta.noktalarPx : [];
+  const kumeler = D.referansKume ? D.referansKume.halkalarPx : [];
+  const kumeTespit = kumeler.map(() => 0);
+  const serbest = [];
+  for (const t of tesp){
+    let k = -1;
+    for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(t.x, t.y, kumeler[i])){ k = i; break; }
+    if (k >= 0) kumeTespit[k]++; else serbest.push(t);
+  }
+  const adaylar = [];
+  for (let r = 0; r < refN.length; r++)
+    for (const t of serbest){
+      const m = Math.hypot(t.x - refN[r][0], t.y - refN[r][1]);
+      if (m <= yaricapPx) adaylar.push({ r, t: t.i, m });
+    }
+  adaylar.sort((a, b) => a.m - b.m);
+  const refEs = new Int32Array(refN.length).fill(-1), tesEs = new Set();
+  const eslesen = [];
+  for (const c of adaylar){
+    if (refEs[c.r] >= 0 || tesEs.has(c.t)) continue;
+    refEs[c.r] = c.t; tesEs.add(c.t); eslesen.push(c);
+  }
+  const tpB = eslesen.length, fnB = refN.length - tpB, fp = serbest.length - tpB;
+  const tpK = kumeTespit.filter(n => n > 0).length, fnK = kumeler.length - tpK;
+  const tp = tpB + tpK, fn = fnB + fnK;
+  const precision = tp + fp ? tp / (tp + fp) : 0, recall = tp + fn ? tp / (tp + fn) : 0;
+  const f1 = precision + recall ? 2 * precision * recall / (precision + recall) : 0;
+  const hatalar = eslesen.map(c => c.m).sort((a, b) => a - b);
+  return { tpB, fnB, fp, tpK, fnK, tp, fn, precision, recall, f1,
+    ortHataPx: hatalar.length ? hatalar.reduce((a, b) => a + b, 0) / hatalar.length : 0,
+    medHataPx: hatalar.length ? hatalar[hatalar.length >> 1] : 0,
+    enBuyukHataPx: hatalar.length ? hatalar[hatalar.length - 1] : 0,
+    eslesen, kumeTespit, refSayi: refN.length, kumeSayi: kumeler.length,
+    tespit: tesp.length, kumeIciTespit: tesp.length - serbest.length, yaricapPx };
+}
+function noktaDogrulukHesapla(){
+  if (!D.sonuc || !D.agaclar || !(D.referansNokta || D.referansKume)) return;
+  const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
+  const yr = eslesmeYaricapPx();
+  const o = noktaDogrulukOlc(D.agaclar, yr.px);
+  const mBirim = geoVar ? g.geo.sx * g.olcek : g.olcek;        // çalışma px → m (ya da özgün px)
+  const birim = geoVar ? 'm' : 'px';
+  D.dogrulukNokta = { ...o, yaricap: yr.deger, birim, mBirim,
+    ortHata: o.ortHataPx * mBirim, medHata: o.medHataPx * mBirim, enBuyukHata: o.enBuyukHataPx * mBirim,
+    refAd: D.referansNokta ? D.referansNokta.ad : null, kumeAd: D.referansKume ? D.referansKume.ad : null,
+    zaman: new Date().toLocaleString('tr-TR') };
+  const toplamRef = o.refSayi + o.kumeSayi;
+  const f1y = o.f1 * 100, ry = o.recall * 100, py = o.precision * 100;
+  const durum = f1y >= 90 ? 'iyi' : (f1y >= 75 ? 'orta' : 'kotu');
+  const sinifAd = kacHtml(D.siniflar[hedefTurIdx()].ad.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim());
+  const fmt = v => v.toFixed(1).replace('.', ',');
+  const hataYazi = o.tpB ? ' · konum hatası ort <b>' + (geoVar ? fmt(D.dogrulukNokta.ortHata) + ' m' : Math.round(D.dogrulukNokta.ortHata) + ' px') +
+    '</b> (med ' + (geoVar ? fmt(D.dogrulukNokta.medHata) + ' m' : Math.round(D.dogrulukNokta.medHata) + ' px') + ')' : '';
+  $('noktaOzet').innerHTML =
+    '<div class="buyuk-deger ' + durum + '">%' + fmt(f1y) + '</div>' +
+    '<div class="ozet-metin"><b>' + sinifAd + ' — noktasal tespit başarısı (F1)</b><br>' +
+    toplamRef + ' referans birimden <b>' + o.tp + '</b> tanesi bulundu' +
+    (o.kumeSayi ? ' (tek ağaç ' + o.tpB + '/' + o.refSayi + ' · küme ' + o.tpK + '/' + o.kumeSayi + ')' : '') +
+    ' · kaçırılan <b>' + o.fn + '</b> · yanlış alarm <b>' + o.fp + '</b></div>' +
+    '<div class="ozet-alt">İsabet %' + fmt(py) + ' · Yakalama %' + fmt(ry) +
+    ' · eşleşme yarıçapı ' + String(yr.deger).replace('.', ',') + ' ' + birim +
+    ' · tespit ' + o.tespit + (o.kumeIciTespit ? ' (' + o.kumeIciTespit + '’i küme içinde)' : '') + hataYazi + '</div>';
+  goster($('noktaOzet'), true);
+  if (!D.dogruluk){
+    const kartlar = [
+      ['TP', o.tp, 'iyi'], ['FP', o.fp, o.fp ? 'kotu' : 'iyi'], ['FN', o.fn, o.fn ? 'kotu' : 'iyi'],
+      ['Precision', yuzde(o.precision), ''], ['Recall', yuzde(o.recall), ''], ['F1', yuzde(o.f1), 'iyi']
+    ];
+    $('dogrulukKartlar').innerHTML = kartlar.map(k =>
+      '<div class="stat-kart ' + k[2] + '"><div class="deger">' + k[1] + '</div><div class="ad">' + k[0] + ' (nokta)</div></div>').join('');
+    goster($('dogrulukKartlar'), true);
+  }
+  goster($('btnDogrulukRapor'), true);
+  durumYaz('Dogruluk', '✓ nokta F1 ' + yuzde(o.f1), true);
+  $('adimDogruluk').open = true;
+}
+/* Güven eşiği × taç çapı ızgarasını tarar; nokta-F1'i en yüksek ayarı uygular.
+   Sunucuya gitmez: yalnız mevcut olasılık ızgarası üzerinde yeniden işaretler. */
+async function enIyiAyariBul(){
+  if (D.mesgul || !D.sonuc || !(D.referansNokta || D.referansKume)) return;
+  if (!D.agaclar) agaclariHesapla(true);
+  const s = D.sonuc, g = D.gorsel, K = D.siniflar.length, camIdx = hedefTurIdx();
+  const probs = aktifProbs();
+  const geoVar = !!(g.geo && !g.geo.cografi);
+  const tacGirdi = parseFloat(String($('tacCapi').value || '').replace(',', '.')) || (geoVar ? 3 : 60);
+  const yr = eslesmeYaricapPx();
+  const esikler = [0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80];
+  const carpanlar = [0.6, 0.8, 1.0, 1.25, 1.5, 1.8];
+  const btn = $('btnAyarTara');
+  D.mesgul = true; btn.disabled = true;
+  const eskiYazi = btn.textContent;
+  const sonuclar = [];
+  try{
+    let i = 0;
+    for (const e of esikler) for (const c of carpanlar){
+      const tac = tacGirdi * c;
+      const tacPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
+      const ag = agacTespitAdaptif({ probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik: e, tacBlok: tacPx / s.adim });
+      const o = noktaDogrulukOlc(ag, yr.px);
+      sonuclar.push({ esik: e, tac, f1: o.f1, precision: o.precision, recall: o.recall, tp: o.tp, fp: o.fp, fn: o.fn, n: ag.length });
+      btn.textContent = '🔎 taranıyor… ' + (++i) + '/' + (esikler.length * carpanlar.length);
+      if ((i & 3) === 0) await beklet();
+    }
+  }finally{
+    D.mesgul = false; btn.disabled = false; btn.textContent = eskiYazi;
+  }
+  /* en yüksek F1; eşitlikte girilen taç çapına en yakın ve daha yüksek eşik tercih edilir */
+  sonuclar.sort((a, b) => b.f1 - a.f1 || Math.abs(a.tac - tacGirdi) - Math.abs(b.tac - tacGirdi) || b.esik - a.esik);
+  const en = sonuclar[0];
+  $('esik').value = String(Math.round(en.esik * 100));
+  $('esikYazi').textContent = '%' + Math.round(en.esik * 100);
+  $('tacCapi').value = String(+en.tac.toFixed(2));
+  $('tacCapi').dataset.elleDegisti = '1';
+  D.ayarTarama = { denenen: sonuclar.length, enIyi: en, ilkBes: sonuclar.slice(0, 5),
+    tacGirdi, yaricap: yr.deger, birim: yr.birim, zaman: new Date().toLocaleString('tr-TR') };
+  if (typeof sonucKatmaniGuncelle === 'function') sonucKatmaniGuncelle();
+  agaclariHesapla(true);
+  /* alansal referans da varsa taç poligonlarını yeni ayarla yeniden çıkar ve IoU'yu güncelle */
+  if (D.referans){
+    await poligonlariCikarUI();
+    if (D.poligonlar && D.poligonlar.liste.length) dogrulukHesapla();
+  }
+  noktaDogrulukHesapla();
+  D.ayarTarama.bitti = true;
+  const birim = geoVar ? ' m' : ' px';
+  $('noktaOzet').innerHTML += '<div class="ipucu" style="margin-top:6px"><b>🔎 Ayar taraması</b> — ' +
+    sonuclar.length + ' kombinasyon denendi; seçilen: eşik <b>%' + Math.round(en.esik * 100) +
+    '</b>, taç çapı <b>' + String(+en.tac.toFixed(2)).replace('.', ',') + birim + '</b>.' +
+    '<table class="istat" style="margin-top:4px"><tr><th>Eşik</th><th>Taç</th><th>TP</th><th>FP</th><th>FN</th><th>F1</th></tr>' +
+    sonuclar.slice(0, 5).map(r => '<tr><td>%' + Math.round(r.esik * 100) + '</td><td>' +
+      String(+r.tac.toFixed(2)).replace('.', ',') + '</td><td>' + r.tp + '</td><td>' + r.fp + '</td><td>' +
+      r.fn + '</td><td><b>' + yuzde(r.f1) + '</b></td></tr>').join('') + '</table>' +
+    '<small>Not: parametreler bu referansa göre seçildi. Tezde ayarı bir doğrulama alt kümesinde seçip ' +
+    'bağımsız test alanında raporlamanız gerekir; rapor bu notu taşır.</small></div>';
+}
 
 /* =====================================================================
    RAPOR

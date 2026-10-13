@@ -61,29 +61,44 @@ edersiniz.
 
 ## Doğruluk Analizi — referans verisi nasıl hazırlanır
 
-İki yol var; ikisi de aynı IoU tabanlı değerlendirmeye girer:
+Üç referans türü vardır; hepsi birlikte yüklenebilir ve **🎯 Değerlendir** her
+biri için ayrı sonuç üretir:
 
-1. **QGIS'te poligon çizmek** (tez için bağımsız referans): aynı ortomozaik
-   üzerinde Çokgen (Polygon) katmanı açın, her tacın çevresini çizin, GeoJSON
-   olarak **ortomozaikle aynı EPSG'de** dışa aktarın → *Doğruluk Analizi →
-   📥 Referans GeoJSON yükle*. Nokta katmanları kabul edilmez; **taç poligonu**
-   gerekir (MultiPolygon da olur).
-2. **✍️ Elle değerlendir** (hızlı yol): tuvalde değnek/fırça/çokgenle taçları
-   işaretleyin; işaretler ayrı bir katmanda tutulur, modele dokunmaz.
+| Referans | QGIS katmanı | Ölçüt |
+|---|---|---|
+| 🌿 **Taç poligonları** | Çokgen (Polygon/MultiPolygon), her taç bir öge | Alansal — IoU eşleştirme, alan R² |
+| 📍 **Ağaç noktaları** | Nokta (Point), her ağaç bir öge | Noktasal — her ağaç için eşleşme yarıçapı içindeki en yakın tespit **bire bir** eşlenir; konum hatası (m) raporlanır |
+| 🌳 **Küme poligonları** | Çokgen; sınırları ayrılamayan ağaç grupları | İçine ≥1 tespit düşen küme **bulundu** sayılır; kümedeki fazla tespit yanlış alarm sayılmaz; boş küme kaçırılmış sayılır |
+
+Hepsini **ortomozaikle aynı EPSG'de** GeoJSON olarak dışa aktarın. Dördüncü yol:
+**✍️ Elle değerlendir** — tuvalde işaretlersiniz, ayrı katmanda tutulur.
+
+**Ağaç başına tek nokta:** tespit artık sabit yarıçaplı bastırma yerine *taç
+bileşenleri + uzaklık dönüşümü tepe sayımı* ile yapılır. Tek yuvarlak taç tek
+nokta verir (olasılık ağırlıklı merkez); birleşmiş taçlar boyun yerinden
+ayrılır ve her parça bir ağaç olur (küme üyeleri kesikli ikinci halkayla
+çizilir, GeoJSON'da `kume_id`/`kume_adet`). Taç boyu değişkenliğinden (2–12 m)
+etkilenmez.
+
+**🔎 En iyi ayarı bul:** güven eşiği (%35–80) × taç çapı (0,6–1,8×) ızgarasını
+sunucuya gitmeden tarar, nokta-F1'i en yüksek ayarı uygular ve ilk 5'i gösterir.
+Tez için dürüst kullanım: ayarı bir *doğrulama* alt kümesinde seçin, bağımsız
+*test* alanında raporlayın — rapor bu notu kendiliğinden taşır.
 
 Önemli ayrıntılar:
 - Referans dosyası tüm sahayı kapsıyor ama yalnız bir parçasını analiz
-  ediyorsanız sorun değil: **görüntü kapsamı dışındaki poligonlar değerlendirmeye
+  ediyorsanız sorun değil: **görüntü kapsamı dışındaki referanslar değerlendirmeye
   alınmaz** (kaç tanesinin elendiği arayüzde ve raporda yazar). Hiçbiri kapsama
   düşmüyorsa CRS uyuşmuyordur.
-- **Ort. taç çapı**'nı gerçek ortalamanıza yakın girin (QGIS'teki poligonların
-  eşdeğer çapından hesaplanabilir); çok küçük girerseniz tek taç birden fazla
-  tespite bölünür, çok büyük girerseniz komşu taçlar birleşir.
+- **Ort. taç çapı**'nı gerçek ortalamanıza yakın girin (QGIS poligonlarının
+  eşdeğer çapından); **eşleşme yarıçapı** ≈ taç yarıçapı (örn. 6 m taç → 3 m).
 - IoU, sınıflandırma **bloğu** çözünürlüğünde hesaplanır. Çok büyük bir
   ortomozaikte işleme çözünürlüğü 3072 px kalırsa blok adımı metre mertebesine
-  çıkar ve 5–6 m'lik taçlar birkaç bloğa sığar; taç düzeyinde IoU için ya
-  **işleme çözünürlüğünü 6144/8192** yapın ya da sahanın bir **parçasını**
-  (QGIS'te kırpıp) analiz edin ve Tarama sıklığını **Sık** seçin.
+  çıkar; taç düzeyinde IoU için **işleme çözünürlüğünü 6144/8192** yapın ya da
+  sahanın bir **parçasını** analiz edin ve Tarama sıklığını **Sık** seçin.
+
+Doğrulama (gerçek QGIS referansı, 2 cm/px çalışma çözünürlüğü, 13 tek taç + 3
+küme): noktasal F1 **%96,8**, yanlış alarm 0, ortalama konum hatası **0,80 m**.
 
 ## Dosyalar arasında geçiş — hangi dosya ne işe yarar
 
