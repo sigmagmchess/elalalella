@@ -588,6 +588,13 @@ textarea.rapor{
         <button class="btn kucuk" id="btnEgitimDosya" title="Eğitim ağaçlarını QGIS'ten ayrı bir GeoJSON (nokta ya da poligon) olarak da verebilirsiniz">📂 Dosyadan…</button>
         <input type="file" id="egitimGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
       </div>
+      <div class="satir" style="flex-wrap:wrap;gap:6px">
+        <button class="btn kucuk" id="btnReferansEtiket"
+          title="🎓 kutusundaki eğitim çamlarının taç poligonları Çam etiketi olur; çevrelerindeki kuşak Çam değil olur. Referanstaki BÜTÜN taçlar ve kümeler (test olanlar dahil) 2 m tamponla kuşağın dışında tutulur, test çamlarının kendisine dokunulmaz.">🖌️ Referanstan etiket üret (eğitim taçları → Çam, çevre → Çam değil)</button>
+        <label for="cevreYaricap" style="font-size:11.5px">Çevre kuşağı:</label>
+        <input type="number" id="cevreYaricap" min="3" max="60" step="1" value="15" style="max-width:56px">
+        <span style="font-size:11.5px;color:var(--ink2)">m</span>
+      </div>
       <div class="satir">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11.5px">
           <input type="checkbox" id="chkReferansGoster" checked>
@@ -3687,8 +3694,36 @@ function vurusUygula(v, kaydet){
       for (let x = x0; x <= x1; x++) m[y * W + x] = deger;
   } else if (tip === 'deynek'){
     tasmaDoldur(D.gorsel.rgba, D.gorsel.gecerli, W, H, v.x, v.y, v.tolerans, m, deger, 3000000);
+  } else if (tip === 'cevre'){
+    cevreDoldur(m, W, H, v, deger);
   }
   if (kaydet) D.vuruslar.push(v);
+}
+/* halkayı eşdeğer yarıçapına göre merkezden 'pay' px dışa (+) ya da içe (−) ölçekler — yaklaşık tampon */
+function halkaOlcekle(h, pay){
+  const n = h.length >> 1;
+  let mx = 0, my = 0, a = 0;
+  for (let i = 0; i < h.length; i += 2){
+    mx += h[i]; my += h[i + 1];
+    const j = (i + 2) % h.length;
+    a += h[i] * h[j + 1] - h[j] * h[i + 1];
+  }
+  mx /= n; my /= n;
+  const r = Math.sqrt(Math.abs(a) / 2 / Math.PI) || 1;
+  const k = Math.max(0.05, 1 + pay / r);
+  const s = new Array(h.length);
+  for (let i = 0; i < h.length; i += 2){ s[i] = mx + (h[i] - mx) * k; s[i + 1] = my + (h[i + 1] - my) * k; }
+  return s;
+}
+/* 'cevre' vuruşu: eğitim taçlarının (halkalar) 'yaricap' px kuşağı etiketlenir; TÜM referans taçları ve
+   kümeler (hepsi) 'tampon' px payla dışarıda bırakılır; yalnız geçerli pikseller yazılır */
+function cevreDoldur(m, W, H, v, deger){
+  const N = W * H;
+  const yakin = new Uint8Array(N), haric = new Uint8Array(N);
+  for (const h of v.halkalar) cokgenDoldur(yakin, W, H, halkaOlcekle(h, v.yaricap), 1);
+  for (const h of v.hepsi) cokgenDoldur(haric, W, H, halkaOlcekle(h, v.tampon), 1);
+  const g = D.gorsel.gecerli;
+  for (let i = 0; i < N; i++) if (yakin[i] && !haric[i] && g[i]) m[i] = deger;
 }
 
 /* fırça dışı araçlar: uygula + tuvali/istatistikleri tazele */
@@ -3846,8 +3881,9 @@ $('btnHavuzaEkle').addEventListener('click', async () => {
   const cozHavuz = D.havuz.length ? D.havuz[0].cozunurluk : null;
   if (cozHavuz && cozSimdi && cozHavuz !== cozSimdi &&
       !(await onayla('Havuzdaki kaynaklar işleme çözünürlüğü ' + cozHavuz + ' px ile eklenmiş; bu fotoğraf ' +
-        cozSimdi + ' px ile yüklü.\nFarklı çözünürlükler karışırsa doğruluk düşer. Önerilen: Adım 1\'de ' +
-        cozHavuz + ' px seçip fotoğrafı yeniden yükleyin.\n\nYine de eklensin mi?'))) return;
+        cozSimdi + ' px ile yüklü.\nFotoğraflar arasında farklı çözünürlükler karışırsa doğruluk düşer; önerilen: Adım 1\'de ' +
+        cozHavuz + ' px seçip fotoğrafı yeniden yükleyin.\nOrtomozaik + fotoğraf karışımı ise sorun değil: çalışma GSD\'leri ' +
+        'yakın (2–4 cm/px) olduğu sürece ekleyebilirsiniz.\n\nYine de eklensin mi?'))) return;
   const veri = ornekleriTopla(yama, parseInt($('secOrnekSiniri').value, 10));
   if (!veri.n){
     await bilgi('Havuza eklenecek örnek bulunamadı — önce fırça/değnek/çokgenle etiket işaretleyin.');
@@ -3886,6 +3922,8 @@ function vuruslariPaketle(liste){
     if (tip === 'cokgen') return { tip, sinif: v.sinif, noktalar: Array.from(v.noktalar, yuvarla) };
     if (tip === 'dikdortgen') return { tip, sinif: v.sinif,
       x0: yuvarla(v.x0), y0: yuvarla(v.y0), x1: yuvarla(v.x1), y1: yuvarla(v.y1) };
+    if (tip === 'cevre') return { tip, sinif: v.sinif, tampon: v.tampon, yaricap: v.yaricap,
+      halkalar: v.halkalar.map(h => Array.from(h, yuvarla)), hepsi: v.hepsi.map(h => Array.from(h, yuvarla)) };
     return { tip, sinif: v.sinif, x: v.x, y: v.y, tolerans: v.tolerans };
   });
 }
@@ -5645,6 +5683,8 @@ $('btnProjeAktar').addEventListener('click', () => {
       if (tip === 'cokgen') return { tip, sinif: v.sinif, noktalar: v.noktalar.map(yuvarla) };
       if (tip === 'dikdortgen') return { tip, sinif: v.sinif,
         x0: yuvarla(v.x0), y0: yuvarla(v.y0), x1: yuvarla(v.x1), y1: yuvarla(v.y1) };
+      if (tip === 'cevre') return { tip, sinif: v.sinif, tampon: v.tampon, yaricap: v.yaricap,
+        halkalar: v.halkalar.map(h => Array.from(h, yuvarla)), hepsi: v.hepsi.map(h => Array.from(h, yuvarla)) };
       return { tip, sinif: v.sinif, x: v.x, y: v.y, tolerans: v.tolerans };
     }),
     ayarlar: {
@@ -5851,6 +5891,7 @@ async function projeIceAktar(proje){
     if (t === 'firca') return Array.isArray(v.noktalar) && v.noktalar.length >= 2 && isFinite(v.boy);
     if (t === 'cokgen') return Array.isArray(v.noktalar) && v.noktalar.length >= 6;
     if (t === 'dikdortgen') return isFinite(v.x0) && isFinite(v.y0) && isFinite(v.x1) && isFinite(v.y1);
+    if (t === 'cevre') return Array.isArray(v.halkalar) && Array.isArray(v.hepsi) && isFinite(v.tampon) && isFinite(v.yaricap);
     return isFinite(v.x) && isFinite(v.y);
   };
   const projeVuruslar = (proje.vuruslar || []).filter(vurusGecerli);
@@ -6709,6 +6750,64 @@ async function egitimDosyaOku(dosya){
   }
 }
 $('chkReferansGoster').addEventListener('change', () => { if (D.gorsel) ciz(); });
+/* ---- REFERANSTAN ETİKET: eğitim çamlarının taçları → hedef tür; çevre kuşağı → "değil" sınıfı ----
+   Ortomozaiğin kendi görünümünü (Pix4D birleştirmesi, yapraklı komşular, gölgeler) modele göstermenin
+   en hızlı yolu. Test çamlarına ve tüm referans taçlarına 2 m tamponla dokunulmaz. */
+$('btnReferansEtiket').addEventListener('click', referanstanEtiketUret);
+async function referanstanEtiketUret(){
+  if (D.mesgul || !D.gorsel) return;
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
+  const hata = m => { hataEl.textContent = '⚠️ ' + m; goster(hataEl, true); };
+  const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
+  if (!(D.referans && !D.referans.elle && D.referans.halkalarPx.length))
+    return hata('Önce 🌿 taç poligonlarını yükleyin — eğitim taçları oradan alınır.');
+  if (!egitimDisiVar())
+    return hata('Önce 🎓 kutusuna eğitimde kullanacağınız çamların kimliklerini yazıp Uygula deyin. Yalnız o taçlar ' +
+      'Çam etiketi olur; kalan (test) çamlara dokunulmaz.');
+  if (D.siniflar.length < 2) return hata('En az iki sınıf gerekli.');
+  const dis = egitimDislamasi(eslesmeYaricapPx().px);
+  const egitimTaclar = D.referans.halkalarPx.filter((_, i) => dis.tacDisi[i]);
+  if (!egitimTaclar.length)
+    return hata('Kimlik listesi hiçbir taçla eşleşmedi. Nokta dosyası yüklüyse kimlikler o noktaların fid\'leri olmalı; ' +
+      'tuvaldeki numaralara bakın.');
+  const pxM = geoVar ? 1 / (g.geo.sx * g.olcek) : 1 / 0.025;        // m → çalışma px (coğrafi bilgi yoksa 2,5 cm/px varsayımı)
+  const kusakM = Math.max(3, parseFloat($('cevreYaricap').value) || 15), tamponM = 2, icPayM = 0.4;
+  const hepsi = D.referans.halkalarPx.concat(D.referansKume ? D.referansKume.halkalarPx : []);
+  const pozIdx = hedefTurIdx();
+  let negIdx = D.siniflar.findIndex((s, i) => i !== pozIdx && /değil|degil|yok|not|diğer|diger|arka/i.test(s.ad));
+  if (negIdx < 0) negIdx = D.siniflar.findIndex((s, i) => i !== pozIdx);
+  const adTemiz = i => D.siniflar[i].ad.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim();
+  const onay = await onayla(egitimTaclar.length + ' eğitim tacı "' + adTemiz(pozIdx) + '" etiketi olacak (kenardan ' +
+    icPayM + ' m içeri).\nÇevrelerindeki ' + kusakM + ' m kuşak "' + adTemiz(negIdx) + '" olacak; referanstaki ' +
+    hepsi.length + ' taç/küme ' + tamponM + ' m tamponla kuşağın dışında tutulur (test çamları dahil).\n' +
+    (D.vuruslar.length ? 'Ekrandaki ' + D.vuruslar.length + ' mevcut vuruş korunur.\n' : '') + '\nDevam edilsin mi?');
+  if (!onay) return;
+  if (D.referansModu) elleDegerlendirBitir(false);
+  D.mesgul = true;
+  try{
+    $('durumBilgi').textContent = 'Referanstan etiket üretiliyor…';
+    await beklet();
+    /* önce çevre (negatif), sonra taçlar (pozitif) — taç pikselleri kuşağı ezer */
+    vurusUygula({ tip: 'cevre', sinif: negIdx, halkalar: egitimTaclar.map(h => h.slice()),
+      hepsi: hepsi.map(h => h.slice()), tampon: tamponM * pxM, yaricap: kusakM * pxM }, true);
+    for (const h of egitimTaclar)
+      vurusUygula({ tip: 'cokgen', sinif: pozIdx, noktalar: halkaOlcekle(h, -icPayM * pxM) }, true);
+    etiketKnvYenile();
+  }finally{
+    D.mesgul = false;
+  }
+  sinifListesiCiz(); etiketDurumGuncelle(); egitimGecersizKil(); ciz();
+  $('adim2').open = true;
+  const say = sinifSayimlari();
+  $('durumBilgi').textContent = '✓ Referanstan etiket: ' + egitimTaclar.length + ' taç ' + adTemiz(pozIdx) +
+    ', çevre kuşağı ' + adTemiz(negIdx) + '.';
+  await bilgi('✓ ' + egitimTaclar.length + ' taç "' + adTemiz(pozIdx) + '" (' + sayiTR(say[pozIdx]) + ' px) ve çevre kuşağı "' +
+    adTemiz(negIdx) + '" (' + sayiTR(say[negIdx]) + ' px) olarak etiketlendi.\n\n' +
+    'Tuvalde kontrol edin, gerekirse fırça/silgiyle düzeltin. Sonra Adım 3 → ➕ Örnekleri havuza ekle ve 🧠 Eğitimi Başlat. ' +
+    'Fotoğraflardan gelen örnekler havuzda kalır; model iki kaynağı birlikte öğrenir. ' +
+    'Çözünürlük uyarısı çıkarsa "yine de ekle" deyin: ortomozaiğin çalışma GSD\'si fotoğraflarla uyumludur.');
+}
 /* tuvalde referans katmanı: numaralı noktalar, taç ve küme sınırları; dışlananlar gri kesikli */
 function referansKatmaniCiz(s){
   const tacVar = !!(D.referans && !D.referans.elle);

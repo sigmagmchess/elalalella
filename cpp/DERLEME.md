@@ -67,6 +67,14 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      bozduğu için kullanılmadı). Seyrek taçlı çamlar parçalanmaz, ağaç başına
      tek nokta kalır, taç poligonu referans taç gibi bütün çıkar. Ayar taraması
      ve rapor bu ayarı kullanır/yazar; proje dosyasında saklanır.
+   - **Doğruluk Analizi → 🖌️ Referanstan etiket üret:** ortomozaiğin kendi
+     görünümünü modele göstermenin en hızlı yolu. 🎓 kutusundaki eğitim
+     çamlarının taç poligonları hedef tür (Çam) etiketi olur (kenardan 0,4 m
+     içeri); çevrelerindeki kuşak (varsayılan 15 m, ayarlanabilir) "değil"
+     sınıfı olur. Referanstaki **bütün** taçlar ve kümeler, test olanlar dahil,
+     2 m tamponla kuşağın dışında tutulur; test çamlarına dokunulmaz. Üretilen
+     etiketler normal vuruş gibi davranır (geri al, havuz, proje, yedek). Sonra
+     havuza ekleyip fotoğraflardan gelen örneklerle birlikte yeniden eğitin.
    - **Doğruluk Analizi → 🎓 Eğitim ağaçları (değerlendirme dışı):** eğitimde
      kullandığınız çamları nokta dosyasının `fid` kimlikleriyle (örn. `3,4,7,10-14`)
      ya da ayrı bir GeoJSON ile verin. Bu ağaçlar referanstan çıkarılır;
