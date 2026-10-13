@@ -41,6 +41,10 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
    - **Adım 2** fırça/çokgen/değnekle etiketleyin; ＋ Sınıf ekle ile
      istediğiniz kadar tür tanımlayın (Çam, Dişbudak, …). Çoklu eğitim için
      **➕ Örnekleri havuza ekle** ile birden çok görüntü birleştirilebilir.
+     Havuz listesinde her fotoğrafın yanında **✏️ Düzenle** (aynı fotoğraf
+     yüklüyken etiket vuruşlarını görüntüye geri getirir; düzeltip yeniden
+     eklersiniz) ve **✕ Çıkar** (yalnız o fotoğrafı siler, diğerleri korunur)
+     bulunur. Vuruşlar havuz kaydıyla birlikte proje dosyasına da yazılır.
    - **Adım 3** 🧠 Eğitimi Başlat: örnekler C++ sunucusuna gönderilir,
      ~10M parametreli derin YSA orada eğitilir — **canlı kayıp/F1 eğrisi**,
      **karışıklık matrisi** ve **tür bazlı Precision/Recall/F1** panelde;

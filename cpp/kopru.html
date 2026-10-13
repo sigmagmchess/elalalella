@@ -431,12 +431,15 @@ textarea.rapor{
         <div class="ipucu" style="font-size:11px">Birden çok görüntüyle eğitmek için: etiketleyin →
           <b>havuza ekle</b> → Adım 1'den yeni görüntü yükleyin → etiketleyin → yine ekleyin…
           <b>Eğitimi Başlat</b>, havuzdaki tüm örnekleri + o anki etiketleri birlikte kullanır.
-          Farklı ışık/bölge/uçuş görüntüleri modeli genelleştirir.</div>
+          Farklı ışık/bölge/uçuş görüntüleri modeli genelleştirir. Yanlış etiket fark ederseniz listedeki
+          <b>✏️ Düzenle</b> o fotoğrafın etiketlerini geri getirir, <b>✕ Çıkar</b> yalnız o fotoğrafı siler;
+          diğer kaynaklar korunur.</div>
         <div class="arac-grup">
           <button class="btn kucuk" id="btnHavuzaEkle" disabled>➕ Örnekleri havuza ekle</button>
           <button class="btn kucuk" id="btnHavuzBosalt" disabled>🗑️ Boşalt</button>
         </div>
         <div id="havuzDurum" style="font-size:11.5px;color:var(--ink2)">Havuz boş.</div>
+        <div id="havuzListe" class="gizli" style="display:flex;flex-direction:column;gap:3px"></div>
       </div>
       <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat (C++ sunucuda)</button>
       <button class="btn gizli" id="btnEgitDurdur">⏹ Durdur (en iyi ağırlıklar korunur)</button>
@@ -3513,6 +3516,35 @@ function havuzGoster(){
       ' · yama ' + D.havuz[0].yama + ' px';
   }
   $('btnHavuzBosalt').disabled = !D.havuz.length || D.mesgul;
+  /* kaynak listesi: her fotoğraf tek tek düzenlenebilir / çıkarılabilir */
+  const liste = $('havuzListe');
+  liste.innerHTML = '';
+  D.havuz.forEach((h, i) => {
+    const sat = document.createElement('div');
+    sat.className = 'havuz-kaynak';
+    sat.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2)';
+    const yazi = document.createElement('span');
+    yazi.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    const ozet = D.siniflar.map((s, c) => s.ad + ' ' + sayiTR(h.sayimlar[c] || 0)).join(' · ');
+    yazi.textContent = (i + 1) + '. ' + h.ad + ' — ' + sayiTR(h.n) + ' yama (' + ozet + ')';
+    yazi.title = h.ad + (h.cozunurluk ? ' · işleme çözünürlüğü ' + h.cozunurluk + ' px' : '') +
+      (h.vuruslar && h.vuruslar.length ? ' · ' + h.vuruslar.length + ' vuruş saklı' : ' · vuruş saklı değil');
+    const duzenle = document.createElement('button');
+    duzenle.className = 'btn kucuk'; duzenle.dataset.islem = 'duzenle';
+    duzenle.textContent = '✏️ Düzenle';
+    duzenle.title = 'Bu fotoğrafın etiketlerini görüntüye geri getirip düzeltin (fotoğraf yüklü olmalı)';
+    duzenle.disabled = D.mesgul;
+    duzenle.addEventListener('click', () => havuzdanDuzenle(i));
+    const cikar = document.createElement('button');
+    cikar.className = 'btn kucuk'; cikar.dataset.islem = 'cikar';
+    cikar.textContent = '✕ Çıkar';
+    cikar.title = 'Yalnız bu fotoğrafı havuzdan çıkar';
+    cikar.disabled = D.mesgul;
+    cikar.addEventListener('click', () => havuzdanCikar(i));
+    sat.append(yazi, duzenle, cikar);
+    liste.append(sat);
+  });
+  goster(liste, D.havuz.length > 0);
 }
 function havuzuBosalt(){
   D.havuz = [];
@@ -3556,7 +3588,11 @@ $('btnHavuzaEkle').addEventListener('click', async () => {
     ad: D.gorsel.dosyaAd || ('görüntü ' + (D.havuz.length + 1)),
     yama, ozellik: OZELLIK_SAYISI,
     n: veri.n, sayimlar: veri.sayimlar, X24: veri.X24, y: veri.y,
-    gsd: (D.gorsel.geo && !D.gorsel.geo.cografi) ? D.gorsel.geo.sx * D.gorsel.olcek : null
+    gsd: (D.gorsel.geo && !D.gorsel.geo.cografi) ? D.gorsel.geo.sx * D.gorsel.olcek : null,
+    /* vuruşlar da saklanır: ✏️ Düzenle ile bu fotoğrafın etiketleri geri getirilebilir */
+    vuruslar: vuruslariPaketle(D.vuruslar),
+    outW: D.gorsel.outW, outH: D.gorsel.outH,
+    cozunurluk: parseInt($('secCozunurluk').value, 10)
   });
   D.vuruslar = [];
   D.etiketMaske.fill(0);
@@ -3568,8 +3604,76 @@ $('btnHavuzaEkle').addEventListener('click', async () => {
   await bilgi('✓ ' + sayiTR(veri.n) + ' örnek yama havuza eklendi (' + D.havuz.length + '. kaynak).\n\n' +
     'Görüntüdeki etiketler havuza taşındı. Şimdi Adım 1\'den yeni bir görüntü yükleyip etiketleyebilir ' +
     'ya da aynı görüntüde farklı bölgeleri işaretleyip yine ekleyebilirsiniz.\n' +
-    '"Eğitimi Başlat" havuzdaki tüm kaynakları + o anki etiketleri birlikte kullanır.');
+    '"Eğitimi Başlat" havuzdaki tüm kaynakları + o anki etiketleri birlikte kullanır.\n\n' +
+    'Yanlış etiket fark ederseniz: havuz listesinde ✏️ Düzenle bu fotoğrafın etiketlerini geri getirir, ' +
+    '✕ Çıkar yalnız bu fotoğrafı siler.');
 });
+/* vuruşları havuz kaydı için sade JSON'a çevirir (elle değerlendirme/referans katmanı hariç) */
+function vuruslariPaketle(liste){
+  const yuvarla = n => Math.round(n * 10) / 10;
+  return (liste || []).filter(v => v && !v.referans).map(v => {
+    const tip = v.tip || 'firca';
+    if (tip === 'firca') return { sinif: v.sinif, boy: v.boy, noktalar: Array.from(v.noktalar, yuvarla) };
+    if (tip === 'cokgen') return { tip, sinif: v.sinif, noktalar: Array.from(v.noktalar, yuvarla) };
+    if (tip === 'dikdortgen') return { tip, sinif: v.sinif,
+      x0: yuvarla(v.x0), y0: yuvarla(v.y0), x1: yuvarla(v.x1), y1: yuvarla(v.y1) };
+    return { tip, sinif: v.sinif, x: v.x, y: v.y, tolerans: v.tolerans };
+  });
+}
+/* havuzdan kaynak çıkınca sunucudaki kopya eskir: boşaltılır, bir sonraki tam eğitim yeniden eşitler */
+function sunucuHavuzunuTemizle(){
+  if (!CPP.bagli) return;
+  fetch(cppKok() + '/havuz/bosalt', { method: 'POST' }).then(() => cppBaglan()).catch(() => {});
+}
+/* tek kaynağı havuzdan çıkarır — diğer fotoğraflar korunur */
+async function havuzdanCikar(i){
+  if (D.mesgul || i >= D.havuz.length) return;
+  const h = D.havuz[i];
+  if (!(await onayla('"' + h.ad + '" kaynağı (' + sayiTR(h.n) + ' yama) havuzdan çıkarılsın mı?\n' +
+    'Diğer ' + (D.havuz.length - 1) + ' kaynak korunur.'))) return;
+  if (D.mesgul || D.havuz[i] !== h) return;
+  D.havuz.splice(i, 1);
+  sunucuHavuzunuTemizle();
+  havuzGoster();
+  etiketDurumGuncelle();
+  egitimGecersizKil();
+  $('durumBilgi').textContent = '"' + h.ad + '" havuzdan çıkarıldı — ' + D.havuz.length + ' kaynak kaldı.';
+}
+/* kaynağın etiket vuruşlarını geri getirir: fotoğraf yüklüyse düzeltip yeniden eklenir */
+async function havuzdanDuzenle(i){
+  if (D.mesgul || i >= D.havuz.length) return;
+  const h = D.havuz[i];
+  if (!h.vuruslar || !h.vuruslar.length){
+    await bilgi('"' + h.ad + '" kaynağında etiket vuruşları saklanmamış (eski sürümle ya da sunucu ' +
+      'havuzundan eklenmiş).\n\n"✕ Çıkar" ile havuzdan çıkarıp yalnız bu fotoğrafı yeniden etiketleyin. ' +
+      'Bundan sonra eklenen kaynaklar düzenlenebilir.');
+    return;
+  }
+  const g = D.gorsel;
+  if (!g || g.outW !== h.outW || g.outH !== h.outH){
+    await bilgi('Önce "' + h.ad + '" fotoğrafını Adım 1\'den, işleme çözünürlüğü ' +
+      (h.cozunurluk || '?') + ' px ile yükleyin; sonra yeniden ✏️ Düzenle\'ye basın.' +
+      (g ? '\n\nŞu an yüklü: ' + (g.dosyaAd || '—') + ' (' + g.outW + '×' + g.outH + ' px), gereken ' +
+        h.outW + '×' + h.outH + ' px.' : ''));
+    return;
+  }
+  if (g.dosyaAd !== h.ad && !(await onayla('Yüklü görüntünün adı farklı ("' + (g.dosyaAd || '—') +
+    '" ↔ "' + h.ad + '").\nVuruşlar yine de bu görüntüye getirilsin mi?'))) return;
+  if (D.mesgul || D.havuz[i] !== h) return;
+  if (D.referansModu) elleDegerlendirBitir(false);
+  D.havuz.splice(i, 1);
+  sunucuHavuzunuTemizle();
+  D.vuruslar.push(...h.vuruslar.map(v => ({ ...v, noktalar: v.noktalar ? v.noktalar.slice() : undefined })));
+  maskeyiYenidenKur();
+  sinifListesiCiz();
+  havuzGoster();
+  etiketDurumGuncelle();
+  egitimGecersizKil();
+  ciz();
+  $('adim2').open = true;
+  $('durumBilgi').textContent = h.vuruslar.length + ' etiket vuruşu geri getirildi — düzeltip ' +
+    '"➕ Örnekleri havuza ekle" ile yeniden ekleyin.';
+}
 $('btnHavuzBosalt').addEventListener('click', async () => {
   if (D.mesgul || !D.havuz.length) return;
   if (!(await onayla('Veri havuzundaki ' + D.havuz.length + ' kaynak (' + sayiTR(havuzOzeti().n) +
@@ -5175,6 +5279,8 @@ $('btnProjeAktar').addEventListener('click', () => {
     gorselOzet: { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
       outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek },
     havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk,
+      vuruslar: h.vuruslar && h.vuruslar.length ? h.vuruslar : null,
       sayimlar: h.sayimlar.slice(),
       y: Array.from(h.y),
       X24: Array.from(h.X24, v => Math.round(v * 1e4) / 1e4) })),
@@ -5393,6 +5499,8 @@ async function projeIceAktar(proje){
       h.n === h.y.length && h.X24.length === h.n * OZELLIK_SAYISI);
     D.havuz = uyumlu.map(h => ({
       ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk,
+      vuruslar: Array.isArray(h.vuruslar) ? h.vuruslar.filter(vurusGecerli) : null,
       sayimlar: (h.sayimlar || []).slice(),
       y: Int32Array.from(h.y), X24: Float32Array.from(h.X24)
     }));
