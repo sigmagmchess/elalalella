@@ -316,6 +316,7 @@ textarea.rapor{
       </div>
       <input type="file" id="dosyaGirdi" accept=".tif,.tiff,.jpg,.jpeg,.png,image/tiff,image/jpeg,image/png" class="gizli">
       <div id="bekleyenProjeNot" class="uyari gizli" style="font-size:12px"></div>
+      <div id="yedekNot" class="uyari gizli" style="font-size:12px"></div>
       <div class="satir">
         <label for="secCozunurluk">İşleme çözünürlüğü:</label>
         <select id="secCozunurluk">
@@ -440,6 +441,7 @@ textarea.rapor{
         </div>
         <div id="havuzDurum" style="font-size:11.5px;color:var(--ink2)">Havuz boş.</div>
         <div id="havuzListe" class="gizli" style="display:flex;flex-direction:column;gap:3px"></div>
+        <div id="yedekDurum" class="ipucu gizli" style="font-size:11px"></div>
       </div>
       <button class="btn birincil" id="btnEgit" disabled>🧠 Eğitimi Başlat (C++ sunucuda)</button>
       <button class="btn gizli" id="btnEgitDurdur">⏹ Durdur (en iyi ağırlıklar korunur)</button>
@@ -3242,7 +3244,7 @@ function sinifListesiCiz(){
     el.addEventListener('dblclick', async () => {
       if (D.mesgul) return;                // eğitim sürerken ad değişirse sunucu anlık görüntüsü şaşar
       const yeni = await sor('Sınıf adı:', s.ad);
-      if (yeni && yeni.trim()){ s.ad = yeni.trim(); sinifListesiCiz(); lejantCiz(); }
+      if (yeni && yeni.trim()){ s.ad = yeni.trim(); sinifListesiCiz(); lejantCiz(); yedekPlanla(); }
     });
     kap.appendChild(el);
   });
@@ -3524,6 +3526,7 @@ function etiketKnvYenile(){
     }
   }
   ctx.putImageData(gd, 0, 0);
+  yedekPlanla();                                   // etiket değişti → otomatik yedek
 }
 function egitimGecersizKil(){
   if (D.egitim && !D.egitim.iceAktarilan) durumYaz(3, 'etiketler değişti — yeniden eğitin');
@@ -3578,6 +3581,7 @@ function havuzGoster(){
     liste.append(sat);
   });
   goster(liste, D.havuz.length > 0);
+  yedekPlanla();                                   // havuz değişti → otomatik yedek
 }
 function havuzuBosalt(){
   D.havuz = [];
@@ -3888,6 +3892,7 @@ kanvas.addEventListener('pointerdown', e => {
     if (boyuyor && aktifVurus){                       // yarım vuruşu kayıt altına al
       D.vuruslar.push(aktifVurus);
       sinifListesiCiz(); etiketDurumGuncelle(); egitimGecersizKil(); referansElleGuncelle();
+      yedekPlanla();
     }
     boyuyor = false; aktifVurus = null;
     const p = [...isaretciler.values()];
@@ -4002,6 +4007,7 @@ function isaretciBirak(e){
     etiketDurumGuncelle();
     egitimGecersizKil();
     referansElleGuncelle();
+    yedekPlanla();
   }
   if (kaydiriyor){
     kaydiriyor = false;
@@ -6506,11 +6512,211 @@ $('btnRaporKopyala').addEventListener('click', async () => {
 });
 $('btnYardim').addEventListener('click', () => $('kipYardim').showModal());
 
+/* =====================================================================
+   OTOMATİK YEDEK — havuz + ekrandaki etiketler tarayıcının IndexedDB'sine
+   yazılır. Sekme kapansa, başka bir kopru.html kopyası açılsa bile aynı
+   tarayıcıda geri gelir. Proje dosyasının yerine geçmez; kaza sigortasıdır.
+   ===================================================================== */
+const YEDEK = { hazir: false, zamanlayici: null, db: null, bekleyen: null, yaziliyor: false, tekrar: false };
+function yedekDb(){
+  if (YEDEK.db) return Promise.resolve(YEDEK.db);
+  return new Promise((coz, red) => {
+    let q;
+    try{ q = indexedDB.open('cam_ai_yedek', 1); }catch(e){ red(e); return; }
+    q.onupgradeneeded = () => q.result.createObjectStore('kayit');
+    q.onsuccess = () => { YEDEK.db = q.result; coz(q.result); };
+    q.onerror = () => red(q.error || new Error('IndexedDB açılamadı'));
+    q.onblocked = () => red(new Error('IndexedDB engellendi'));
+  });
+}
+async function yedekOku(anahtar){
+  const db = await yedekDb();
+  return new Promise((coz, red) => {
+    const q = db.transaction('kayit').objectStore('kayit').get(anahtar);
+    q.onsuccess = () => coz(q.result || null);
+    q.onerror = () => red(q.error);
+  });
+}
+async function yedekYaz(anahtar, deger){
+  const db = await yedekDb();
+  return new Promise((coz, red) => {
+    const t = db.transaction('kayit', 'readwrite');
+    if (deger === null) t.objectStore('kayit').delete(anahtar);
+    else t.objectStore('kayit').put(deger, anahtar);
+    t.oncomplete = () => coz();
+    t.onerror = () => red(t.error);
+  });
+}
+function yedekPaketi(){
+  return {
+    surum: 1, zaman: Date.now(),
+    siniflar: D.siniflar.map(s => ({ ad: s.ad, renk: s.renk })),
+    ayarlar: { yama: parseInt($('secYama').value, 10), ornekSiniri: parseInt($('secOrnekSiniri').value, 10),
+               cozunurluk: parseInt($('secCozunurluk').value, 10) },
+    /* y / X24 tipli diziler olduğu gibi saklanır (structured clone) — JSON'a göre çok daha küçük/hızlı */
+    havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, vuruslar: h.vuruslar || null,
+      sayimlar: h.sayimlar.slice(), y: h.y, X24: h.X24 })),
+    vuruslar: D.gorsel ? vuruslariPaketle(D.vuruslar) : [],
+    gorselOzet: D.gorsel ? { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
+      outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek } : null
+  };
+}
+const yedekDolu = y => !!(y && ((y.havuz && y.havuz.length) || (y.vuruslar && y.vuruslar.length)));
+function yedekPlanla(){
+  if (!YEDEK.hazir) return;                        // açılış kararı verilmeden eski yedek ezilmez
+  clearTimeout(YEDEK.zamanlayici);
+  YEDEK.zamanlayici = setTimeout(yedekKaydet, 1500);
+}
+async function yedekKaydet(){
+  if (!YEDEK.hazir) return;
+  if (YEDEK.yaziliyor){ YEDEK.tekrar = true; return; }
+  YEDEK.yaziliyor = true;
+  try{
+    const yeni = yedekPaketi();
+    const eski = await yedekOku('son');
+    /* kaynak sayısı azalıyorsa bir önceki durum ayrıca saklanır — yanlış Boşalt/Çıkar sigortası */
+    if (eski && eski.havuz && eski.havuz.length > yeni.havuz.length) await yedekYaz('onceki', eski);
+    await yedekYaz('son', yedekDolu(yeni) ? yeni : null);
+    yedekDurumuYaz(yeni);
+  }catch(e){
+    console.warn('otomatik yedek yazılamadı', e);
+    const el = $('yedekDurum');
+    el.textContent = '💾 Otomatik yedek yazılamadı (tarayıcı depolamayı engelliyor) — projeyi sık kaydedin.';
+    goster(el, true);
+  }finally{
+    YEDEK.yaziliyor = false;
+    if (YEDEK.tekrar){ YEDEK.tekrar = false; yedekPlanla(); }
+  }
+}
+function yedekDurumuYaz(y){
+  const el = $('yedekDurum');
+  if (!yedekDolu(y)){ goster(el, false); return; }
+  const n = y.havuz.reduce((a, h) => a + h.n, 0);
+  el.textContent = '💾 Otomatik yedek ' + new Date(y.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) +
+    ' — ' + y.havuz.length + ' kaynak · ' + sayiTR(n) + ' yama' + (y.vuruslar.length ? ' · ekranda ' + y.vuruslar.length + ' vuruş' : '') +
+    ' (tarayıcı belleği; proje dosyası yerine geçmez)';
+  goster(el, true);
+}
+function yedekOzeti(y){
+  const n = y.havuz.reduce((a, h) => a + h.n, 0);
+  return y.havuz.length + ' kaynak · ' + sayiTR(n) + ' yama · ' + y.siniflar.length + ' sınıf' +
+    (y.vuruslar && y.vuruslar.length ? ' · ekranda ' + y.vuruslar.length + ' vuruş' : '') +
+    ' — ' + new Date(y.zaman).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+async function yedekBaslat(){
+  let son = null, onceki = null;
+  try{ son = await yedekOku('son'); onceki = await yedekOku('onceki'); }
+  catch(_e){ YEDEK.hazir = true; return; }       // IndexedDB yoksa yedeksiz devam
+  if (!yedekDolu(son) && !yedekDolu(onceki)){ YEDEK.hazir = true; return; }
+  YEDEK.bekleyen = { son: yedekDolu(son) ? son : null, onceki: yedekDolu(onceki) ? onceki : null };
+  const kutu = $('yedekNot');
+  kutu.innerHTML = '';
+  const baslik = document.createElement('div');
+  baslik.innerHTML = '💾 <b>Tarayıcı yedeği bulundu.</b> Önceki oturumda havuza eklediğiniz örnekler ve ekrandaki etiketler ' +
+    'kendiliğinden saklanmıştı. "Geri yükle"ye basana kadar yeni çalışmanız yedeklenmez.';
+  kutu.append(baslik);
+  for (const [anahtar, etiket] of [['son', 'Son yedek'], ['onceki', 'Bir önceki yedek']]){
+    const y = YEDEK.bekleyen[anahtar];
+    if (!y) continue;
+    const sat = document.createElement('div');
+    sat.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px';
+    const yazi = document.createElement('span');
+    yazi.textContent = etiket + ': ' + yedekOzeti(y);
+    const b = document.createElement('button');
+    b.className = 'btn kucuk'; b.dataset.yedek = anahtar; b.textContent = '⤵️ Geri yükle';
+    b.addEventListener('click', () => yedekGeriYukle(anahtar));
+    sat.append(yazi, b);
+    kutu.append(sat);
+  }
+  const sil = document.createElement('button');
+  sil.className = 'btn kucuk'; sil.id = 'btnYedekSil'; sil.textContent = '🗑️ Yedekleri sil';
+  sil.style.marginTop = '5px';
+  sil.addEventListener('click', yedekSil);
+  kutu.append(sil);
+  goster(kutu, true);
+  $('adim1').open = true;
+}
+async function yedekGeriYukle(anahtar){
+  const y = YEDEK.bekleyen && YEDEK.bekleyen[anahtar];
+  if (!y || D.mesgul) return;
+  const yama = y.havuz.length ? y.havuz[0].yama : null;
+  if (D.havuz.length){
+    const adlarAyni = y.siniflar.length === D.siniflar.length && y.siniflar.every((s, i) => s.ad === D.siniflar[i].ad);
+    if (!adlarAyni || (yama && D.havuz[0].yama !== yama)){
+      await bilgi('Havuzda şu an ' + D.havuz.length + ' kaynak var ve sınıf listesi ya da yama boyu yedekle uyuşmuyor.\n\n' +
+        'Önce Adım 5\'ten projeyi kaydedin, "🗑️ Boşalt" ile havuzu temizleyin, sonra yedeği geri yükleyin.');
+      return;
+    }
+    if (!(await onayla('Yedekteki ' + y.havuz.length + ' kaynak, havuzdaki ' + D.havuz.length +
+      ' kaynağın yanına eklensin mi?'))) return;
+  } else {
+    D.siniflar = y.siniflar.map((s, i) => ({ ad: s.ad, renk: s.renk || SINIF_RENKLERI[i % SINIF_RENKLERI.length] }));
+    D.seciliSinif = 0;
+    sonucuGecersizKil();
+    etiketleriSiniflaraUydur();
+    if (y.ayarlar){
+      if (y.ayarlar.yama) $('secYama').value = String(y.ayarlar.yama);
+      if (y.ayarlar.ornekSiniri) $('secOrnekSiniri').value = String(y.ayarlar.ornekSiniri);
+      if (y.ayarlar.cozunurluk && [...$('secCozunurluk').options].some(o => o.value === String(y.ayarlar.cozunurluk)))
+        $('secCozunurluk').value = String(y.ayarlar.cozunurluk);
+    }
+  }
+  for (const h of y.havuz){
+    D.havuz.push({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, vuruslar: h.vuruslar || null,
+      sayimlar: (h.sayimlar || []).slice(),
+      y: h.y instanceof Int32Array ? h.y : Int32Array.from(h.y),
+      X24: h.X24 instanceof Float32Array ? h.X24 : Float32Array.from(h.X24) });
+  }
+  let mesaj = 'Yedek geri yüklendi: ' + y.havuz.length + ' kaynak, ' +
+    sayiTR(y.havuz.reduce((a, h) => a + h.n, 0)) + ' yama.';
+  if (y.vuruslar && y.vuruslar.length){
+    if (D.vuruslar.length){
+      mesaj += '\nEkranda zaten etiket olduğu için yedekteki ' + y.vuruslar.length + ' vuruş uygulanmadı.';
+    } else if (D.gorsel && y.gorselOzet && D.gorsel.outW === y.gorselOzet.outW && D.gorsel.outH === y.gorselOzet.outH){
+      D.vuruslar = y.vuruslar.map(v => ({ ...v, noktalar: v.noktalar ? v.noktalar.slice() : undefined }));
+      D.referansMaske = null;
+      maskeyiYenidenKur();
+      mesaj += '\n' + D.vuruslar.length + ' etiket vuruşu görüntüye geri getirildi.';
+    } else {
+      /* görüntü yok/boyut tutmuyor → bekleyen proje mekanizması: fotoğraf gelince kendiliğinden yerleşir */
+      D.bekleyenProje = { bicim: 'cam-ai-proje', siniflar: y.siniflar, vuruslar: y.vuruslar,
+        gorselOzet: y.gorselOzet, ayarlar: y.ayarlar, havuz: [], model: null };
+      const ad = y.gorselOzet ? y.gorselOzet.ad : 'aynı görüntü';
+      $('bekleyenProjeNot').innerHTML = '⏳ <b>Etiketler beklemede:</b> ' + kacHtml(ad) +
+        ' görüntüsünü Adım 1\'den yükleyin — ' + y.vuruslar.length +
+        ' etiket vuruşu kendiliğinden yerleşecek. (İşleme çözünürlüğü: ' +
+        (y.ayarlar && y.ayarlar.cozunurluk ? y.ayarlar.cozunurluk + ' px' : 'kayıtlı değer') + ')';
+      goster($('bekleyenProjeNot'), true);
+      mesaj += '\nSon fotoğrafın ' + y.vuruslar.length + ' etiket vuruşu beklemede: "' + ad +
+        '" fotoğrafını Adım 1\'den yükleyin, kendiliğinden yerleşir.';
+    }
+  }
+  YEDEK.bekleyen = null;
+  goster($('yedekNot'), false);
+  YEDEK.hazir = true;
+  sinifListesiCiz(); lejantCiz(); havuzGoster(); etiketDurumGuncelle();
+  if (D.gorsel) ciz();
+  yedekKaydet();
+  await bilgi(mesaj + '\n\nBundan sonra yaptıklarınız yine otomatik yedeklenir. Yine de her fotoğraftan sonra ' +
+    'Adım 5\'ten projeyi kaydedin; yedek yalnız bu tarayıcıda durur.');
+}
+async function yedekSil(){
+  if (!(await onayla('Tarayıcıdaki yedekler silinsin mi? Bu geri alınamaz.'))) return;
+  try{ await yedekYaz('son', null); await yedekYaz('onceki', null); }catch(_e){}
+  YEDEK.bekleyen = null;
+  goster($('yedekNot'), false);
+  YEDEK.hazir = true;
+  yedekPlanla();
+}
+
 /* başlangıç */
 sinifListesiCiz();
 havuzGoster();
 kanvasBoyutla();
 cppBaglan();                               // açılışta sunucuyu dene — kayıtlı model varsa göster
+yedekBaslat();                             // önceki oturumun tarayıcı yedeği varsa geri yükleme teklif et
 </script>
 </body>
 </html>

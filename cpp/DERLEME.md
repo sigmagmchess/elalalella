@@ -47,6 +47,13 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      bulunur. Vuruşlar havuz kaydıyla birlikte proje dosyasına da yazılır.
      **Sınıf eklemek havuzu boşaltmaz** (yeni sınıf sona eklenir); sınıf
      silmek yalnız o sınıfın örneklerini havuzdan çıkarır, kalan kaynaklar durur.
+     **Otomatik yedek:** havuz ve ekrandaki etiketler her değişiklikten ~1,5 s
+     sonra tarayıcının IndexedDB'sine yazılır. Sekme kapansa ya da başka bir
+     `kopru.html` kopyası açılsa bile aynı tarayıcıda sayfa açılınca Adım 1'de
+     "Tarayıcı yedeği bulundu" notu çıkar; **⤵️ Geri yükle** ile havuz ve
+     etiketler geri gelir (kaynak sayısı azalan bir işlemden önceki durum da
+     "bir önceki yedek" olarak tutulur). Bu bir kaza sigortasıdır; proje
+     dosyası (Adım 5) yerine geçmez ve başka bir tarayıcıya/bilgisayara taşınmaz.
    - **Adım 3** 🧠 Eğitimi Başlat: örnekler C++ sunucusuna gönderilir,
      ~10M parametreli derin YSA orada eğitilir — **canlı kayıp/F1 eğrisi**,
      **karışıklık matrisi** ve **tür bazlı Precision/Recall/F1** panelde;
