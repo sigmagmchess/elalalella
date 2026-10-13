@@ -45,6 +45,8 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      yüklüyken etiket vuruşlarını görüntüye geri getirir; düzeltip yeniden
      eklersiniz) ve **✕ Çıkar** (yalnız o fotoğrafı siler, diğerleri korunur)
      bulunur. Vuruşlar havuz kaydıyla birlikte proje dosyasına da yazılır.
+     **Sınıf eklemek havuzu boşaltmaz** (yeni sınıf sona eklenir); sınıf
+     silmek yalnız o sınıfın örneklerini havuzdan çıkarır, kalan kaynaklar durur.
    - **Adım 3** 🧠 Eğitimi Başlat: örnekler C++ sunucusuna gönderilir,
      ~10M parametreli derin YSA orada eğitilir — **canlı kayıp/F1 eğrisi**,
      **karışıklık matrisi** ve **tür bazlı Precision/Recall/F1** panelde;

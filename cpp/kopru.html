@@ -3316,7 +3316,13 @@ $('btnSinifEkle').addEventListener('click', async () => {
   D.siniflar.push({ ad: ad.trim(), renk: SINIF_RENKLERI[D.siniflar.length % SINIF_RENKLERI.length] });
   D.seciliSinif = D.siniflar.length - 1;
   if (D.egitim || D.sonuc) egitimiSifirla('sınıflar değişti — yeniden eğitin');
-  if (D.havuz.length){ havuzuBosalt(); $('durumBilgi').textContent = 'Sınıflar değişti — veri havuzu boşaltıldı.'; }
+  /* sona eklenen sınıf mevcut etiket numaralarını bozmaz → havuz KORUNUR (eskiden boşaltılıyordu) */
+  if (D.havuz.length){
+    for (const h of D.havuz) while (h.sayimlar.length < D.siniflar.length) h.sayimlar.push(0);
+    havuzGoster();
+    $('durumBilgi').textContent = 'Yeni sınıf eklendi — havuzdaki ' + D.havuz.length +
+      ' kaynak korundu; "' + ad.trim() + '" için henüz örnek yok, etiketleyip ekleyin.';
+  }
   sinifListesiCiz();
   lejantCiz();
   etiketDurumGuncelle();
@@ -3339,11 +3345,38 @@ async function sinifSil(i){
   if (D.seciliSinif >= D.siniflar.length) D.seciliSinif = 0;
   etiketKnvYenile();
   if (D.egitim || D.sonuc) egitimiSifirla('sınıflar değişti — yeniden eğitin');
-  if (D.havuz.length){ havuzuBosalt(); $('durumBilgi').textContent = 'Sınıflar değişti — veri havuzu boşaltıldı.'; }
+  /* havuz korunur: silinen sınıfın örnekleri çıkarılır, sonraki sınıf numaraları kaydırılır */
+  if (D.havuz.length){
+    const onceki = D.havuz.length;
+    havuzSinifSil(i);
+    sunucuHavuzunuTemizle();
+    havuzGoster();
+    $('durumBilgi').textContent = 'Sınıf silindi — havuzdaki ' + D.havuz.length + '/' + onceki +
+      ' kaynak korundu, o sınıfın örnekleri çıkarıldı.';
+  }
   sinifListesiCiz();
   lejantCiz();
   etiketDurumGuncelle();
   ciz();
+}
+/* havuzdan bir sınıfın örneklerini çıkarır; i'den büyük sınıf numaraları bir azalır */
+function havuzSinifSil(i){
+  const d = OZELLIK_SAYISI;
+  D.havuz = D.havuz.map(h => {
+    const tut = [];
+    for (let k = 0; k < h.n; k++) if (h.y[k] !== i) tut.push(k);
+    const X = new Float32Array(tut.length * d), y = new Int32Array(tut.length);
+    tut.forEach((k, j) => {
+      X.set(h.X24.subarray(k * d, (k + 1) * d), j * d);
+      y[j] = h.y[k] > i ? h.y[k] - 1 : h.y[k];
+    });
+    const sayimlar = h.sayimlar.slice();
+    if (i < sayimlar.length) sayimlar.splice(i, 1);
+    const vuruslar = h.vuruslar
+      ? h.vuruslar.filter(v => v.sinif !== i).map(v => v.sinif > i ? { ...v, sinif: v.sinif - 1 } : v)
+      : h.vuruslar;
+    return { ...h, X24: X, y, n: tut.length, sayimlar, vuruslar };
+  }).filter(h => h.n > 0);
 }
 
 function aracSec(ad){
