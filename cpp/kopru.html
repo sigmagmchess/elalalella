@@ -314,7 +314,7 @@ textarea.rapor{
         <b>Pix4D çıktınızı buraya bırakın</b> ya da tıklayıp seçin<br>
         <small>GeoTIFF ortomozaik (<code>.tif</code>), DSM/DTM (<code>.tif</code>), <code>.jpg</code>, <code>.png</code></small>
       </div>
-      <input type="file" id="dosyaGirdi" accept=".tif,.tiff,.jpg,.jpeg,.png,image/tiff,image/jpeg,image/png" class="gizli">
+      <input type="file" id="dosyaGirdi" accept=".tif,.tiff,.jpg,.jpeg,.png,image/tiff,image/jpeg,image/png" class="gizli" multiple>
       <div id="bekleyenProjeNot" class="uyari gizli" style="font-size:12px"></div>
       <div id="yedekNot" class="uyari gizli" style="font-size:12px"></div>
       <div class="satir">
@@ -341,7 +341,10 @@ textarea.rapor{
       <table class="bilgi gizli" id="tabloBilgi"></table>
       <div class="ipucu">💡 GeoTIFF yüklerseniz <b>GSD (yer örnekleme aralığı)</b> ve <b>koordinat sistemi</b>
         (Pix4D'de genellikle UTM) otomatik okunur; alan hesapları m² cinsinden yapılır ve sonuçlar CBS'ye (QGIS) aktarılabilir.
-        Dosyanız çok büyükse Pix4D'den LZW sıkıştırmalı GeoTIFF ya da JPG dışa aktarımı da kullanabilirsiniz.</div>
+        Dosyanız çok büyükse Pix4D'den LZW sıkıştırmalı GeoTIFF ya da JPG dışa aktarımı da kullanabilirsiniz.
+        <b>Tek dosya açılamayacak kadar büyükse:</b> Pix4D'nin karo dosyalarını (<code>…_group1_1_1.tif</code>,
+        <code>_1_2.tif</code>, …) dosya penceresinde <b>topluca seçin</b>; uygulama onları koordinatlarına göre
+        tek görüntüde birleştirir. Yalnız çamların olduğu karoları seçmeniz yeterlidir.</div>
     </div>
   </details>
 
@@ -1111,6 +1114,8 @@ async function tiffCoz(buf, secenek = {}){
   const w = D(256, [0])[0], h = D(257, [0])[0];
   if (!w || !h) throw new Error('TIFF boyutları okunamadı.');
   if (w * h > 4e9) throw new Error('Görüntü aşırı büyük (' + w + '×' + h + ').');
+  /* yalnız başlık: karolu mozaik birleştirme için boyut + coğrafi bilgi (piksel çözülmez) */
+  if (secenek.yalnizBaslik) return { w, h, geo: geoOku(dv, sayfa, az) };
   const bitler = D(258, [8]);
   const bit = bitler[0];
   const sik = D(259, [1])[0];
@@ -1161,8 +1166,8 @@ async function tiffCoz(buf, secenek = {}){
   }
   const karoSutun = karoMu ? Math.ceil(w / cW) : 1;
 
-  /* hedef (çalışma) çözünürlüğü */
-  const k = Math.max(1, Math.ceil(Math.max(w, h) / maxDim));
+  /* hedef (çalışma) çözünürlüğü — kZorla: karolu mozaikte tüm karolar ortak k ile çözülür */
+  const k = secenek.kZorla ? Math.max(1, secenek.kZorla | 0) : Math.max(1, Math.ceil(Math.max(w, h) / maxDim));
   const outW = Math.ceil(w / k), outH = Math.ceil(h / k);
   const N = outW * outH;
   const ortalamaVar = k > 1 && foto !== 3;             // palet indeksi ortalanmaz
@@ -3032,10 +3037,12 @@ birak.addEventListener('dragover', e => { e.preventDefault(); birak.classList.ad
 birak.addEventListener('dragleave', () => birak.classList.remove('ustunde'));
 birak.addEventListener('drop', e => {
   e.preventDefault(); birak.classList.remove('ustunde');
-  if (e.dataTransfer.files.length) dosyaYukle(e.dataTransfer.files[0]);
+  const fl = e.dataTransfer.files;
+  if (fl.length > 1) karolariYukle([...fl]); else if (fl.length) dosyaYukle(fl[0]);
 });
 $('dosyaGirdi').addEventListener('change', e => {
-  if (e.target.files.length) dosyaYukle(e.target.files[0]);
+  const fl = e.target.files;
+  if (fl.length > 1) karolariYukle([...fl]); else if (fl.length) dosyaYukle(fl[0]);   // çoklu seçim = Pix4D karoları
   e.target.value = '';
 });
 
@@ -3097,6 +3104,112 @@ async function dosyaYukle(dosya){
     hataEl.textContent = '⚠️ Yükleme başarısız: ' + (hata && hata.message ? hata.message : hata) +
       '\n\nÇözüm önerileri:\n• Pix4D\'den "GeoTIFF (LZW)" veya JPG olarak yeniden dışa aktarın.\n' +
       '• Çok büyükse işleme çözünürlüğünü 2048\'e düşürün.';
+    goster(hataEl, true);
+    return false;
+  }finally{
+    D.mesgul = false;
+  }
+}
+
+/* PIX4D KAROLARI: aynı GSD/CRS'li birden çok GeoTIFF (…_group1_r_c.tif) koordinatlarına göre tek
+   çalışma görüntüsünde birleştirilir. Her karo ayrı çözüldüğü için dev tek dosyanın bellek sınırı aşılmaz. */
+async function karolariYukle(dosyalar){
+  if (D.mesgul) return false;
+  const hataEl = $('yukleHata');
+  goster(hataEl, false);
+  const tifler = [...dosyalar].filter(f => /\.tiff?$/i.test(f.name || ''));
+  if (tifler.length !== dosyalar.length){
+    hataEl.textContent = 'Birden çok dosya seçildiğinde hepsi GeoTIFF karosu (.tif) olmalı. JPG/PNG fotoğraflar tek tek yüklenir.';
+    goster(hataEl, true);
+    return false;
+  }
+  const maxDim = parseInt($('secCozunurluk').value, 10);
+  const safNodata = $('chkSafNodata').checked;
+  D.mesgul = true;
+  const kutu = $('yukleIlerlemeKutu'), cubuk = $('yukleIlerleme'), yazi = $('yukleIlerlemeYazi');
+  goster(kutu, true);
+  try{
+    /* 1) yalnız başlıklar: boyut + coğrafi bilgi */
+    const basliklar = [];
+    for (let i = 0; i < tifler.length; i++){
+      ilerlemeKur(kutu, cubuk, yazi, 0.02 + 0.08 * i / tifler.length, 'karo başlıkları okunuyor… ' + (i + 1) + '/' + tifler.length);
+      await beklet();
+      const f = tifler[i];
+      const b = await tiffCoz(await f.arrayBuffer(), { yalnizBaslik: true });
+      if (!b.geo) throw new Error('"' + f.name + '" coğrafi bilgi içermiyor — karolar GeoTIFF olmalı.');
+      if (b.geo.cografi) throw new Error('"' + f.name + '" derece koordinatlı; karolar projeksiyonlu (ör. UTM, EPSG:32635) olmalı.');
+      basliklar.push({ f, w: b.w, h: b.h, geo: b.geo });
+    }
+    const g0 = basliklar[0].geo;
+    for (const b of basliklar){
+      if (Math.abs(b.geo.sx - g0.sx) > 1e-6 * g0.sx || Math.abs(b.geo.sy - g0.sy) > 1e-6 * g0.sy)
+        throw new Error('Karoların piksel boyutu (GSD) farklı: ' + b.f.name + '. Aynı ortomozaiğin karolarını seçin.');
+      if ((b.geo.epsg || 0) !== (g0.epsg || 0))
+        throw new Error('Karoların koordinat sistemi farklı: ' + b.f.name + '.');
+    }
+    /* 2) birleşik kapsam (özgün piksel ızgarasında) ve ortak küçültme katsayısı */
+    const ox = Math.min(...basliklar.map(b => b.geo.ox));
+    const oy = Math.max(...basliklar.map(b => b.geo.oy));
+    const W = Math.max(...basliklar.map(b => Math.round((b.geo.ox - ox) / g0.sx) + b.w));
+    const H = Math.max(...basliklar.map(b => Math.round((oy - b.geo.oy) / g0.sy) + b.h));
+    const k = Math.max(1, Math.ceil(Math.max(W, H) / maxDim));
+    const outW = Math.ceil(W / k), outH = Math.ceil(H / k);
+    if (outW * outH > 110e6)
+      throw new Error('Birleşik görüntü çalışma boyutunda çok büyük (' + sayiTR(outW) + '×' + sayiTR(outH) +
+        ' px). İşleme çözünürlüğünü düşürün ya da yalnız gereken karoları seçin.');
+    const rgba = new Uint8ClampedArray(outW * outH * 4);
+    const gecerli = new Uint8Array(outW * outH);
+    /* 3) karoları ortak k ile çöz, yerine yaz (geçerli piksel boşu doldurur; saydam kenarlar ezmez) */
+    let toplamMB = 0, dolu = 0;
+    for (let i = 0; i < basliklar.length; i++){
+      const b = basliklar[i];
+      toplamMB += b.f.size / 1048576;
+      const taban = 0.10 + 0.85 * i / basliklar.length, pay = 0.85 / basliklar.length;
+      const t = await tiffCoz(await b.f.arrayBuffer(), {
+        kZorla: k, safNodata,
+        onProgress: (oran, mesaj) => ilerlemeKur(kutu, cubuk, yazi, taban + pay * oran,
+          'karo ' + (i + 1) + '/' + basliklar.length + ' · ' + mesaj)
+      });
+      const px0 = Math.round((b.geo.ox - ox) / g0.sx / k), py0 = Math.round((oy - b.geo.oy) / g0.sy / k);
+      for (let y = 0; y < t.outH; y++){
+        const ty = py0 + y;
+        if (ty < 0 || ty >= outH) continue;
+        for (let x = 0; x < t.outW; x++){
+          const tx = px0 + x;
+          if (tx < 0 || tx >= outW) continue;
+          const si = y * t.outW + x;
+          if (!t.gecerli[si]) continue;
+          const di = ty * outW + tx;
+          if (!gecerli[di]) dolu++;
+          gecerli[di] = 1;
+          rgba[di * 4] = t.rgba[si * 4]; rgba[di * 4 + 1] = t.rgba[si * 4 + 1];
+          rgba[di * 4 + 2] = t.rgba[si * 4 + 2]; rgba[di * 4 + 3] = 255;
+        }
+      }
+      await beklet();
+    }
+    if (!dolu) throw new Error('Seçilen karoların hiçbirinde geçerli piksel yok (hepsi saydam). Çamların olduğu karoları seçin.');
+    const ad0 = basliklar[0].f.name.replace(/\.tiff?$/i, '').replace(/_\d+_\d+$/, '');
+    const g = {
+      w: W, h: H, outW, outH, olcek: k, rgba, gecerli,
+      geo: { sx: g0.sx, sy: g0.sy, ox, oy, epsg: g0.epsg, cografi: false, ad: g0.ad, donuk: false },
+      meta: { sikAd: 'karolu mozaik', bit: 8, bantSayi: 4, karoMu: true, big: false,
+        parcaBoy: basliklar.length + ' GeoTIFF karosu', sayfaSayisi: basliklar.length, nodata: null, gri: false },
+      dosyaAd: ad0 + ' (' + basliklar.length + ' karo)', dosyaMB: toplamMB, tur: 'GeoTIFF karoları',
+      cozunurluk: maxDim
+    };
+    ilerlemeKur(kutu, cubuk, yazi, 0.97, 'tuval hazırlanıyor…');
+    await beklet();
+    gorselKur(g);
+    goster(kutu, false);
+    gorselKopyasiKaydet(g);
+    $('durumBilgi').textContent = basliklar.length + ' karo birleştirildi · ' + sayiTR(W) + '×' + sayiTR(H) +
+      ' px → çalışma ' + sayiTR(outW) + '×' + sayiTR(outH) + ' (1/' + k + ')' + (g0.epsg ? ' · EPSG:' + g0.epsg : '');
+    return true;
+  }catch(hata){
+    console.error(hata);
+    goster(kutu, false);
+    hataEl.textContent = '⚠️ Karolar birleştirilemedi: ' + (hata && hata.message ? hata.message : hata);
     goster(hataEl, true);
     return false;
   }finally{

@@ -38,6 +38,12 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
 2. `kopru.html` — tarayıcıda açın → **Adım 0: 🔌 Bağlan** (açılışta kendiliğinden de dener).
 3. Sonrası bildiğiniz Çam-AI akışı:
    - **Adım 1** ortomozaiği yükleyin (GeoTIFF/JPG/PNG; EPSG + GSD otomatik okunur).
+     Tek dosya tarayıcıya sığmayacak kadar büyükse (≈2 GB üstü "görüntü
+     yüklenemedi") Pix4D'nin karo dosyalarını (`…_group1_r_c.tif`) dosya
+     penceresinde **topluca seçin**: başlıklardan ortak kapsam ve küçültme
+     katsayısı hesaplanır, her karo ayrı çözülüp koordinatına yazılır; sonuç
+     tek bir GeoTIFF gibi davranır (GSD, EPSG, referans dosyaları aynen çalışır).
+     Karoların GSD ve CRS'si aynı olmalıdır; tamamen saydam karolar atlanır.
    - **Adım 2** fırça/çokgen/değnekle etiketleyin; ＋ Sınıf ekle ile
      istediğiniz kadar tür tanımlayın (Çam, Dişbudak, …). Çoklu eğitim için
      **➕ Örnekleri havuza ekle** ile birden çok görüntü birleştirilebilir.
