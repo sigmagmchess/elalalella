@@ -59,6 +59,32 @@ Model her eğitim sonunda `cam_ai_model.bin` olarak diske kaydedilir; sonraki
 açılışta **Adım 0 → "📥 Sunucudaki kayıtlı modeli kullan"** ile eğitimsiz devam
 edersiniz.
 
+## Doğruluk Analizi — referans verisi nasıl hazırlanır
+
+İki yol var; ikisi de aynı IoU tabanlı değerlendirmeye girer:
+
+1. **QGIS'te poligon çizmek** (tez için bağımsız referans): aynı ortomozaik
+   üzerinde Çokgen (Polygon) katmanı açın, her tacın çevresini çizin, GeoJSON
+   olarak **ortomozaikle aynı EPSG'de** dışa aktarın → *Doğruluk Analizi →
+   📥 Referans GeoJSON yükle*. Nokta katmanları kabul edilmez; **taç poligonu**
+   gerekir (MultiPolygon da olur).
+2. **✍️ Elle değerlendir** (hızlı yol): tuvalde değnek/fırça/çokgenle taçları
+   işaretleyin; işaretler ayrı bir katmanda tutulur, modele dokunmaz.
+
+Önemli ayrıntılar:
+- Referans dosyası tüm sahayı kapsıyor ama yalnız bir parçasını analiz
+  ediyorsanız sorun değil: **görüntü kapsamı dışındaki poligonlar değerlendirmeye
+  alınmaz** (kaç tanesinin elendiği arayüzde ve raporda yazar). Hiçbiri kapsama
+  düşmüyorsa CRS uyuşmuyordur.
+- **Ort. taç çapı**'nı gerçek ortalamanıza yakın girin (QGIS'teki poligonların
+  eşdeğer çapından hesaplanabilir); çok küçük girerseniz tek taç birden fazla
+  tespite bölünür, çok büyük girerseniz komşu taçlar birleşir.
+- IoU, sınıflandırma **bloğu** çözünürlüğünde hesaplanır. Çok büyük bir
+  ortomozaikte işleme çözünürlüğü 3072 px kalırsa blok adımı metre mertebesine
+  çıkar ve 5–6 m'lik taçlar birkaç bloğa sığar; taç düzeyinde IoU için ya
+  **işleme çözünürlüğünü 6144/8192** yapın ya da sahanın bir **parçasını**
+  (QGIS'te kırpıp) analiz edin ve Tarama sıklığını **Sık** seçin.
+
 ## Dosyalar arasında geçiş — hangi dosya ne işe yarar
 
 | Dosya | Nerede oluşur | Ne yapar |
