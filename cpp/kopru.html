@@ -570,6 +570,20 @@ textarea.rapor{
         <input type="file" id="referansKumeGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
         <button class="btn kucuk birincil" id="btnElleDegerlendir">✍️ Elle değerlendir (tuvalde işaretle)</button>
       </div>
+      <div class="satir" style="flex-wrap:wrap;gap:6px">
+        <label for="egitimIdler" title="Eğitimde kullandığınız ağaçlar: bunlar ve çevresindeki tespitler değerlendirmeye alınmaz; doğruluk yalnız kalan (test) ağaçlar üzerinden hesaplanır">🎓 Eğitim ağaçları (değerlendirme dışı):</label>
+        <input type="text" id="egitimIdler" placeholder="nokta dosyasındaki fid'ler, örn. 3,4,7,10-14"
+          style="flex:1;min-width:150px;font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)">
+        <button class="btn kucuk" id="btnEgitimUygula">Uygula</button>
+        <button class="btn kucuk" id="btnEgitimDosya" title="Eğitim ağaçlarını QGIS'ten ayrı bir GeoJSON (nokta ya da poligon) olarak da verebilirsiniz">📂 Dosyadan…</button>
+        <input type="file" id="egitimGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
+      </div>
+      <div class="satir">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11.5px">
+          <input type="checkbox" id="chkReferansGoster" checked>
+          Referansları ve numaralarını tuvalde göster (gri kesikli = değerlendirme dışı)
+        </label>
+      </div>
       <div id="elleIpucu" class="ipucu gizli"></div>
       <div id="referansBilgi" class="ipucu gizli"></div>
       <div class="satir">
@@ -3107,6 +3121,7 @@ function gorselKur(g){
   D.vuruslar = [];
   /* referanslar görüntü pikseline çevrilmişti — yeni görüntüde geçersiz */
   D.referansNokta = null; D.referansKume = null; D.dogrulukNokta = null; D.ayarTarama = null;
+  if (D.egitimDisi){ D.egitimDisi.dosya = null; $('btnEgitimDosya').textContent = '📂 Dosyadan…'; }  // kimlik listesi kalır
   D.cokgen = [];
   D.dikTaslak = null;
   const aktarilan = D.egitim || null;   // eğitilmiş/içe aktarılmış model yeni görüntüde korunur
@@ -3931,6 +3946,8 @@ function ciz(){
     ctxAna.imageSmoothingEnabled = true;
     ctxAna.drawImage(D.isaretKnv, 0, 0);
   }
+  /* referans katmanı: numaralı ağaç noktaları, taç/küme sınırları (değerlendirme dışı olanlar gri kesikli) */
+  if ($('chkReferansGoster').checked && !D.referansModu) referansKatmaniCiz(g.s);
   /* çokgen / kutu ön izlemeleri */
   if (D.arac === 'cokgen' && D.cokgen.length >= 2){
     ctxAna.lineWidth = 1.6 / g.s;
@@ -5872,10 +5889,14 @@ function dogrulukHesapla(){
   if (!D.poligonlar || !D.referans) return;
   const P = D.poligonlar;
   try{
-    /* referansları blok çözünürlüğünde rasterize et */
+    /* referansları blok çözünürlüğünde rasterize et (eğitim ağaçlarının taçları değerlendirme dışı) */
     const refMaskeler = [];
     let atilanBuyuk = 0;
-    for (const halkaPx of D.referans.halkalarPx){
+    const disAlansal = egitimDislamasi(eslesmeYaricapPx().px);
+    const yoksayHalkalar = [];                              // dışlanan taç/küme/dosya poligonları (blok ızgarasına)
+    for (let hi = 0; hi < D.referans.halkalarPx.length; hi++){
+      const halkaPx = D.referans.halkalarPx[hi];
+      if (disAlansal.var && disAlansal.tacDisi[hi]){ yoksayHalkalar.push(halkaPx); continue; }
       const blok = new Array(halkaPx.length);
       for (let i = 0; i < halkaPx.length; i += 2){
         blok[i] = (halkaPx[i] - P.yari) / P.adim + 0.5;
@@ -5933,6 +5954,44 @@ function dogrulukHesapla(){
       sonuc.ciftler = [];                               // blok düzeyi ölçüm — çift yok
     } else {
       sonuc = iouEslestir(P.etiket, P.gw, P.gh, P.liste, refMaskeler, esik);
+      /* eğitim ağaçlarının bölgesine düşen eşleşmemiş tahminler yanlış alarm SAYILMAZ */
+      sonuc.yoksayilanTahmin = 0;
+      sonuc.tacDisiSayi = disAlansal.var ? disAlansal.tacDisiSayi : 0;
+      if (disAlansal.var){
+        const yoksay = new Uint8Array(P.gw * P.gh);
+        const halkaBoya = halkaPx => {
+          const blok = new Array(halkaPx.length);
+          for (let i = 0; i < halkaPx.length; i += 2){
+            blok[i] = (halkaPx[i] - P.yari) / P.adim + 0.5;
+            blok[i + 1] = (halkaPx[i + 1] - P.yari) / P.adim + 0.5;
+          }
+          cokgenDoldur(yoksay, P.gw, P.gh, blok, 1);
+        };
+        for (const h of yoksayHalkalar) halkaBoya(h);
+        for (const h of disAlansal.disHalka) halkaBoya(h);
+        const rBlok = eslesmeYaricapPx().px / P.adim;
+        for (const n of disAlansal.disNokta){
+          const cx = (n[0] - P.yari) / P.adim, cy = (n[1] - P.yari) / P.adim;
+          for (let y = Math.max(0, Math.floor(cy - rBlok)); y <= Math.min(P.gh - 1, Math.ceil(cy + rBlok)); y++)
+            for (let x = Math.max(0, Math.floor(cx - rBlok)); x <= Math.min(P.gw - 1, Math.ceil(cx + rBlok)); x++)
+              if ((x - cx) ** 2 + (y - cy) ** 2 <= rBlok * rBlok) yoksay[y * P.gw + x] = 1;
+        }
+        const alan = new Map(), ortus = new Map();
+        for (let i = 0; i < yoksay.length; i++){
+          const l = P.etiket[i];
+          if (!l) continue;
+          alan.set(l, (alan.get(l) || 0) + 1);
+          if (yoksay[i]) ortus.set(l, (ortus.get(l) || 0) + 1);
+        }
+        const eslesenNo = new Set(sonuc.ciftler.map(c => P.liste[c.tahminIdx].etiketNo));
+        for (const t of P.liste)
+          if (!eslesenNo.has(t.etiketNo) && (ortus.get(t.etiketNo) || 0) >= 0.5 * (alan.get(t.etiketNo) || 1))
+            sonuc.yoksayilanTahmin++;
+        sonuc.fp = Math.max(0, sonuc.fp - sonuc.yoksayilanTahmin);
+        sonuc.precision = sonuc.tp + sonuc.fp ? sonuc.tp / (sonuc.tp + sonuc.fp) : 0;
+        sonuc.recall = sonuc.tp + sonuc.fn ? sonuc.tp / (sonuc.tp + sonuc.fn) : 0;
+        sonuc.f1 = sonuc.precision + sonuc.recall ? 2 * sonuc.precision * sonuc.recall / (sonuc.precision + sonuc.recall) : 0;
+      }
     }
     /* eşleşen çiftlerin alanları (m² ya da px²) */
     const blokKenarOz = P.adim * D.gorsel.olcek;
@@ -5998,7 +6057,10 @@ function dogrulukHesapla(){
         '<div class="ozet-alt">Referans <b>' + refMaskeler.length + '</b> taçtan <b>' + sonuc.tp +
         '</b> tanesi doğru bulundu · ' + sonuc.fn + ' taç kaçırıldı · ' + sonuc.fp +
         ' yanlış alan taç sayıldı<br>İsabet %' + (sonuc.precision * 100).toFixed(1).replace('.', ',') +
-        ' · Yakalama %' + (sonuc.recall * 100).toFixed(1).replace('.', ',') + '</div>';
+        ' · Yakalama %' + (sonuc.recall * 100).toFixed(1).replace('.', ',') +
+        (sonuc.tacDisiSayi || sonuc.yoksayilanTahmin
+          ? '<br>🎓 Değerlendirme dışı: <b>' + sonuc.tacDisiSayi + '</b> eğitim tacı · bölgelerindeki <b>' +
+            sonuc.yoksayilanTahmin + '</b> tahmin sayılmadı' : '') + '</div>';
     }
     goster($('dogrulukOzet'), true);
     if (elleMi){
@@ -6112,6 +6174,11 @@ $('btnDogrulukRapor').addEventListener('click', () => {
       m.push('F1        = ' + (d.f1 * 100).toFixed(2) + '%');
     }
     m.push('Alan R²   = ' + d.r2.toFixed(4) + ' (eşleşen ' + d.tp + ' çift)');
+    if (d.tacDisiSayi || d.yoksayilanTahmin){
+      m.push('Değerlendirme dışı (eğitim ağaçları): ' + d.tacDisiSayi + ' referans tacı; bu bölgelere düşen ' +
+        d.yoksayilanTahmin + ' tahmin poligonu ne TP ne FP sayıldı.');
+      m.push('  → Sonuçlar yalnız bağımsız (test) ağaçlar üzerinden hesaplanmıştır.');
+    }
     m.push('');
     if (!d.kapsamBazli){
       m.push('EŞLEŞEN ÇİFTLER (tahmin id, referans no, IoU, tahmin alan, referans alan [' + birim + '])');
@@ -6133,6 +6200,15 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     if (D.referansKume && D.referansKume.disarida)
       m.push('                  (' + D.referansKume.disarida + ' küme görüntü kapsamı dışında, alınmadı)');
     m.push('Tespit          : ' + n.tespit + ' nokta' + (n.kumeIciTespit ? ' (' + n.kumeIciTespit + ' tanesi küme içinde)' : ''));
+    if (n.egitimDisi){
+      const e = D.egitimDisi;
+      m.push('Değerlendirme dışı (eğitim ağaçları): ' + n.refDisiSayi + ' referans ağacı' +
+        (n.kumeDisiSayi ? ' + ' + n.kumeDisiSayi + ' küme' : '') +
+        (e.idler.size ? ' — kimlikler: ' + [...e.idler].join(', ') : '') +
+        (e.dosya ? ' — dosya: ' + e.dosya.ad : ''));
+      m.push('                  Bu ağaçların çevresine düşen ' + n.egitimIciTespit + ' tespit ne TP ne FP sayıldı;');
+      m.push('                  sonuçlar yalnız bağımsız (test) ağaçlar üzerinden hesaplanmıştır.');
+    }
     m.push('TP = ' + n.tp + ' (tek ' + n.tpB + ' + küme ' + n.tpK + ')   FP = ' + n.fp + '   FN = ' + n.fn + ' (tek ' + n.fnB + ' + küme ' + n.fnK + ')');
     m.push('Precision = ' + (n.precision * 100).toFixed(2) + '%');
     m.push('Recall    = ' + (n.recall * 100).toFixed(2) + '%');
@@ -6141,7 +6217,8 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     m.push('Protokol  : küme poligonuna düşen tespitler kümeyi "bulundu" sayar; kümedeki fazla tespit FP sayılmaz;');
     m.push('            tek ağaçlar yarıçap içinde artan mesafeyle bire bir eşlenir.');
     if (n.kumeSayi){
-      m.push('Kümeler   : ' + n.kumeTespit.map((k, i) => '#' + (i + 1) + ': ' + k + ' tespit').join(' · '));
+      m.push('Kümeler   : ' + n.kumeTespit.map((k, i) => '#' + (i + 1) + ': ' +
+        (k === null ? 'değerlendirme dışı' : k + ' tespit')).join(' · '));
     }
     if (n.eslesen.length){
       m.push('');
@@ -6173,34 +6250,44 @@ function geojsonCoz(gj){
   const px = n => geoVar
     ? [(n[0] - g.geo.ox) / (g.geo.sx * g.olcek), (g.geo.oy - n[1]) / (g.geo.sy * g.olcek)]
     : [n[0] / g.olcek, -n[1] / g.olcek];
-  const halkalar = [], noktalar = [];
-  const halkaEkle = k => {
+  const halkalar = [], noktalar = [], halkaIdler = [], noktaIdler = [];
+  const halkaEkle = (k, id) => {
     if (!Array.isArray(k) || k.length < 3) return;
     const h = [];
     for (const n of k){ if (!Array.isArray(n) || n.length < 2) return; const [x, y] = px(n); h.push(x, y); }
-    halkalar.push(h);
+    halkalar.push(h); halkaIdler.push(id);
   };
-  const noktaEkle = n => { if (Array.isArray(n) && n.length >= 2 && isFinite(n[0]) && isFinite(n[1])) noktalar.push(px(n)); };
-  const geometriler = gj.type === 'FeatureCollection'
-    ? (gj.features || []).map(f => f && f.geometry).filter(Boolean)
-    : (gj.type === 'Feature' ? [gj.geometry] : [gj]);
-  for (const geom of geometriler){
-    if (!geom) continue;
-    if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0]);
-    else if (geom.type === 'MultiPolygon') for (const p of geom.coordinates) halkaEkle(p[0]);
-    else if (geom.type === 'Point') noktaEkle(geom.coordinates);
-    else if (geom.type === 'MultiPoint') for (const n of geom.coordinates) noktaEkle(n);
-  }
+  const noktaEkle = (n, id) => {
+    if (Array.isArray(n) && n.length >= 2 && isFinite(n[0]) && isFinite(n[1])){ noktalar.push(px(n)); noktaIdler.push(id); }
+  };
+  /* öğe kimliği: QGIS/DXF dışa aktarımlarında fid; yoksa id/no ya da 1'den başlayan sıra */
+  const idAl = (f, i) => {
+    const p = (f && f.properties) || {};
+    const v = p.fid ?? p.FID ?? p.id ?? p.ID ?? p.no ?? p.NO ?? p.Id ?? (f && f.id);
+    return (v === undefined || v === null || v === '') ? (i + 1) : v;
+  };
+  const ogeler = gj.type === 'FeatureCollection'
+    ? (gj.features || []).filter(Boolean)
+    : (gj.type === 'Feature' ? [gj] : [{ geometry: gj, properties: {} }]);
+  ogeler.forEach((f, i) => {
+    const geom = f.geometry, id = idAl(f, i);
+    if (!geom) return;
+    if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0], id);
+    else if (geom.type === 'MultiPolygon') for (const p of geom.coordinates) halkaEkle(p[0], id);
+    else if (geom.type === 'Point') noktaEkle(geom.coordinates, id);
+    else if (geom.type === 'MultiPoint') for (const n of geom.coordinates) noktaEkle(n, id);
+  });
   const icinde = (x, y) => x >= 0 && y >= 0 && x < g.outW && y < g.outH;
-  const halkaIc = [], halkaDis = [];
-  for (const h of halkalar){
+  const halkaIc = [], halkaDis = [], halkaIcId = [];
+  halkalar.forEach((h, k) => {
     let mx = 0, my = 0; const n = h.length >> 1;
     for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; }
-    (icinde(mx / n, my / n) ? halkaIc : halkaDis).push(h);
-  }
-  const noktaIc = noktalar.filter(n => icinde(n[0], n[1]));
-  return { halkalar: halkaIc, halkaDisarida: halkaDis.length, halkaToplam: halkalar.length,
-           noktalar: noktaIc, noktaDisarida: noktalar.length - noktaIc.length, noktaToplam: noktalar.length };
+    if (icinde(mx / n, my / n)){ halkaIc.push(h); halkaIcId.push(halkaIdler[k]); } else halkaDis.push(h);
+  });
+  const noktaIc = [], noktaIcId = [];
+  noktalar.forEach((n, k) => { if (icinde(n[0], n[1])){ noktaIc.push(n); noktaIcId.push(noktaIdler[k]); } });
+  return { halkalar: halkaIc, halkaIdler: halkaIcId, halkaDisarida: halkaDis.length, halkaToplam: halkalar.length,
+           noktalar: noktaIc, noktaIdler: noktaIcId, noktaDisarida: noktalar.length - noktaIc.length, noktaToplam: noktalar.length };
 }
 async function referansDosyaOku(dosya, tur){
   const hataEl = $('dogrulukHata');
@@ -6216,12 +6303,12 @@ async function referansDosyaOku(dosya, tur){
     if (tur === 'nokta'){
       if (!c.noktaToplam) throw new Error('Dosyada Point/MultiPoint bulunamadı — QGIS\'ten nokta katmanını GeoJSON olarak dışa aktarın.');
       if (!c.noktalar.length) throw new Error('Noktaların hiçbiri (' + c.noktaToplam + ') görüntü kapsamına düşmüyor — ' + epsg + ' olarak yeniden dışa aktarın.');
-      D.referansNokta = { ad: dosya.name, noktalarPx: c.noktalar, sayi: c.noktalar.length,
+      D.referansNokta = { ad: dosya.name, noktalarPx: c.noktalar, idler: c.noktaIdler, sayi: c.noktalar.length,
                           toplam: c.noktaToplam, disarida: c.noktaDisarida };
     } else {
       if (!c.halkaToplam) throw new Error('Dosyada Polygon/MultiPolygon bulunamadı — QGIS\'ten poligon katmanını GeoJSON olarak dışa aktarın.');
       if (!c.halkalar.length) throw new Error('Poligonların hiçbiri (' + c.halkaToplam + ') görüntü kapsamına düşmüyor — ' + epsg + ' olarak yeniden dışa aktarın.');
-      const kayit = { ad: dosya.name, halkalarPx: c.halkalar, sayi: c.halkalar.length,
+      const kayit = { ad: dosya.name, halkalarPx: c.halkalar, idler: c.halkaIdler, sayi: c.halkalar.length,
                       toplam: c.halkaToplam, disarida: c.halkaDisarida, elle: false };
       if (tur === 'kume') D.referansKume = kayit;
       else { if (D.referans && D.referans.elle) elleDegerlendirBitir(false); D.referans = kayit; }
@@ -6248,6 +6335,24 @@ function referansOzetiYaz(){
   if (D.referans && D.referans.elle) parca.push('✍️ Elle işaretleme — ' + D.referans.sayi + ' taç');
   if (D.referansNokta) parca.push(satir('📍', D.referansNokta, 'ağaç noktası'));
   if (D.referansKume) parca.push(satir('🌳', D.referansKume, 'küme poligonu'));
+  if (D.referansNokta && D.referansNokta.idler && D.referansNokta.idler.length){
+    const idler = D.referansNokta.idler.map(String);
+    const sayisal = idler.every(v => /^\d+$/.test(v));
+    parca.push('<small>Nokta kimlikleri (fid): ' + (sayisal
+      ? Math.min(...idler.map(Number)) + ' – ' + Math.max(...idler.map(Number))
+      : idler.slice(0, 8).join(', ') + (idler.length > 8 ? '…' : '')) + ' — tuvalde numaralı görünür</small>');
+  }
+  if (egitimDisiVar() && D.gorsel){
+    const e = D.egitimDisi, dis = egitimDislamasi(eslesmeYaricapPx().px);
+    const kaynak = [];
+    if (e.idler.size) kaynak.push(e.idler.size + ' kimlik');
+    if (e.dosya) kaynak.push(kacHtml(e.dosya.ad) + ' (' + (dis.dosyaNokta + dis.dosyaPoligon) + ' öğe)');
+    parca.push('🎓 <b>Değerlendirme dışı (eğitim) ağaçlar:</b> ' + kaynak.join(' + ') +
+      ' → eşleşen: ' + dis.refDisiSayi + ' nokta, ' + dis.tacDisiSayi + ' taç, ' + dis.kumeDisiSayi + ' küme. ' +
+      'Bu ağaçlar ve çevrelerindeki tespitler sayılmaz; doğruluk kalan (test) ağaçlar üzerinden hesaplanır.' +
+      (e.idler.size && D.referansNokta && !dis.refDisiSayi
+        ? ' <b>⚠️ Verilen kimlikler nokta dosyasındaki fid\'lerle eşleşmedi.</b>' : ''));
+  }
   const varMi = parca.length > 0;
   $('referansBilgi').innerHTML = parca.join('<br>') +
     ((D.referansNokta || D.referansKume)
@@ -6258,6 +6363,166 @@ function referansOzetiYaz(){
   $('btnDogrulukHesapla').disabled = !(varMi && D.sonuc);
   $('btnAyarTara').disabled = !(D.sonuc && (D.referansNokta || D.referansKume));
   durumYaz('Dogruluk', varMi ? (D.sonuc ? 'değerlendirmeye hazır' : 'önce sınıflandırın') : 'bekliyor');
+}
+/* ---- DEĞERLENDİRME DIŞI (EĞİTİM) AĞAÇLAR ----
+   Eğitimde kullanılan ağaçlar id listesiyle (nokta dosyasının fid'leri) ya da ayrı bir GeoJSON ile
+   verilir. Bu ağaçlar referanstan çıkarılır; çevrelerine/taçlarına düşen tespitler ne TP ne FP sayılır.
+   Böylece doğruluk yalnız bağımsız (test) ağaçlar üzerinden hesaplanır. */
+D.egitimDisi = { idler: new Set(), dosya: null };
+function egitimDisiVar(){
+  const e = D.egitimDisi;
+  return !!(e && (e.idler.size || (e.dosya && (e.dosya.noktalarPx.length || e.dosya.halkalarPx.length))));
+}
+const idDisiMi = id => D.egitimDisi.idler.has(String(id).trim());
+function idListesiCoz(metin){
+  const s = new Set();
+  for (const parca of String(metin || '').split(/[,;\s]+/)){
+    if (!parca) continue;
+    const ar = parca.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+    if (ar){
+      const a = parseInt(ar[1], 10), b = parseInt(ar[2], 10);
+      if (b >= a && b - a <= 10000) for (let i = a; i <= b; i++) s.add(String(i));
+    } else s.add(parca.trim());
+  }
+  return s;
+}
+/* hangi referansların dışlandığını ve bir tespitin dışlanan bölgeye düşüp düşmediğini hesaplar */
+function egitimDislamasi(yaricapPx){
+  const refN = D.referansNokta ? D.referansNokta.noktalarPx : [];
+  const refId = D.referansNokta ? (D.referansNokta.idler || []) : [];
+  const kumeler = D.referansKume ? D.referansKume.halkalarPx : [];
+  const kumeId = D.referansKume ? (D.referansKume.idler || []) : [];
+  const tacVar = !!(D.referans && !D.referans.elle);
+  const taclar = tacVar ? D.referans.halkalarPx : [];
+  const tacId = tacVar ? (D.referans.idler || []) : [];
+  const refDisi = new Uint8Array(refN.length), kumeDisi = new Uint8Array(kumeler.length), tacDisi = new Uint8Array(taclar.length);
+  const bos = { refDisi, kumeDisi, tacDisi, tespitDisi: () => false, var: false,
+    refDisiSayi: 0, kumeDisiSayi: 0, tacDisiSayi: 0, dosyaNokta: 0, dosyaPoligon: 0 };
+  if (!egitimDisiVar()) return bos;
+  const e = D.egitimDisi;
+  const dNokta = e.dosya ? e.dosya.noktalarPx : [], dHalka = e.dosya ? e.dosya.halkalarPx : [];
+  const rRef = 0.5 * yaricapPx;                                   // referansı dosya noktasıyla eşleme payı
+  const yakin = (x, y, liste, r) => liste.some(n => Math.hypot(n[0] - x, n[1] - y) <= r);
+  const icinde = (x, y, liste) => liste.some(h => noktaHalkaIcinde(x, y, h));
+  const merkez = h => { let mx = 0, my = 0; const n = h.length >> 1;
+    for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; } return [mx / n, my / n]; };
+  refN.forEach((n, i) => {
+    if (idDisiMi(refId[i]) || yakin(n[0], n[1], dNokta, rRef) || icinde(n[0], n[1], dHalka)) refDisi[i] = 1;
+  });
+  const disRefNokta = refN.filter((_, i) => refDisi[i]);
+  /* taç poligonu: nokta dosyası varsa dışlanan NOKTAYI içeren taç dışlanır (katmanların fid'leri farklı olabilir);
+     nokta dosyası yoksa tacın kendi id'si kullanılır */
+  taclar.forEach((h, i) => {
+    const [mx, my] = merkez(h);
+    const noktaIle = disRefNokta.some(n => noktaHalkaIcinde(n[0], n[1], h));
+    if (noktaIle || (!refN.length && idDisiMi(tacId[i])) || yakin(mx, my, dNokta, rRef) || icinde(mx, my, dHalka) ||
+        dNokta.some(n => noktaHalkaIcinde(n[0], n[1], h))) tacDisi[i] = 1;
+  });
+  kumeler.forEach((h, i) => {
+    const [mx, my] = merkez(h);
+    if (idDisiMi(kumeId[i]) || icinde(mx, my, dHalka) || dNokta.some(n => noktaHalkaIcinde(n[0], n[1], h)) ||
+        disRefNokta.some(n => noktaHalkaIcinde(n[0], n[1], h))) kumeDisi[i] = 1;
+  });
+  const disNokta = dNokta.concat(disRefNokta);
+  const disHalka = dHalka.concat(taclar.filter((_, i) => tacDisi[i]), kumeler.filter((_, i) => kumeDisi[i]));
+  const tespitDisi = (x, y) => yakin(x, y, disNokta, yaricapPx) || icinde(x, y, disHalka);
+  return { refDisi, kumeDisi, tacDisi, tespitDisi, var: true,
+    refDisiSayi: disRefNokta.length,
+    kumeDisiSayi: kumeDisi.reduce((a, b) => a + b, 0),
+    tacDisiSayi: tacDisi.reduce((a, b) => a + b, 0),
+    dosyaNokta: dNokta.length, dosyaPoligon: dHalka.length, disNokta, disHalka };
+}
+function egitimDisiGuncelle(){
+  D.dogruluk = null; D.dogrulukNokta = null; D.ayarTarama = null;
+  goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false); goster($('noktaOzet'), false);
+  goster($('sacilimKnv'), false); goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
+  $('btnEgitimDosya').textContent = D.egitimDisi.dosya ? '📂 Dosyayı kaldır' : '📂 Dosyadan…';
+  referansOzetiYaz();
+  if (D.gorsel) ciz();
+}
+$('btnEgitimUygula').addEventListener('click', () => {
+  D.egitimDisi.idler = idListesiCoz($('egitimIdler').value);
+  egitimDisiGuncelle();
+  $('durumBilgi').textContent = D.egitimDisi.idler.size
+    ? '🎓 ' + D.egitimDisi.idler.size + ' eğitim ağacı değerlendirme dışı bırakıldı — 🎯 Değerlendir ile yeniden hesaplayın.'
+    : 'Değerlendirme dışı ağaç listesi temizlendi.';
+});
+$('egitimIdler').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); $('btnEgitimUygula').click(); } });
+$('btnEgitimDosya').addEventListener('click', () => {
+  if (D.egitimDisi.dosya){ D.egitimDisi.dosya = null; egitimDisiGuncelle(); return; }
+  $('egitimGirdi').click();
+});
+$('egitimGirdi').addEventListener('change', async e => {
+  if (e.target.files.length) await egitimDosyaOku(e.target.files[0]);
+  e.target.value = '';
+});
+async function egitimDosyaOku(dosya){
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
+  try{
+    if (!D.gorsel) throw new Error('Önce görüntüyü yükleyin (koordinat dönüşümü için gerekli).');
+    const c = geojsonCoz(JSON.parse(await dosya.text()));
+    if (!c.noktaToplam && !c.halkaToplam) throw new Error('Dosyada nokta ya da poligon bulunamadı.');
+    if (!c.noktalar.length && !c.halkalar.length)
+      throw new Error('Eğitim ağaçlarının hiçbiri görüntü kapsamına düşmüyor — CRS\'yi kontrol edin.');
+    D.egitimDisi.dosya = { ad: dosya.name, noktalarPx: c.noktalar, halkalarPx: c.halkalar };
+    egitimDisiGuncelle();
+  }catch(h){
+    hataEl.textContent = '⚠️ ' + (h && h.message ? h.message : h);
+    goster(hataEl, true);
+  }
+}
+$('chkReferansGoster').addEventListener('change', () => { if (D.gorsel) ciz(); });
+/* tuvalde referans katmanı: numaralı noktalar, taç ve küme sınırları; dışlananlar gri kesikli */
+function referansKatmaniCiz(s){
+  const tacVar = !!(D.referans && !D.referans.elle);
+  if (!D.referansNokta && !D.referansKume && !tacVar) return;
+  const yr = eslesmeYaricapPx().px;
+  const dis = egitimDislamasi(yr);
+  const ctx = ctxAna;
+  const halkaCiz = (h, renk, kesik) => {
+    ctx.beginPath();
+    ctx.moveTo(h[0], h[1]);
+    for (let i = 2; i < h.length; i += 2) ctx.lineTo(h[i], h[i + 1]);
+    ctx.closePath();
+    ctx.setLineDash(kesik ? [5 / s, 4 / s] : []);
+    ctx.strokeStyle = renk; ctx.lineWidth = 1.4 / s; ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  if (tacVar) D.referans.halkalarPx.forEach((h, i) =>
+    halkaCiz(h, dis.tacDisi[i] ? 'rgba(170,175,180,0.9)' : 'rgba(255,255,255,0.85)', !!dis.tacDisi[i]));
+  if (D.referansKume) D.referansKume.halkalarPx.forEach((h, i) =>
+    halkaCiz(h, dis.kumeDisi[i] ? 'rgba(170,175,180,0.9)' : 'rgba(255,0,255,0.85)', true));
+  if (D.referansNokta){
+    const idler = D.referansNokta.idler || [];
+    ctx.font = 'bold ' + (12 / s) + 'px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    D.referansNokta.noktalarPx.forEach((n, i) => {
+      const disi = !!dis.refDisi[i];
+      ctx.beginPath();
+      ctx.arc(n[0], n[1], yr, 0, Math.PI * 2);
+      ctx.setLineDash(disi ? [5 / s, 4 / s] : []);
+      ctx.strokeStyle = disi ? 'rgba(170,175,180,0.9)' : 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1.4 / s; ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(n[0], n[1], 2.2 / s, 0, Math.PI * 2);
+      ctx.fillStyle = disi ? 'rgba(170,175,180,1)' : '#fff'; ctx.fill();
+      const yazi = String(idler[i] ?? (i + 1));
+      ctx.lineWidth = 3 / s; ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+      ctx.strokeText(yazi, n[0], n[1] - yr - 8 / s);
+      ctx.fillStyle = disi ? '#c9ced3' : '#ffe76a';
+      ctx.fillText(yazi, n[0], n[1] - yr - 8 / s);
+    });
+  }
+  /* dosyadan gelen eğitim ağaçları (referansla çakışmayanlar da görünsün) */
+  if (D.egitimDisi.dosya){
+    D.egitimDisi.dosya.halkalarPx.forEach(h => halkaCiz(h, 'rgba(170,175,180,0.9)', true));
+    for (const n of D.egitimDisi.dosya.noktalarPx){
+      ctx.beginPath(); ctx.arc(n[0], n[1], yr, 0, Math.PI * 2);
+      ctx.setLineDash([5 / s, 4 / s]); ctx.strokeStyle = 'rgba(170,175,180,0.9)'; ctx.lineWidth = 1.4 / s; ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
 }
 function noktaHalkaIcinde(x, y, h){
   let ic = false;
@@ -6277,15 +6542,23 @@ function eslesmeYaricapPx(){
    kalan tespitler referans noktalarla yarıçap içinde, artan mesafeyle bire bir eşlenir. */
 function noktaDogrulukOlc(agaclar, yaricapPx){
   const s = D.sonuc;
-  const tesp = agaclar.map((a, i) => ({ i, x: s.yari + a.x * s.adim, y: s.yari + a.y * s.adim, p: a.p, kume: a.kume || 0 }));
-  const refN = D.referansNokta ? D.referansNokta.noktalarPx : [];
-  const kumeler = D.referansKume ? D.referansKume.halkalarPx : [];
-  const kumeTespit = kumeler.map(() => 0);
+  const tespTum = agaclar.map((a, i) => ({ i, x: s.yari + a.x * s.adim, y: s.yari + a.y * s.adim, p: a.p, kume: a.kume || 0 }));
+  const refTum = D.referansNokta ? D.referansNokta.noktalarPx : [];
+  const kumeTum = D.referansKume ? D.referansKume.halkalarPx : [];
+  /* eğitim ağaçları: referanstan çıkar, çevrelerindeki tespitleri yok say (ne TP ne FP) */
+  const dis = egitimDislamasi(yaricapPx);
+  const tesp = dis.var ? tespTum.filter(t => !dis.tespitDisi(t.x, t.y)) : tespTum;
+  const egitimIciTespit = tespTum.length - tesp.length;
+  const refAsil = [], refN = [];
+  refTum.forEach((n, i) => { if (!dis.refDisi[i]){ refAsil.push(i); refN.push(n); } });
+  const kumeAsil = [], kumeler = [];
+  kumeTum.forEach((h, i) => { if (!dis.kumeDisi[i]){ kumeAsil.push(i); kumeler.push(h); } });
+  const kumeTespitK = kumeler.map(() => 0);
   const serbest = [];
   for (const t of tesp){
     let k = -1;
     for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(t.x, t.y, kumeler[i])){ k = i; break; }
-    if (k >= 0) kumeTespit[k]++; else serbest.push(t);
+    if (k >= 0) kumeTespitK[k]++; else serbest.push(t);
   }
   const adaylar = [];
   for (let r = 0; r < refN.length; r++)
@@ -6298,20 +6571,24 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
   const eslesen = [];
   for (const c of adaylar){
     if (refEs[c.r] >= 0 || tesEs.has(c.t)) continue;
-    refEs[c.r] = c.t; tesEs.add(c.t); eslesen.push(c);
+    refEs[c.r] = c.t; tesEs.add(c.t); eslesen.push({ r: refAsil[c.r], t: c.t, m: c.m });   // r: dosyadaki asıl sıra
   }
   const tpB = eslesen.length, fnB = refN.length - tpB, fp = serbest.length - tpB;
-  const tpK = kumeTespit.filter(n => n > 0).length, fnK = kumeler.length - tpK;
+  const tpK = kumeTespitK.filter(n => n > 0).length, fnK = kumeler.length - tpK;
   const tp = tpB + tpK, fn = fnB + fnK;
   const precision = tp + fp ? tp / (tp + fp) : 0, recall = tp + fn ? tp / (tp + fn) : 0;
   const f1 = precision + recall ? 2 * precision * recall / (precision + recall) : 0;
   const hatalar = eslesen.map(c => c.m).sort((a, b) => a - b);
+  /* küme tespit sayıları dosyadaki tüm kümeler için (dışlanan → null) */
+  const kumeTespit = kumeTum.map(() => null);
+  kumeAsil.forEach((asil, k) => { kumeTespit[asil] = kumeTespitK[k]; });
   return { tpB, fnB, fp, tpK, fnK, tp, fn, precision, recall, f1,
     ortHataPx: hatalar.length ? hatalar.reduce((a, b) => a + b, 0) / hatalar.length : 0,
     medHataPx: hatalar.length ? hatalar[hatalar.length >> 1] : 0,
     enBuyukHataPx: hatalar.length ? hatalar[hatalar.length - 1] : 0,
     eslesen, kumeTespit, refSayi: refN.length, kumeSayi: kumeler.length,
-    tespit: tesp.length, kumeIciTespit: tesp.length - serbest.length, yaricapPx };
+    tespit: tesp.length, kumeIciTespit: tesp.length - serbest.length, yaricapPx,
+    egitimDisi: dis.var, refDisiSayi: dis.refDisiSayi, kumeDisiSayi: dis.kumeDisiSayi, egitimIciTespit };
 }
 function noktaDogrulukHesapla(){
   if (!D.sonuc || !D.agaclar || !(D.referansNokta || D.referansKume)) return;
@@ -6339,7 +6616,10 @@ function noktaDogrulukHesapla(){
     ' · kaçırılan <b>' + o.fn + '</b> · yanlış alarm <b>' + o.fp + '</b></div>' +
     '<div class="ozet-alt">İsabet %' + fmt(py) + ' · Yakalama %' + fmt(ry) +
     ' · eşleşme yarıçapı ' + String(yr.deger).replace('.', ',') + ' ' + birim +
-    ' · tespit ' + o.tespit + (o.kumeIciTespit ? ' (' + o.kumeIciTespit + '’i küme içinde)' : '') + hataYazi + '</div>';
+    ' · tespit ' + o.tespit + (o.kumeIciTespit ? ' (' + o.kumeIciTespit + '’i küme içinde)' : '') + hataYazi +
+    (o.egitimDisi ? '<br>🎓 Değerlendirme dışı: <b>' + o.refDisiSayi + '</b> eğitim ağacı' +
+      (o.kumeDisiSayi ? ' + ' + o.kumeDisiSayi + ' küme' : '') + ' · çevrelerindeki <b>' + o.egitimIciTespit +
+      '</b> tespit sayılmadı — sonuç yalnız bağımsız (test) ağaçlar üzerinden' : '') + '</div>';
   goster($('noktaOzet'), true);
   if (!D.dogruluk){
     const kartlar = [

@@ -51,6 +51,15 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      saydamlık varsa PNG; 20 MP üstü saydamlıklı ortomozaikler hariç) tarayıcıda
      saklanır; kopyadan açılan görüntü bilgi tablosunda "kayıtlı kopya" olarak
      görünür.
+   - **Doğruluk Analizi → 🎓 Eğitim ağaçları (değerlendirme dışı):** eğitimde
+     kullandığınız çamları nokta dosyasının `fid` kimlikleriyle (örn. `3,4,7,10-14`)
+     ya da ayrı bir GeoJSON ile verin. Bu ağaçlar referanstan çıkarılır;
+     taçlarına/yarıçaplarına düşen tespitler ne TP ne FP sayılır. Böylece F1,
+     yanlış alarm ve kaçan ağaç sayıları **yalnız bağımsız (test) ağaçlar**
+     üzerinden hesaplanır; rapor bunu ayrı bölümde belirtir. Taç poligonları
+     dışlanan noktayı içermelerine göre dışlanır (katmanların fid'leri farklı
+     olabilir). Referanslar tuvalde fid numaralarıyla çizilir; dışlananlar gri
+     kesiklidir ("Referansları ve numaralarını tuvalde göster" kutusu).
      **Sınıf eklemek havuzu boşaltmaz** (yeni sınıf sona eklenir); sınıf
      silmek yalnız o sınıfın örneklerini havuzdan çıkarır, kalan kaynaklar durur.
      **Otomatik yedek:** havuz ve ekrandaki etiketler her değişiklikten ~1,5 s
