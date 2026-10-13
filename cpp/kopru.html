@@ -2960,14 +2960,38 @@ function ilerlemeKur(kutu, cubuk, yazi, oran, metin){
   cubuk.style.width = Math.round(oran * 100) + '%';
   if (metin !== undefined) yazi.textContent = metin;
 }
-function indir(ad, icerik, tip){
+/* Dosya indirme. file:// sayfalarda <a download> bazı tarayıcılarda sayfa değiştirme sayılır ve
+   "Siteden çıkılsın mı?" uyarısına takılır. Önce "Farklı kaydet" penceresi (Chrome/Edge) denenir;
+   olmazsa klasik indirme yapılır ve çıkış uyarısı o anlık susturulur. */
+let indirKilidi = 0;
+async function indir(ad, icerik, tip){
   const blob = icerik instanceof Blob ? icerik : new Blob([icerik], { type: tip || 'application/octet-stream' });
+  /* otomasyon (webdriver) altında yerel pencere açılamaz, klasik indirmeye düşülür */
+  if (window.showSaveFilePicker && !navigator.webdriver && navigator.userActivation && navigator.userActivation.isActive){
+    try{
+      const uz = (String(ad).match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+      const mime = (blob.type || 'application/octet-stream').split(';')[0].trim();
+      const secenek = { suggestedName: ad };
+      if (uz) secenek.types = [{ description: uz.slice(1).toUpperCase() + ' dosyası', accept: { [mime]: [uz] } }];
+      const tutamac = await window.showSaveFilePicker(secenek);
+      const yazici = await tutamac.createWritable();
+      await yazici.write(blob);
+      await yazici.close();
+      $('durumBilgi').textContent = '💾 Kaydedildi: ' + tutamac.name;
+      return true;
+    }catch(e){
+      if (e && e.name === 'AbortError') return false;        // kullanıcı pencereyi kapattı
+      /* desteklenmiyor/izin yok → klasik indirme */
+    }
+  }
+  indirKilidi = Date.now() + 4000;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = ad;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  return true;
 }
 function sayiTR(x, hane){ return x.toLocaleString('tr-TR', { maximumFractionDigits: hane ?? 0, minimumFractionDigits: 0 }); }
 function yuzde(x){ return (x * 100).toFixed(1).replace('.', ',') + '%'; }
@@ -5414,10 +5438,21 @@ $('btnGeojsonAktar').addEventListener('click', () => {
 $('btnModelAktar').addEventListener('click', () => {
   if (!D.egitim) return;
   if (D.egitim.tur === 'cpp'){
-    const a = document.createElement('a');
-    a.href = cppKok() + '/model';
-    a.download = 'cam_ai_10m.bin';
-    a.click();
+    /* sunucu adresine doğrudan bağlantı sayfadan çıkış sayılırdı ("Siteden çıkılsın mı?") —
+       model önce belleğe alınır, sonra sıradan dosya gibi kaydedilir */
+    (async () => {
+      try{
+        const yanit = await fetch(cppKok() + '/model');
+        if (!yanit.ok) throw new Error('HTTP ' + yanit.status);
+        const blob = await yanit.blob();
+        const ad = 'cam_ai_' + (D.egitim.parametre ? Math.round(D.egitim.parametre / 1e6) + 'm' : 'model') + '.bin';
+        await indir(ad, blob, 'application/octet-stream');
+      }catch(e){
+        await bilgi('Model indirilemedi: ' + (e && e.message ? e.message : e) +
+          '\n\nSunucu açık mı? Model zaten cam_ai.exe\'nin yanındaki cam_ai_model.bin dosyasında duruyor; ' +
+          'yedek için o dosyayı kopyalamanız da yeterli.');
+      }
+    })();
     return;
   }
   const paket = modelPaketle(D.egitim.enIyi, D.siniflar, D.egitim.yama);
@@ -5520,7 +5555,10 @@ $('btnProjeAktar').addEventListener('click', () => {
             not: 'Model bilgisayardaki C++ sunucusunda kayıtlıdır (cam_ai_model.bin).' }
         : modelPaketle(D.egitim.enIyi, D.siniflar, D.egitim.yama))
   };
-  indir(dosyaKok() + '_proje.json', JSON.stringify(proje), 'application/json');
+  /* proje = havuz + etiketler + ayarlar; ekrandaki fotoğrafa değil oturuma aittir → tarihli sabit ad */
+  const t = new Date(), iki = n => String(n).padStart(2, '0');
+  const damga = t.getFullYear() + '-' + iki(t.getMonth() + 1) + '-' + iki(t.getDate()) + '_' + iki(t.getHours()) + iki(t.getMinutes());
+  indir('cam_ai_proje_' + damga + '.json', JSON.stringify(proje), 'application/json');
 });
 
 $('btnIceAktar').addEventListener('click', () => $('iceAktarGirdi').click());
@@ -5903,6 +5941,7 @@ $('btnElleDegerlendir').addEventListener('click', elleDegerlendirBaslat);
 
 /* H2 — kazara sekme kapanmasında saatlerce etiketleme kaybolmasın */
 window.addEventListener('beforeunload', e => {
+  if (Date.now() < indirKilidi) return;                 // indirme bağlantısı sayfa değiştirme değildir
   if (D.mesgul || D.vuruslar.length || D.havuz.length){
     e.preventDefault();
     e.returnValue = '';
