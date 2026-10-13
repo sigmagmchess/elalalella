@@ -2984,6 +2984,7 @@ async function dosyaYukle(dosya){
     g.dosyaAd = ad;
     g.dosyaMB = dosya.size / 1048576;
     g.tur = tiffMi ? 'GeoTIFF/TIFF' : uzanti.toUpperCase();
+    g.cozunurluk = maxDim;                     // yükleme anındaki işleme çözünürlüğü (havuz tutarlılığı için)
     ilerlemeKur(kutu, cubuk, yazi, 0.97, 'tuval hazırlanıyor…');
     await beklet();
     gorselKur(g);
@@ -3626,6 +3627,13 @@ $('btnHavuzaEkle').addEventListener('click', async () => {
     yama = D.havuz[0].yama;                            // havuz tek yama boyuyla tutarlı kalır
     $('secYama').value = String(yama);
   }
+  /* işleme çözünürlüğü de havuz genelinde aynı kalmalı: aksi halde model aynı dokuyu iki ölçekte görür */
+  const cozSimdi = D.gorsel.cozunurluk || parseInt($('secCozunurluk').value, 10);
+  const cozHavuz = D.havuz.length ? D.havuz[0].cozunurluk : null;
+  if (cozHavuz && cozSimdi && cozHavuz !== cozSimdi &&
+      !(await onayla('Havuzdaki kaynaklar işleme çözünürlüğü ' + cozHavuz + ' px ile eklenmiş; bu fotoğraf ' +
+        cozSimdi + ' px ile yüklü.\nFarklı çözünürlükler karışırsa doğruluk düşer. Önerilen: Adım 1\'de ' +
+        cozHavuz + ' px seçip fotoğrafı yeniden yükleyin.\n\nYine de eklensin mi?'))) return;
   const veri = ornekleriTopla(yama, parseInt($('secOrnekSiniri').value, 10));
   if (!veri.n){
     await bilgi('Havuza eklenecek örnek bulunamadı — önce fırça/değnek/çokgenle etiket işaretleyin.');
@@ -3639,7 +3647,7 @@ $('btnHavuzaEkle').addEventListener('click', async () => {
     /* vuruşlar da saklanır: ✏️ Düzenle ile bu fotoğrafın etiketleri geri getirilebilir */
     vuruslar: vuruslariPaketle(D.vuruslar),
     outW: D.gorsel.outW, outH: D.gorsel.outH,
-    cozunurluk: parseInt($('secCozunurluk').value, 10)
+    cozunurluk: cozSimdi
   });
   D.vuruslar = [];
   D.etiketMaske.fill(0);
@@ -3769,6 +3777,7 @@ async function gorselKopyasiKaydet(g){
     if (!blob) return;
     await yedekYaz(gorselKopyaAnahtari(g.dosyaAd, g.outW, g.outH), {
       ad: g.dosyaAd, w: g.w, h: g.h, outW: g.outW, outH: g.outH, olcek: g.olcek,
+      cozunurluk: g.cozunurluk || null,
       geo: g.geo || null, meta: g.meta || null, tur: g.tur || 'JPG', dosyaMB: g.dosyaMB || 0,
       blob, zaman: Date.now() });
   }catch(e){ console.warn('fotoğraf kopyası yazılamadı', e); }
@@ -3791,6 +3800,7 @@ async function gorseliKopyadanAc(k){
   }
   gorselKur({ w: k.w, h: k.h, outW: k.outW, outH: k.outH, olcek: k.olcek, rgba, gecerli,
     geo: k.geo || null, meta: k.meta || { sikAd: '—', bit: 8, bantSayi: 4, gri: false },
+    cozunurluk: k.cozunurluk || null,
     dosyaAd: k.ad, dosyaMB: k.dosyaMB || 0, tur: (k.tur || 'JPG') + ' · kayıtlı kopya', kopyadan: true });
 }
 $('btnHavuzBosalt').addEventListener('click', async () => {
