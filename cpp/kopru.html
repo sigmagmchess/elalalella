@@ -7113,7 +7113,8 @@ async function yoloVeriSetiAktar(){
   const maskePay = 1.0 * pxM;
   const onay = await onayla('YOLO veri seti:\n• ' + egitimTac.length + ' eğitim tacı → kutu; ' + testTac.length +
     ' test tacı ve ' + kumeler.length + ' küme eğitim karolarında maskelenir (1 m tampon)\n• Karo ' + T + ' px' +
-    (geoVar ? ' ≈ ' + (T / pxM).toFixed(0) + ' m' : '') + ', %20 bindirme; pozitif karolar %80 eğitim / %20 doğrulama\n' +
+    (geoVar ? ' ≈ ' + (T / pxM).toFixed(0) + ' m' : '') + '; eğitim tacı başına 6 rastgele konumlu karo; her 5. eğitim tacı ' +
+    'doğrulamaya ayrılır (taç düzeyinde ayrım, eğitim karolarında maskelenir)\n' +
     '• Tahmin için tüm ortomozaik karoları (maskesiz) + coğrafi bilgi' +
     (fotoDahil ? '\n• Havuzdaki fotoğraf kopyaları ve Çam çokgenleri de eğitime eklenir' : '') + '\n\nDevam edilsin mi?');
   if (!onay) return;
@@ -7128,70 +7129,122 @@ async function yoloVeriSetiAktar(){
     };
     const kesisim = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
     const egitimKutu = egitimTac.map(bbox);
-    const maskeHalka = testTac.concat(kumeler).map(h => halkaOlcekle(h, maskePay));
-    const maskeKutu = maskeHalka.map(bbox);
+    /* Doğrulama ayrımı TAÇ düzeyinde: her 5. eğitim tacı doğrulama tacıdır. Eğitim karolarında doğrulama taçları,
+       doğrulama karolarında eğitim taçları maskelenir; böylece bindirmeli karolar üzerinden sızıntı olmaz ve
+       Colab'daki doğrulama metriği gerçekten görülmemiş ağacı ölçer. */
+    const dogrulamaMi = egitimTac.map((_, i) => egitimTac.length >= 3 && i % 5 === 2);
+    if (egitimTac.length >= 2 && !dogrulamaMi.some(Boolean)) dogrulamaMi[egitimTac.length - 1] = true;
+    const sabitMaske = testTac.concat(kumeler).map(h => halkaOlcekle(h, maskePay));   // her eğitim/doğrulama karosunda gizlenir
+    const sabitMaskeKutu = sabitMaske.map(bbox);
     const eksen = (boy) => { const s = new Set(); for (let v = 0; v < boy; v += ADIM){ s.add(Math.min(v, Math.max(0, boy - T))); if (v + T >= boy) break; } return [...s]; };
     const xler = eksen(W), yler = eksen(H);
-    const girdiler = [], karoBilgi = [], pozitif = [], arkaplan = [];
+    const girdiler = [], karoBilgi = [], egitimBilgi = [], egitimKaro = [], dogrulamaKaro = [], arkaplan = [];
     const knv = document.createElement('canvas'); knv.width = T; knv.height = T;
     const ctx = knv.getContext('2d', { willReadFrequently: true });
     const kucuk = document.createElement('canvas'); kucuk.width = 32; kucuk.height = 32;
     const kctx = kucuk.getContext('2d', { willReadFrequently: true });
+    const blobAl = () => new Promise(r => knv.toBlob(r, 'image/jpeg', 0.92));
+    const gecerliOrani = (tx, ty, tw, th) => {
+      let gecerliSay = 0, orneklem = 0;
+      for (let y = 0; y < th; y += 8) for (let x = 0; x < tw; x += 8){ orneklem++; if (g.gecerli[(ty + y) * W + tx + x]) gecerliSay++; }
+      return orneklem ? gecerliSay / orneklem : 0;
+    };
+    const karoCiz = (tx, ty, tw, th) => { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, T, T); ctx.drawImage(D.tabanKnv, tx, ty, tw, th, 0, 0, tw, th); };
+    const maskele = (maskeler, tx, ty) => {                      // karonun ortalama rengiyle düz dolgu
+      kctx.drawImage(knv, 0, 0, 32, 32);
+      const d2 = kctx.getImageData(0, 0, 32, 32).data;
+      let r = 0, gg = 0, b = 0, n = 0;
+      for (let i = 0; i < d2.length; i += 4){ if (d2[i] + d2[i + 1] + d2[i + 2] < 15) continue; r += d2[i]; gg += d2[i + 1]; b += d2[i + 2]; n++; }
+      if (n){ r /= n; gg /= n; b /= n; } else { r = gg = b = 110; }
+      ctx.fillStyle = 'rgb(' + Math.round(r) + ',' + Math.round(gg) + ',' + Math.round(b) + ')';
+      for (const h of maskeler){
+        ctx.beginPath(); ctx.moveTo(h[0] - tx, h[1] - ty);
+        for (let i = 2; i < h.length; i += 2) ctx.lineTo(h[i] - tx, h[i + 1] - ty);
+        ctx.closePath(); ctx.fill();
+      }
+    };
+    /* kip 'egitim': doğrulama dışı eğitim taçları kutu; doğrulama taçları + test + küme + kenarda yarım kalanlar maske.
+       kip 'dogrulama': doğrulama taçları kutu; diğer eğitim taçları + test + küme maske. Tuvale çizer, satırları döndürür. */
+    const etiketliKaro = (tx, ty, kip) => {
+      const tw = Math.min(T, W - tx), th = Math.min(T, H - ty);
+      const karo = { x0: tx, y0: ty, x1: tx + tw, y1: ty + th };
+      karoCiz(tx, ty, tw, th);
+      const satirlar = [];
+      const maskeler = sabitMaske.filter((h, i) => kesisim(sabitMaskeKutu[i], karo) > 0);
+      egitimKutu.forEach((b, i) => {
+        const alan = (b.x1 - b.x0) * (b.y1 - b.y0);
+        if (alan <= 0) return;
+        const kes = kesisim(b, karo);
+        if (kes <= 0) return;
+        const etiketle = (kip === 'dogrulama') === dogrulamaMi[i];
+        if (etiketle && kes / alan >= 0.5){
+          const x0 = Math.max(b.x0, tx) - tx, x1 = Math.min(b.x1, tx + tw) - tx;
+          const y0 = Math.max(b.y0, ty) - ty, y1 = Math.min(b.y1, ty + th) - ty;
+          satirlar.push('0 ' + ((x0 + x1) / 2 / T).toFixed(6) + ' ' + ((y0 + y1) / 2 / T).toFixed(6) + ' ' +
+            ((x1 - x0) / T).toFixed(6) + ' ' + ((y1 - y0) / T).toFixed(6));
+        } else {
+          maskeler.push(halkaOlcekle(egitimTac[i], maskePay));
+        }
+      });
+      if (maskeler.length) maskele(maskeler, tx, ty);
+      return { satirlar, tw, th };
+    };
+    /* 1) düzenli ızgara: tahmin karoları (maskesiz) + arka plan adayları */
     const toplam = xler.length * yler.length;
     let say = 0;
     for (const ty of yler) for (const tx of xler){
       say++;
       if (say % 3 === 0){ durum('YOLO karoları hazırlanıyor… ' + say + '/' + toplam); await beklet(); }
       const tw = Math.min(T, W - tx), th = Math.min(T, H - ty);
-      let gecerliSay = 0, orneklem = 0;
-      for (let y = 0; y < th; y += 8) for (let x = 0; x < tw; x += 8){ orneklem++; if (g.gecerli[(ty + y) * W + tx + x]) gecerliSay++; }
-      const gecerliOran = orneklem ? gecerliSay / orneklem : 0;
-      if (gecerliOran < 0.02) continue;
-      const karo = { x0: tx, y0: ty, x1: tx + tw, y1: ty + th };
-      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, T, T);
-      ctx.drawImage(D.tabanKnv, tx, ty, tw, th, 0, 0, tw, th);
+      const oran = gecerliOrani(tx, ty, tw, th);
+      if (oran < 0.02) continue;
+      karoCiz(tx, ty, tw, th);
       const ad = 'karo_' + String(ty).padStart(5, '0') + '_' + String(tx).padStart(5, '0');
-      const tahminBlob = await new Promise(r => knv.toBlob(r, 'image/jpeg', 0.92));
-      girdiler.push({ ad: 'tahmin/images/' + ad + '.jpg', veri: tahminBlob });
+      girdiler.push({ ad: 'tahmin/images/' + ad + '.jpg', veri: await blobAl() });
       karoBilgi.push({ dosya: ad + '.jpg', x0: tx, y0: ty, w: tw, h: th });
-      if (gecerliOran < 0.3) continue;
-      const satirlar = [];
-      const maskeler = maskeHalka.filter((h, i) => kesisim(maskeKutu[i], karo) > 0);
-      egitimKutu.forEach((b, i) => {
-        const alan = (b.x1 - b.x0) * (b.y1 - b.y0);
-        if (alan <= 0) return;
-        const kes = kesisim(b, karo);
-        if (kes / alan >= 0.5){
-          const x0 = Math.max(b.x0, tx) - tx, x1 = Math.min(b.x1, tx + tw) - tx;
-          const y0 = Math.max(b.y0, ty) - ty, y1 = Math.min(b.y1, ty + th) - ty;
-          satirlar.push('0 ' + ((x0 + x1) / 2 / T).toFixed(6) + ' ' + ((y0 + y1) / 2 / T).toFixed(6) + ' ' +
-            ((x1 - x0) / T).toFixed(6) + ' ' + ((y1 - y0) / T).toFixed(6));
-        } else if (kes > 0){
-          maskeler.push(halkaOlcekle(egitimTac[i], maskePay));     // kenarda yarım kalan eğitim tacı etiketsiz kalmasın
-        }
-      });
-      if (maskeler.length){
-        kctx.drawImage(knv, 0, 0, 32, 32);
-        const d2 = kctx.getImageData(0, 0, 32, 32).data;
-        let r = 0, gg = 0, b = 0, n = 0;
-        for (let i = 0; i < d2.length; i += 4){ if (d2[i] + d2[i + 1] + d2[i + 2] < 15) continue; r += d2[i]; gg += d2[i + 1]; b += d2[i + 2]; n++; }
-        if (n){ r /= n; gg /= n; b /= n; } else { r = gg = b = 110; }
-        ctx.fillStyle = 'rgb(' + Math.round(r) + ',' + Math.round(gg) + ',' + Math.round(b) + ')';
-        for (const h of maskeler){
-          ctx.beginPath(); ctx.moveTo(h[0] - tx, h[1] - ty);
-          for (let i = 2; i < h.length; i += 2) ctx.lineTo(h[i] - tx, h[i + 1] - ty);
-          ctx.closePath(); ctx.fill();
-        }
-      }
-      const egitimBlob = maskeler.length ? await new Promise(r => knv.toBlob(r, 'image/jpeg', 0.92)) : tahminBlob;
-      (satirlar.length ? pozitif : arkaplan).push({ ad, blob: egitimBlob, etiket: satirlar.join('\n') });
+      if (oran < 0.3) continue;
+      const karo = { x0: tx, y0: ty, x1: tx + tw, y1: ty + th };
+      const tacVar = egitimKutu.some(b => { const alan = (b.x1 - b.x0) * (b.y1 - b.y0); return alan > 0 && kesisim(b, karo) / alan >= 0.5; });
+      if (tacVar) continue;                                         // kutulu karolar aşağıda taç merkezli üretilir
+      const { satirlar } = etiketliKaro(tx, ty, 'egitim');          // kutu çıkmaz; test/küme/yarım taçlar maskelenir
+      if (satirlar.length) continue;
+      arkaplan.push({ ad, blob: await blobAl(), etiket: '', x0: tx, y0: ty, w: tw, h: th });
     }
+    /* 2) taç merkezli karolar: her eğitim tacı için KARO_TAC, her doğrulama tacı için KARO_DOGRULAMA rastgele konum;
+          taç karonun tamamen içinde kalır, konumu her seferinde değişir (birebir kopya değil, farklı kesit) */
+    const KARO_TAC = 6, KARO_DOGRULAMA = 3;
     const rng = mulberry32(42);
+    const tacIdler = D.referans.idler || [];
+    const egitimIdx = []; D.referans.halkalarPx.forEach((_, i) => { if (dis.tacDisi[i]) egitimIdx.push(i); });
+    const dogrulamaIdler = [];
+    for (let i = 0; i < egitimTac.length; i++){
+      const b = egitimKutu[i], kip = dogrulamaMi[i] ? 'dogrulama' : 'egitim';
+      const fid = tacIdler[egitimIdx[i]] ?? (egitimIdx[i] + 1);
+      if (dogrulamaMi[i]) dogrulamaIdler.push(fid);
+      const adet = dogrulamaMi[i] ? KARO_DOGRULAMA : KARO_TAC;
+      const konum = (b0, b1, boy) => {
+        if (boy <= T) return 0;
+        const alt = Math.max(0, Math.ceil(b1) - T), ust = Math.min(boy - T, Math.floor(b0));
+        if (ust >= alt) return Math.round(alt + rng() * (ust - alt));
+        return Math.max(0, Math.min(boy - T, Math.round((b0 + b1) / 2 - T / 2)));   // taç karodan büyük: ortala
+      };
+      for (let k = 0; k < adet; k++){
+        const tx = konum(b.x0, b.x1, W), ty = konum(b.y0, b.y1, H);
+        const tw = Math.min(T, W - tx), th = Math.min(T, H - ty);
+        if (gecerliOrani(tx, ty, tw, th) < 0.3) continue;
+        const { satirlar } = etiketliKaro(tx, ty, kip);
+        if (!satirlar.length) continue;
+        const ad = (kip === 'egitim' ? 'egitim_' : 'dogrulama_') + String(fid).replace(/[^A-Za-z0-9_-]/g, '_') + '_' + k;
+        (kip === 'egitim' ? egitimKaro : dogrulamaKaro).push({ ad, blob: await blobAl(), etiket: satirlar.join('\n') });
+        egitimBilgi.push({ dosya: ad + '.jpg', bolum: kip === 'egitim' ? 'train' : 'val', x0: tx, y0: ty, w: tw, h: th, tac: fid });
+        if ((egitimBilgi.length & 3) === 0){ durum('Eğitim karoları hazırlanıyor… ' + egitimBilgi.length); await beklet(); }
+      }
+    }
     const karistir = a => { for (let i = a.length - 1; i > 0; i--){ const j = (rng() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    karistir(pozitif); karistir(arkaplan);
-    if (!pozitif.length) throw new Error('Hiçbir karoya eğitim tacı düşmedi (taçlar görüntü kapsamında mı?).');
-    const valSayi = Math.max(1, Math.round(pozitif.length * 0.2));
-    const arkaSec = arkaplan.slice(0, Math.max(2, pozitif.length));
+    karistir(arkaplan);
+    if (!egitimKaro.length) throw new Error('Hiçbir karoya eğitim tacı düşmedi (taçlar görüntü kapsamında mı?).');
+    if (!dogrulamaKaro.length) dogrulamaKaro.push({ ...egitimKaro[0], ad: 'dogrulama_' + egitimKaro[0].ad });   // tek taç: doğrulama boş kalmasın
+    const arkaSec = arkaplan.slice(0, Math.max(2, Math.round(egitimKaro.length / 2)));
     const valArka = Math.min(arkaSec.length, Math.max(1, Math.round(arkaSec.length * 0.2)));
     const koy = (liste, bolum) => {
       for (const k of liste){
@@ -7199,8 +7252,9 @@ async function yoloVeriSetiAktar(){
         girdiler.push({ ad: 'labels/' + bolum + '/' + k.ad + '.txt', veri: k.etiket });
       }
     };
-    koy(pozitif.slice(valSayi), 'train'); koy(pozitif.slice(0, valSayi), 'val');
+    koy(egitimKaro, 'train'); koy(dogrulamaKaro, 'val');
     koy(arkaSec.slice(valArka), 'train'); koy(arkaSec.slice(0, valArka), 'val');
+    const pozitif = egitimKaro, valSayi = dogrulamaKaro.length;    // özet metinleri için
     /* fotoğraflar (isteğe bağlı): havuz kopyaları + Çam çokgenleri */
     let fotoSayi = 0, fotoKutu = 0, fotoAtlanan = 0;
     if (fotoDahil){
@@ -7239,16 +7293,20 @@ async function yoloVeriSetiAktar(){
       sx: geoVar ? g.geo.sx * g.olcek : null, sy: geoVar ? g.geo.sy * g.olcek : null,
       calisma_w: W, calisma_h: H, olcek: g.olcek, karo: T, bindirme: 0.2,
       egitim_tac: egitimTac.length, test_tac: testTac.length, kume: kumeler.length,
-      egitim_kimlikler: [...D.egitimDisi.idler], uretim: new Date().toISOString()
+      egitim_kimlikler: [...D.egitimDisi.idler], uretim: new Date().toISOString(),
+      egitim_karo_tipi: 'tac_merkezli', tac_basina_karo: KARO_TAC, dogrulama_tac_basina_karo: KARO_DOGRULAMA,
+      dogrulama_taclar: dogrulamaIdler
     };
-    girdiler.push({ ad: 'tahmin/karolar.json', veri: JSON.stringify({ meta, karolar: karoBilgi }) });
+    girdiler.push({ ad: 'tahmin/karolar.json', veri: JSON.stringify({ meta, karolar: karoBilgi, egitim: egitimBilgi }) });
     girdiler.push({ ad: 'data.yaml', veri: 'path: .\ntrain: images/train\nval: images/val\nnames:\n  0: cam\n' });
     girdiler.push({ ad: 'README_tr.txt', veri: [
       'ÇAM-AI → YOLO veri seti (' + new Date().toLocaleString('tr-TR') + ')',
       'Kaynak: ' + g.dosyaAd + (geoVar ? ' · EPSG:' + g.geo.epsg + ' · çalışma GSD ' + (g.geo.sx * g.olcek * 100).toFixed(2) + ' cm/px' : ''),
       'Eğitim taçları: ' + egitimTac.length + ' (kimlikler: ' + [...D.egitimDisi.idler].join(', ') + ')',
+      '  → doğrulama taçları (her 5. eğitim tacı; eğitim karolarında maskelenir): ' + (dogrulamaIdler.join(', ') || '—'),
       'Test taçları: ' + testTac.length + ' + küme ' + kumeler.length + ' → eğitim karolarında 1 m tamponla maskelendi (model görmez)',
-      'Pozitif karo: ' + pozitif.length + ' (eğitim ' + (pozitif.length - valSayi) + ' / doğrulama ' + valSayi + ') · arka plan karosu: ' + arkaSec.length,
+      'Eğitim karoları: ' + egitimKaro.length + ' (taç başına ' + KARO_TAC + ' rastgele konumlu ' + T + ' px karo) · doğrulama karoları: ' +
+        dogrulamaKaro.length + ' (taç başına ' + KARO_DOGRULAMA + ') · arka plan karosu: ' + arkaSec.length,
       'Tahmin karoları: ' + karoBilgi.length + ' (maskesiz, tüm ortomozaik) — tahmin/karolar.json coğrafi dönüşümü içerir',
       fotoDahil ? 'Fotoğraflar: ' + fotoSayi + ' görüntü, ' + fotoKutu + ' kutu' + (fotoAtlanan ? ' (' + fotoAtlanan + ' fotoğrafın kopyası yok, atlandı)' : '') : 'Fotoğraflar: eklenmedi',
       '', 'Kullanım: ZIP\'i Colab defterine (cam_yolo_colab.ipynb) yükleyin; eğitim sonunda üretilen',
@@ -7259,8 +7317,10 @@ async function yoloVeriSetiAktar(){
     const t = new Date(), iki = n => String(n).padStart(2, '0');
     const damga = t.getFullYear() + '-' + iki(t.getMonth() + 1) + '-' + iki(t.getDate()) + '_' + iki(t.getHours()) + iki(t.getMinutes());
     await indir('cam_yolo_veri_' + damga + '.zip', zip, 'application/zip');
-    await bilgi('✓ YOLO veri seti hazır (' + (zip.size / 1048576).toFixed(1) + ' MB): ' + pozitif.length + ' pozitif karo (' +
-      egitimTac.length + ' taç), ' + arkaSec.length + ' arka plan karosu, ' + karoBilgi.length + ' tahmin karosu' +
+    await bilgi('✓ YOLO veri seti hazır (' + (zip.size / 1048576).toFixed(1) + ' MB): ' + egitimKaro.length + ' eğitim karosu (' +
+      (egitimTac.length - dogrulamaIdler.length) + ' taç × ' + KARO_TAC + ' konum), ' + dogrulamaKaro.length + ' doğrulama karosu (' +
+      dogrulamaIdler.length + ' taç: ' + (dogrulamaIdler.join(', ') || '—') + '), ' + arkaSec.length + ' arka plan karosu, ' +
+      karoBilgi.length + ' tahmin karosu' +
       (fotoDahil ? ', ' + fotoSayi + ' fotoğraf (' + fotoKutu + ' kutu' + (fotoAtlanan ? ', ' + fotoAtlanan + ' kopyasız atlandı' : '') + ')' : '') +
       '.\n\nZIP dosyasını Colab defterine yükleyin; adımlar YOLO_REHBER.md\'de.');
   }catch(e){
