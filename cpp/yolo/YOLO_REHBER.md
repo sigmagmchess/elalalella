@@ -51,6 +51,9 @@ README_tr.txt             özet
 1. [colab.research.google.com](https://colab.research.google.com) → **Dosya → Not defteri yükle** → `cam_yolo_colab.ipynb`.
 2. **Çalışma zamanı → Çalışma zamanı türünü değiştir → T4 GPU**.
 3. 2. hücrede `ZIP_YOLU` değişkenine Drive yolunu yazın (`/content/drive/MyDrive/cam_yolo_veri_….zip`).
+   Roboflow'da etiketlediğiniz fotoğraflar varsa 2b hücresinde `EK_VERI_ZIP`'e YOLOv8 formatındaki ZIP'in yolunu yazın
+   (yalnız `cam` sınıfı alınır). Dikkat: ham fotoğraflarda test çamları da görünebilir; temiz karşılaştırma için bu
+   hücreyi boş bırakın, fotoğraflı modeli ayrı bir varyant olarak raporlayın.
 4. Hücreleri sırayla çalıştırın. Varsayılan: `yolo11m.pt`, `imgsz=1024`, `epochs=150`, `patience=30`, `batch=8`,
    COCO ön eğitimli, havadan görüntü artırmaları (`flipud/fliplr/degrees`), tohum 42.
    - *CUDA out of memory* → `BATCH=4` ya da `MODEL="yolo11s.pt"`.
