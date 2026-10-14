@@ -614,6 +614,13 @@ textarea.rapor{
         <span id="eslesmeBirim" style="font-size:11.5px;color:var(--ink2)">m</span>
         <small style="font-size:11px;color:var(--ink2)">(≈ taç yarıçapı; tespit bu mesafe içindeyse "bulundu")</small>
       </div>
+      <div class="satir">
+        <label for="secEslesmeProtokol" title="Yarıçap: her referans noktası merkeze en yakın tek tespitle bire bir eşlenir (katı). Taç poligonu: poligonun içine en az bir tespit düşerse ağaç bulundu sayılır, içindeki fazla tespitler yanlış alarm sayılmaz (poligon içi). İkisini de raporlayabilirsiniz.">Noktasal eşleşme:</label>
+        <select id="secEslesmeProtokol" style="max-width:260px">
+          <option value="yaricap" selected>Yarıçap — merkeze ≤ r, bire bir (katı)</option>
+          <option value="poligon">Taç poligonu — içine ≥1 tespit = bulundu</option>
+        </select>
+      </div>
       <div class="arac-grup">
         <button class="btn birincil" id="btnDogrulukHesapla" disabled>🎯 Değerlendir</button>
         <button class="btn kucuk" id="btnAyarTara" disabled title="Güven eşiği × taç çapı ızgarasını tarar, nokta-F1'i en yüksek ayarı uygular">🔎 En iyi ayarı bul</button>
@@ -3788,6 +3795,7 @@ function havuzOzeti(){
   const sayim = new Array(K).fill(0);
   let n = 0;
   for (const h of D.havuz){
+    if (h.pasif) continue;                       // eğitime dahil edilmeyen kaynak sayılmaz
     n += h.n;
     h.sayimlar.forEach((s, c) => { if (c < K) sayim[c] += s; });
   }
@@ -3799,7 +3807,9 @@ function havuzGoster(){
     el.textContent = 'Havuz boş — yalnız geçerli görüntünün etiketleriyle eğitilir.';
   } else {
     const oz = havuzOzeti();
-    el.innerHTML = '📚 <b>' + D.havuz.length + ' kaynak · ' + sayiTR(oz.n) + ' yama</b> — ' +
+    const pasifSayi = D.havuz.filter(h => h.pasif).length;
+    el.innerHTML = '📚 <b>' + D.havuz.length + ' kaynak' + (pasifSayi ? ' (' + (D.havuz.length - pasifSayi) + ' eğitime dahil)' : '') +
+      ' · ' + sayiTR(oz.n) + ' yama</b> — ' +
       D.siniflar.map((s, c) => s.ad + ': ' + sayiTR(oz.sayim[c] || 0)).join(' · ') +
       ' · yama ' + D.havuz[0].yama + ' px';
   }
@@ -3822,8 +3832,22 @@ function havuzGoster(){
     yazi.textContent = sayiTR(h.n) + ' yama · ' + ozet +
       (h.cozunurluk ? ' · ' + h.cozunurluk + ' px' : '') +
       (h.vuruslar && h.vuruslar.length ? '' : ' · vuruş saklı değil');
+    if (h.pasif){ ad.style.opacity = '0.55'; yazi.style.opacity = '0.55'; }
     const dugmeler = document.createElement('div');
-    dugmeler.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap';
+    dugmeler.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;align-items:center';
+    /* eğitime dahil / hariç — ortomozaik + fotoğraf karşılaştırması için kaynak seçimi */
+    const dahilEtiket = document.createElement('label');
+    dahilEtiket.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;margin-right:4px';
+    const dahil = document.createElement('input');
+    dahil.type = 'checkbox'; dahil.checked = !h.pasif; dahil.dataset.islem = 'dahil'; dahil.disabled = D.mesgul;
+    dahil.title = 'İşaretli: bu kaynak eğitime girer. Kaldırırsanız kayıt havuzda durur ama eğitimde kullanılmaz.';
+    dahil.addEventListener('change', () => { h.pasif = !dahil.checked; havuzDahilDegisti(); });
+    dahilEtiket.append(dahil, document.createTextNode('eğitime dahil'));
+    const yalniz = document.createElement('button');
+    yalniz.className = 'btn kucuk'; yalniz.dataset.islem = 'yalniz'; yalniz.textContent = '⭐ Yalnız bu';
+    yalniz.title = 'Yalnız bu kaynakla eğit (diğerleri havuzda kalır, eğitime girmez)';
+    yalniz.disabled = D.mesgul;
+    yalniz.addEventListener('click', () => { D.havuz.forEach(x => { x.pasif = x !== h; }); havuzDahilDegisti(); });
     const duzenle = document.createElement('button');
     duzenle.className = 'btn kucuk'; duzenle.dataset.islem = 'duzenle';
     duzenle.textContent = '✏️ Düzenle';
@@ -3836,12 +3860,27 @@ function havuzGoster(){
     cikar.title = 'Yalnız bu fotoğrafı havuzdan çıkar';
     cikar.disabled = D.mesgul;
     cikar.addEventListener('click', () => havuzdanCikar(i));
-    dugmeler.append(duzenle, cikar);
+    dugmeler.append(dahilEtiket, yalniz, duzenle, cikar);
     sat.append(ad, yazi, dugmeler);
     liste.append(sat);
   });
+  if (D.havuz.length > 1 && D.havuz.some(h => h.pasif)){
+    const hepsi = document.createElement('button');
+    hepsi.className = 'btn kucuk'; hepsi.id = 'btnHavuzHepsiDahil'; hepsi.textContent = '☑️ Hepsini eğitime dahil et';
+    hepsi.addEventListener('click', () => { D.havuz.forEach(x => { x.pasif = false; }); havuzDahilDegisti(); });
+    liste.append(hepsi);
+  }
   goster(liste, D.havuz.length > 0);
   yedekPlanla();                                   // havuz değişti → otomatik yedek
+}
+/* kaynak dahil/hariç değişti: sayımlar, eğitim düğmesi ve eski eğitim durumu tazelenir */
+function havuzDahilDegisti(){
+  havuzGoster();
+  etiketDurumGuncelle();
+  egitimGecersizKil();
+  const aktif = D.havuz.filter(h => !h.pasif).length;
+  $('durumBilgi').textContent = 'Eğitime dahil kaynak: ' + aktif + '/' + D.havuz.length +
+    (aktif < D.havuz.length ? ' — diğerleri havuzda duruyor, eğitimde kullanılmayacak.' : '.');
 }
 function havuzuBosalt(){
   D.havuz = [];
@@ -4064,7 +4103,7 @@ $('btnHavuzBosalt').addEventListener('click', async () => {
 
 /* havuz + geçerli etiketleri tek eğitim setinde birleştirir; sınıf başına üst sınırı uygular */
 function egitimVerisiBirlestir(guncel, sinir, K){
-  const parcalar = D.havuz.slice();
+  const parcalar = D.havuz.filter(h => !h.pasif);   // yalnız "eğitime dahil" kaynaklar
   const kaynaklar = parcalar.map(h => h.ad + ' (' + h.n + ')');
   if (guncel.n){
     parcalar.push({ X24: guncel.X24, y: guncel.y, n: guncel.n });
@@ -5696,7 +5735,7 @@ $('btnProjeAktar').addEventListener('click', () => {
     gorselOzet: { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
       outW: D.gorsel.outW, outH: D.gorsel.outH, olcek: D.gorsel.olcek },
     havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd,
-      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, pasif: !!h.pasif,
       vuruslar: h.vuruslar && h.vuruslar.length ? h.vuruslar : null,
       sayimlar: h.sayimlar.slice(),
       y: Array.from(h.y),
@@ -5923,7 +5962,7 @@ async function projeIceAktar(proje){
       h.n === h.y.length && h.X24.length === h.n * OZELLIK_SAYISI);
     D.havuz = uyumlu.map(h => ({
       ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
-      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, pasif: !!h.pasif,
       vuruslar: Array.isArray(h.vuruslar) ? h.vuruslar.filter(vurusGecerli) : null,
       sayimlar: (h.sayimlar || []).slice(),
       y: Int32Array.from(h.y), X24: Float32Array.from(h.X24)
@@ -6132,7 +6171,7 @@ $('btnDogrulukHesapla').addEventListener('click', async () => {
   goster(hataEl, false);
   if (D.referansModu) elleDegerlendirBitir(false);
   const alansal = !!D.referans;
-  const noktasal = !!(D.referansNokta || D.referansKume);
+  const noktasal = noktasalReferansVar();
   if (!alansal && !noktasal){
     hataEl.textContent = '⚠️ Önce referans yükleyin (taç poligonu, ağaç noktası ya da küme) ya da elle işaretleyin.';
     goster(hataEl, true);
@@ -6491,8 +6530,14 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     m.push('Recall    = ' + (n.recall * 100).toFixed(2) + '%');
     m.push('F1        = ' + (n.f1 * 100).toFixed(2) + '%');
     if (n.tpB) m.push('Konum hatası (eşleşen ' + n.tpB + ' ağaç): ort ' + fmt(n.ortHata) + ' · medyan ' + fmt(n.medHata) + ' · en büyük ' + fmt(n.enBuyukHata));
-    m.push('Protokol  : küme poligonuna düşen tespitler kümeyi "bulundu" sayar; kümedeki fazla tespit FP sayılmaz;');
-    m.push('            tek ağaçlar yarıçap içinde artan mesafeyle bire bir eşlenir.');
+    if (n.protokol === 'poligon'){
+      m.push('Protokol  : TAÇ POLİGONU — poligonun içine en az bir tespit düşen taç "bulundu" sayılır; poligon');
+      m.push('            içindeki fazla tespitler FP sayılmaz; hiçbir taç/kümeye düşmeyen tespitler FP, tespitsiz taçlar FN.');
+      m.push('            Konum hatası: taç merkezine en yakın tespitin uzaklığıdır. (Yarıçap protokolü daha katıdır; ikisini de raporlayın.)');
+    } else {
+      m.push('Protokol  : YARIÇAP — küme poligonuna düşen tespitler kümeyi "bulundu" sayar; kümedeki fazla tespit FP sayılmaz;');
+      m.push('            tek ağaçlar yarıçap içinde artan mesafeyle bire bir eşlenir (katı).');
+    }
     if (n.kumeSayi){
       m.push('Kümeler   : ' + n.kumeTespit.map((k, i) => '#' + (i + 1) + ': ' +
         (k === null ? 'değerlendirme dışı' : k + ' tespit')).join(' · '));
@@ -6638,7 +6683,7 @@ function referansOzetiYaz(){
         'tespitler yanlış alarm sayılmaz.</small>' : '');
   goster($('referansBilgi'), varMi);
   $('btnDogrulukHesapla').disabled = !(varMi && D.sonuc);
-  $('btnAyarTara').disabled = !(D.sonuc && (D.referansNokta || D.referansKume));
+  $('btnAyarTara').disabled = !(D.sonuc && noktasalReferansVar());
   durumYaz('Dogruluk', varMi ? (D.sonuc ? 'değerlendirmeye hazır' : 'önce sınıflandırın') : 'bekliyor');
 }
 /* ---- DEĞERLENDİRME DIŞI (EĞİTİM) AĞAÇLAR ----
@@ -6859,6 +6904,19 @@ function referansKatmaniCiz(s){
     }
   }
 }
+/* noktasal eşleşme protokolü: 'yaricap' (merkeze ≤ r, bire bir) ya da 'poligon' (taç içine ≥1 tespit) */
+const eslesmeProtokolu = () => ($('secEslesmeProtokol') ? $('secEslesmeProtokol').value : 'yaricap');
+const tacPoligonuVar = () => !!(D.referans && !D.referans.elle && D.referans.halkalarPx && D.referans.halkalarPx.length);
+/* noktasal değerlendirme için yeterli referans var mı */
+function noktasalReferansVar(){
+  return !!(D.referansNokta || D.referansKume || (eslesmeProtokolu() === 'poligon' && tacPoligonuVar()));
+}
+$('secEslesmeProtokol').addEventListener('change', () => {
+  D.dogrulukNokta = null; D.ayarTarama = null;
+  goster($('noktaOzet'), false);
+  referansOzetiYaz();
+  if (D.gorsel) ciz();
+});
 function noktaHalkaIcinde(x, y, h){
   let ic = false;
   for (let i = 0, j = h.length - 2; i < h.length; j = i, i += 2){
@@ -6889,26 +6947,56 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
   const kumeAsil = [], kumeler = [];
   kumeTum.forEach((h, i) => { if (!dis.kumeDisi[i]){ kumeAsil.push(i); kumeler.push(h); } });
   const kumeTespitK = kumeler.map(() => 0);
+  /* TAÇ POLİGONU PROTOKOLÜ: referans birimi taç poligonudur; içine ≥1 tespit düşen taç bulundu sayılır,
+     içindeki fazla tespitler yanlış alarm değildir; noktalar bu kipte eşlenmez (yalnız kimlik/dışlama için) */
+  const poligonModu = eslesmeProtokolu() === 'poligon' && tacPoligonuVar();
+  const tacAsil = [], taclar = [];
+  if (poligonModu) D.referans.halkalarPx.forEach((h, i) => { if (!dis.tacDisi[i]){ tacAsil.push(i); taclar.push(h); } });
+  const tacTespit = taclar.map(() => []);
+  const merkez = h => { let mx = 0, my = 0; const n = h.length >> 1;
+    for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; } return [mx / n, my / n]; };
   const serbest = [];
   for (const t of tesp){
     let k = -1;
     for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(t.x, t.y, kumeler[i])){ k = i; break; }
-    if (k >= 0) kumeTespitK[k]++; else serbest.push(t);
-  }
-  const adaylar = [];
-  for (let r = 0; r < refN.length; r++)
-    for (const t of serbest){
-      const m = Math.hypot(t.x - refN[r][0], t.y - refN[r][1]);
-      if (m <= yaricapPx) adaylar.push({ r, t: t.i, m });
+    if (k >= 0){ kumeTespitK[k]++; continue; }
+    if (poligonModu){
+      let tk = -1;
+      for (let i = 0; i < taclar.length; i++) if (noktaHalkaIcinde(t.x, t.y, taclar[i])){ tk = i; break; }
+      if (tk >= 0){ tacTespit[tk].push(t); continue; }
     }
-  adaylar.sort((a, b) => a.m - b.m);
-  const refEs = new Int32Array(refN.length).fill(-1), tesEs = new Set();
-  const eslesen = [];
-  for (const c of adaylar){
-    if (refEs[c.r] >= 0 || tesEs.has(c.t)) continue;
-    refEs[c.r] = c.t; tesEs.add(c.t); eslesen.push({ r: refAsil[c.r], t: c.t, m: c.m });   // r: dosyadaki asıl sıra
+    serbest.push(t);
   }
-  const tpB = eslesen.length, fnB = refN.length - tpB, fp = serbest.length - tpB;
+  const eslesen = [];
+  let tpB, fnB, fp, birimSayi;
+  if (poligonModu){
+    /* taç başına: içine düşen tespitlerden merkeze en yakını kayda geçer (konum hatası için) */
+    taclar.forEach((h, k) => {
+      if (!tacTespit[k].length) return;
+      const [cx, cy] = merkez(h);
+      let enYakin = null;
+      for (const t of tacTespit[k]){
+        const m = Math.hypot(t.x - cx, t.y - cy);
+        if (!enYakin || m < enYakin.m) enYakin = { r: tacAsil[k], t: t.i, m };
+      }
+      eslesen.push(enYakin);
+    });
+    tpB = eslesen.length; fnB = taclar.length - tpB; fp = serbest.length; birimSayi = taclar.length;
+  } else {
+    const adaylar = [];
+    for (let r = 0; r < refN.length; r++)
+      for (const t of serbest){
+        const m = Math.hypot(t.x - refN[r][0], t.y - refN[r][1]);
+        if (m <= yaricapPx) adaylar.push({ r, t: t.i, m });
+      }
+    adaylar.sort((a, b) => a.m - b.m);
+    const refEs = new Int32Array(refN.length).fill(-1), tesEs = new Set();
+    for (const c of adaylar){
+      if (refEs[c.r] >= 0 || tesEs.has(c.t)) continue;
+      refEs[c.r] = c.t; tesEs.add(c.t); eslesen.push({ r: refAsil[c.r], t: c.t, m: c.m });   // r: dosyadaki asıl sıra
+    }
+    tpB = eslesen.length; fnB = refN.length - tpB; fp = serbest.length - tpB; birimSayi = refN.length;
+  }
   const tpK = kumeTespitK.filter(n => n > 0).length, fnK = kumeler.length - tpK;
   const tp = tpB + tpK, fn = fnB + fnK;
   const precision = tp + fp ? tp / (tp + fp) : 0, recall = tp + fn ? tp / (tp + fn) : 0;
@@ -6921,12 +7009,13 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
     ortHataPx: hatalar.length ? hatalar.reduce((a, b) => a + b, 0) / hatalar.length : 0,
     medHataPx: hatalar.length ? hatalar[hatalar.length >> 1] : 0,
     enBuyukHataPx: hatalar.length ? hatalar[hatalar.length - 1] : 0,
-    eslesen, kumeTespit, refSayi: refN.length, kumeSayi: kumeler.length,
-    tespit: tesp.length, kumeIciTespit: tesp.length - serbest.length, yaricapPx,
+    eslesen, kumeTespit, refSayi: birimSayi, kumeSayi: kumeler.length,
+    tespit: tesp.length, kumeIciTespit: kumeTespitK.reduce((a, b) => a + b, 0),
+    tacIciTespit: tacTespit.reduce((a, l) => a + l.length, 0), protokol: poligonModu ? 'poligon' : 'yaricap', yaricapPx,
     egitimDisi: dis.var, refDisiSayi: dis.refDisiSayi, kumeDisiSayi: dis.kumeDisiSayi, egitimIciTespit };
 }
 function noktaDogrulukHesapla(){
-  if (!D.sonuc || !D.agaclar || !(D.referansNokta || D.referansKume)) return;
+  if (!D.sonuc || !D.agaclar || !noktasalReferansVar()) return;
   const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
   const yr = eslesmeYaricapPx();
   const o = noktaDogrulukOlc(D.agaclar, yr.px);
@@ -6950,8 +7039,12 @@ function noktaDogrulukHesapla(){
     (o.kumeSayi ? ' (tek ağaç ' + o.tpB + '/' + o.refSayi + ' · küme ' + o.tpK + '/' + o.kumeSayi + ')' : '') +
     ' · kaçırılan <b>' + o.fn + '</b> · yanlış alarm <b>' + o.fp + '</b></div>' +
     '<div class="ozet-alt">İsabet %' + fmt(py) + ' · Yakalama %' + fmt(ry) +
-    ' · eşleşme yarıçapı ' + String(yr.deger).replace('.', ',') + ' ' + birim +
-    ' · tespit ' + o.tespit + (o.kumeIciTespit ? ' (' + o.kumeIciTespit + '’i küme içinde)' : '') + hataYazi +
+    (o.protokol === 'poligon'
+      ? ' · protokol: <b>taç poligonu içine ≥1 tespit</b> (fazlası yanlış alarm değil)'
+      : ' · eşleşme yarıçapı ' + String(yr.deger).replace('.', ',') + ' ' + birim + ' (bire bir, katı)') +
+    ' · tespit ' + o.tespit +
+    ((o.tacIciTespit || o.kumeIciTespit) ? ' (' + [o.tacIciTespit ? o.tacIciTespit + '’i taç içinde' : '',
+      o.kumeIciTespit ? o.kumeIciTespit + '’i küme içinde' : ''].filter(Boolean).join(', ') + ')' : '') + hataYazi +
     (o.egitimDisi ? '<br>🎓 Değerlendirme dışı: <b>' + o.refDisiSayi + '</b> eğitim ağacı' +
       (o.kumeDisiSayi ? ' + ' + o.kumeDisiSayi + ' küme' : '') + ' · çevrelerindeki <b>' + o.egitimIciTespit +
       '</b> tespit sayılmadı — sonuç yalnız bağımsız (test) ağaçlar üzerinden' : '') + '</div>';
@@ -6972,7 +7065,7 @@ function noktaDogrulukHesapla(){
 /* Güven eşiği × taç çapı ızgarasını tarar; nokta-F1'i en yüksek ayarı uygular.
    Sunucuya gitmez: yalnız mevcut olasılık ızgarası üzerinde yeniden işaretler. */
 async function enIyiAyariBul(){
-  if (D.mesgul || !D.sonuc || !(D.referansNokta || D.referansKume)) return;
+  if (D.mesgul || !D.sonuc || !noktasalReferansVar()) return;
   if (!D.agaclar) agaclariHesapla(true);
   const s = D.sonuc, g = D.gorsel, K = D.siniflar.length, camIdx = hedefTurIdx();
   const probs = aktifProbs();
@@ -7264,7 +7357,7 @@ function yedekPaketi(){
                cozunurluk: parseInt($('secCozunurluk').value, 10) },
     /* y / X24 tipli diziler olduğu gibi saklanır (structured clone) — JSON'a göre çok daha küçük/hızlı */
     havuz: D.havuz.map(h => ({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
-      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, vuruslar: h.vuruslar || null,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, vuruslar: h.vuruslar || null, pasif: !!h.pasif,
       sayimlar: h.sayimlar.slice(), y: h.y, X24: h.X24 })),
     vuruslar: D.gorsel ? vuruslariPaketle(D.vuruslar) : [],
     gorselOzet: D.gorsel ? { ad: D.gorsel.dosyaAd, w: D.gorsel.w, h: D.gorsel.h,
@@ -7373,7 +7466,7 @@ async function yedekGeriYukle(anahtar){
   }
   for (const h of y.havuz){
     D.havuz.push({ ad: h.ad, yama: h.yama, ozellik: OZELLIK_SAYISI, n: h.n, gsd: h.gsd ?? null,
-      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, vuruslar: h.vuruslar || null,
+      outW: h.outW, outH: h.outH, cozunurluk: h.cozunurluk, vuruslar: h.vuruslar || null, pasif: !!h.pasif,
       sayimlar: (h.sayimlar || []).slice(),
       y: h.y instanceof Int32Array ? h.y : Int32Array.from(h.y),
       X24: h.X24 instanceof Float32Array ? h.X24 : Float32Array.from(h.X24) });

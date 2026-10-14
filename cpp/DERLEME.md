@@ -67,6 +67,13 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      bozduğu için kullanılmadı). Seyrek taçlı çamlar parçalanmaz, ağaç başına
      tek nokta kalır, taç poligonu referans taç gibi bütün çıkar. Ayar taraması
      ve rapor bu ayarı kullanır/yazar; proje dosyasında saklanır.
+   - **Doğruluk Analizi → Noktasal eşleşme protokolü:** *Yarıçap* (varsayılan,
+     katı): her referans noktası merkeze ≤ r içindeki en yakın tespitle bire bir
+     eşlenir. *Taç poligonu* (poligon içi): taç poligonunun içine ≥1 tespit
+     düşerse ağaç bulundu sayılır, içindeki fazla tespitler yanlış alarm değildir;
+     hiçbir taç/kümeye düşmeyen tespitler FP, tespitsiz taçlar FN. Konum hatası
+     taç merkezine en yakın tespitle hesaplanır. Ayar taraması seçili protokolle
+     koşar; rapor protokolü yazar. Tezde ikisini yan yana verin.
    - **Doğruluk Analizi → 🖌️ Referanstan etiket üret:** ortomozaiğin kendi
      görünümünü modele göstermenin en hızlı yolu. 🎓 kutusundaki eğitim
      çamlarının taç poligonları hedef tür (Çam) etiketi olur (kenardan 0,4 m
@@ -84,6 +91,10 @@ Linux/macOS (test): `g++ -O3 -march=native -fopenmp -o cam_ai cam_ai_sunucu.cpp 
      dışlanan noktayı içermelerine göre dışlanır (katmanların fid'leri farklı
      olabilir). Referanslar tuvalde fid numaralarıyla çizilir; dışlananlar gri
      kesiklidir ("Referansları ve numaralarını tuvalde göster" kutusu).
+     Her kaynağın **"eğitime dahil"** kutusu vardır; kaldırılan kaynak havuzda
+     durur ama eğitime, sayımlara ve sunucu eşitlemesine girmez. **⭐ Yalnız bu**
+     tek kaynakla (ör. yalnız ortomozaik) eğitmek içindir; "Hepsini eğitime
+     dahil et" geri alır. Seçim proje dosyası ve yedekle birlikte saklanır.
      **Sınıf eklemek havuzu boşaltmaz** (yeni sınıf sona eklenir); sınıf
      silmek yalnız o sınıfın örneklerini havuzdan çıkarır, kalan kaynaklar durur.
      **Otomatik yedek:** havuz ve ekrandaki etiketler her değişiklikten ~1,5 s
