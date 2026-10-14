@@ -54,9 +54,12 @@ README_tr.txt             özet
    Roboflow'da etiketlediğiniz fotoğraflar varsa 2b hücresinde `EK_VERI_ZIP`'e YOLOv8 formatındaki ZIP'in yolunu yazın
    (yalnız `cam` sınıfı alınır). Dikkat: ham fotoğraflarda test çamları da görünebilir; temiz karşılaştırma için bu
    hücreyi boş bırakın, fotoğraflı modeli ayrı bir varyant olarak raporlayın.
-4. Hücreleri sırayla çalıştırın. Varsayılan: `yolo11m.pt`, `imgsz=1024`, `epochs=150`, `patience=30`, `batch=8`,
-   COCO ön eğitimli, havadan görüntü artırmaları (`flipud/fliplr/degrees`), tohum 42.
-   - *CUDA out of memory* → `BATCH=4` ya da `MODEL="yolo11s.pt"`.
+4. Hücreleri sırayla çalıştırın. 2c hücresi kutulu eğitim karolarını 6 kat çoğaltır (az veride epoch başına yeterli adım
+   için şart; her kopya farklı artırma alır). Varsayılan eğitim: `yolo11s.pt`, `imgsz=1024`, `epochs=120`, erken durdurma
+   kapalı (`patience=0`), AdamW `lr0=0.001` + 5 epoch ısınma, `batch=8`, COCO ön eğitimli, havadan görüntü artırmaları
+   (`flipud/fliplr/degrees`), tohum 42. Ultralytics 8.3 sürümüne sabitlenmiştir (8.4'te eğitim kararsızlığı görüldü).
+   - *CUDA out of memory* → `BATCH=4`.
+   - Doğrulama mAP50 0,1'in altında kalırsa: `COGALT`'ı 10 yapın, `EPOCHS=200`; hâlâ düşükse QGIS'te ek taç çizin.
    - Colab oturumu düşerse (12 saat sınırı/boşta kalma) `CALISMA` klasörü silinir; `best.pt` ve sonuç ZIP'i Drive'a kopyalanır, oradan devam edin.
 5. Defter sonunda `yolo_sonuclar_cam_yolo11m.zip` iner (Drive'a da kopyalanır). İçinde `yolo_tespitler.geojson`,
    `yolo_kutular.geojson`, `best.pt`, `egitim/results.csv|png`, karışıklık matrisi, PR eğrisi, `args.yaml`, `dogrulama_metrikleri.txt`.
