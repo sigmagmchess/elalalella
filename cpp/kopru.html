@@ -511,7 +511,7 @@ textarea.rapor{
       </div>
       <div class="satir gizli" id="esikSatir">
         <label for="esik">Güven eşiği:</label>
-        <input type="range" id="esik" min="30" max="95" value="50" style="flex:1">
+        <input type="range" id="esik" min="5" max="95" value="50" style="flex:1">
         <span id="esikYazi" style="font-size:11.5px;color:var(--ink2)">%50</span>
       </div>
       <div class="satir gizli" id="opaklikSatir">
@@ -595,6 +595,11 @@ textarea.rapor{
         <input type="number" id="cevreYaricap" min="3" max="60" step="1" value="15" style="max-width:56px">
         <span style="font-size:11.5px;color:var(--ink2)">m</span>
       </div>
+      <div class="satir" style="flex-wrap:wrap;gap:6px">
+        <button class="btn kucuk" id="btnDisTespit"
+          title="Başka bir yöntemin (ör. Colab'da eğitilen YOLO) tespitlerini GeoJSON nokta ya da kutu olarak yükleyin; aynı referans ve aynı protokolle puanlanır. Güven değeri 'guven'/'conf' özniteliğinden okunur, Adım 4'teki güven eşiği kaydırıcısıyla süzülür.">📥 Dış tespitleri yükle (YOLO GeoJSON)…</button>
+        <input type="file" id="disTespitGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
+      </div>
       <div class="satir">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11.5px">
           <input type="checkbox" id="chkReferansGoster" checked>
@@ -646,6 +651,13 @@ textarea.rapor{
         <button class="btn kucuk" id="btnGeojsonAktar" disabled>🌍 GeoJSON (QGIS)</button>
         <button class="btn kucuk" id="btnAgacGeojson" disabled>📍 Ağaç noktaları (GeoJSON)</button>
         <button class="btn kucuk" id="btnPoligonGeojson" disabled>🌿 Taç poligonları (GeoJSON)</button>
+      </div>
+      <div class="arac-grup" style="align-items:center">
+        <button class="btn kucuk" id="btnYoloAktar" disabled
+          title="Ortomozaik karoları + QGIS taçlarından YOLO eğitim seti (eğitim taçları kutu, test taçları maskelenir), tahmin karoları ve coğrafi bilgi; Colab defterine yüklenir">🧊 YOLO veri seti (ZIP)</button>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11.5px" title="Havuzdaki fotoğraf kopyaları ve Çam çokgenleri de eğitim görüntüsü olarak eklenir (test çamları fotoğraflarda ayırt edilemez; raporda belirtin)">
+          <input type="checkbox" id="chkYoloFoto"> fotoğrafları da ekle
+        </label>
       </div>
       <div class="arac-grup">
         <button class="btn kucuk" id="btnModelAktar" disabled>🧠 C++ modelini indir (.bin)</button>
@@ -3334,6 +3346,7 @@ function gorselKur(g){
   D.vuruslar = [];
   /* referanslar görüntü pikseline çevrilmişti — yeni görüntüde geçersiz */
   D.referansNokta = null; D.referansKume = null; D.dogrulukNokta = null; D.ayarTarama = null;
+  D.disTespit = null;
   if (D.egitimDisi){ D.egitimDisi.dosya = null; $('btnEgitimDosya').textContent = '📂 Dosyadan…'; }  // kimlik listesi kalır
   D.cokgen = [];
   D.dikTaslak = null;
@@ -3390,6 +3403,7 @@ function gorselKur(g){
   $('btnEgit').disabled = true;
   $('btnSiniflandir').disabled = !aktarilan;
   ['btnPngAktar', 'btnCsvAktar', 'btnGeojsonAktar'].forEach(b => $(b).disabled = true);
+  $('btnYoloAktar').disabled = false;                   // referans + kimlikler yüklenince işlev kendisi denetler
   $('btnModelAktar').disabled = !aktarilan;
   $('btnRapor').disabled = !aktarilan;
   $('btnProjeAktar').disabled = false;
@@ -4914,6 +4928,7 @@ function aktifProbs(){
 }
 
 function sonucKatmaniGuncelle(){
+  if (D.disTespit) disTespitUygula();                   // dış tespitler güven eşiğiyle yeniden süzülür
   if (!D.sonuc) return;
   const s = D.sonuc, K = D.siniflar.length;
   const esik = parseInt($('esik').value, 10) / 100;
@@ -5142,6 +5157,7 @@ function agacTespitAdaptif(ayar){
 function agaclariHesapla(sessiz){
   const s = D.sonuc, g = D.gorsel;
   if (!s || !g) return;
+  D.disTespit = null;                                   // modelin kendi işaretlerine dönülür
   const K = D.siniflar.length;
   const camIdx = hedefTurIdx();
   const esik = parseInt($('esik').value, 10) / 100;
@@ -5211,7 +5227,7 @@ function poligonKutuTemizle(){
   D.dogruluk = null;
   if (D.referans && D.referans.elle) elleDegerlendirBitir(false);
   $('btnPoligonGeojson').disabled = true;
-  $('btnDogrulukHesapla').disabled = !(D.sonuc && (D.referansNokta || D.referansKume));
+  $('btnDogrulukHesapla').disabled = !((D.sonuc || D.disTespit) && noktasalReferansVar());
   goster($('poligonKutu'), false);
   goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false); goster($('sacilimKnv'), false);
   goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
@@ -5373,7 +5389,7 @@ $('secTacKapat').addEventListener('change', () => {
 });
 
 function isaretKnvOlustur(){
-  const g = D.gorsel, s = D.sonuc;
+  const g = D.gorsel, s = blokOlcek();
   if (!D.isaretKnv) D.isaretKnv = document.createElement('canvas');
   D.isaretKnv.width = g.outW;
   D.isaretKnv.height = g.outH;
@@ -6170,15 +6186,15 @@ $('btnDogrulukHesapla').addEventListener('click', async () => {
   const hataEl = $('dogrulukHata');
   goster(hataEl, false);
   if (D.referansModu) elleDegerlendirBitir(false);
-  const alansal = !!D.referans;
+  const alansal = !!D.referans && !!D.sonuc;           // alansal (IoU) ölçüm model sonucu ister; dış tespitte yok
   const noktasal = noktasalReferansVar();
   if (!alansal && !noktasal){
     hataEl.textContent = '⚠️ Önce referans yükleyin (taç poligonu, ağaç noktası ya da küme) ya da elle işaretleyin.';
     goster(hataEl, true);
     return;
   }
-  if (!D.sonuc){
-    hataEl.textContent = '⚠️ Önce Adım 4’ten görüntüyü sınıflandırın.';
+  if (!D.sonuc && !D.disTespit){
+    hataEl.textContent = '⚠️ Önce Adım 4’ten görüntüyü sınıflandırın (ya da 📥 dış tespitleri yükleyin).';
     goster(hataEl, true);
     return;
   }
@@ -6509,6 +6525,9 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     const fmt = v => (n.birim === 'm' ? v.toFixed(2) : Math.round(v)) + ' ' + n.birim;
     m.push('');
     m.push('NOKTA BAZLI DEĞERLENDİRME (ağaç başına tek nokta; eşleşme yarıçapı ' + n.yaricap + ' ' + n.birim + ')');
+    m.push('Tespit kaynağı  : ' + (n.kaynak && n.kaynak !== 'model'
+      ? 'DIŞ TESPİT dosyası — ' + n.kaynak + ' (ör. Colab/YOLO çıktısı; güven eşiği %' + n.esikYuzde + ')'
+      : 'Çam-AI modeli (tarayıcı/sunucu; güven eşiği %' + n.esikYuzde + ')'));
     m.push('Referans        : ' + n.refSayi + ' tek ağaç' + (n.refAd ? ' (' + n.refAd + ')' : '') +
       (n.kumeSayi ? ' + ' + n.kumeSayi + ' küme (' + n.kumeAd + ')' : '') + ' = ' + (n.refSayi + n.kumeSayi) + ' birim');
     if (D.referansNokta && D.referansNokta.disarida)
@@ -6548,7 +6567,17 @@ $('btnDogrulukRapor').addEventListener('click', () => {
       for (const c of n.eslesen) m.push('  ref ' + String(c.r + 1).padStart(4) + '  tespit ' + String(c.t + 1).padStart(4) + '  ' + fmt(c.m * n.mBirim));
     }
   }
-  if (D.ayarTarama){
+  if (D.ayarTarama && D.ayarTarama.harici){
+    const t = D.ayarTarama;
+    m.push('');
+    m.push('GÜVEN EŞİĞİ TARAMASI — DIŞ TESPİT (' + t.zaman + '; kaynak: ' + t.kaynak + '): ' + t.denenen +
+      ' eşik denendi; seçilen eşik %' + Math.round(t.enIyi.esik * 100));
+    m.push('  ' + 'Eşik'.padEnd(7) + 'TP'.padStart(4) + 'FP'.padStart(4) + 'FN'.padStart(4) + 'F1'.padStart(9));
+    for (const r of t.ilkBes)
+      m.push('  ' + ('%' + Math.round(r.esik * 100)).padEnd(7) + String(r.tp).padStart(4) +
+        String(r.fp).padStart(4) + String(r.fn).padStart(4) + ((r.f1 * 100).toFixed(2) + '%').padStart(9));
+    m.push('  NOT: Eşik bu referansa göre seçildi; bağımsız test alanı sonuçları ayrıca raporlanmalıdır.');
+  } else if (D.ayarTarama){
     const t = D.ayarTarama;
     m.push('');
     m.push('PARAMETRE TARAMASI (' + t.zaman + '): ' + t.denenen + ' ayar denendi; seçilen eşik %' +
@@ -6572,15 +6601,17 @@ function geojsonCoz(gj){
   const px = n => geoVar
     ? [(n[0] - g.geo.ox) / (g.geo.sx * g.olcek), (g.geo.oy - n[1]) / (g.geo.sy * g.olcek)]
     : [n[0] / g.olcek, -n[1] / g.olcek];
-  const halkalar = [], noktalar = [], halkaIdler = [], noktaIdler = [];
-  const halkaEkle = (k, id) => {
+  const halkalar = [], noktalar = [], halkaIdler = [], noktaIdler = [], halkaOz = [], noktaOz = [];
+  const halkaEkle = (k, id, oz) => {
     if (!Array.isArray(k) || k.length < 3) return;
     const h = [];
     for (const n of k){ if (!Array.isArray(n) || n.length < 2) return; const [x, y] = px(n); h.push(x, y); }
-    halkalar.push(h); halkaIdler.push(id);
+    halkalar.push(h); halkaIdler.push(id); halkaOz.push(oz || {});
   };
-  const noktaEkle = (n, id) => {
-    if (Array.isArray(n) && n.length >= 2 && isFinite(n[0]) && isFinite(n[1])){ noktalar.push(px(n)); noktaIdler.push(id); }
+  const noktaEkle = (n, id, oz) => {
+    if (Array.isArray(n) && n.length >= 2 && isFinite(n[0]) && isFinite(n[1])){
+      noktalar.push(px(n)); noktaIdler.push(id); noktaOz.push(oz || {});
+    }
   };
   /* öğe kimliği: QGIS/DXF dışa aktarımlarında fid; yoksa id/no ya da 1'den başlayan sıra */
   const idAl = (f, i) => {
@@ -6592,24 +6623,24 @@ function geojsonCoz(gj){
     ? (gj.features || []).filter(Boolean)
     : (gj.type === 'Feature' ? [gj] : [{ geometry: gj, properties: {} }]);
   ogeler.forEach((f, i) => {
-    const geom = f.geometry, id = idAl(f, i);
+    const geom = f.geometry, id = idAl(f, i), oz = (f && f.properties) || {};
     if (!geom) return;
-    if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0], id);
-    else if (geom.type === 'MultiPolygon') for (const p of geom.coordinates) halkaEkle(p[0], id);
-    else if (geom.type === 'Point') noktaEkle(geom.coordinates, id);
-    else if (geom.type === 'MultiPoint') for (const n of geom.coordinates) noktaEkle(n, id);
+    if (geom.type === 'Polygon') halkaEkle(geom.coordinates[0], id, oz);
+    else if (geom.type === 'MultiPolygon') for (const p of geom.coordinates) halkaEkle(p[0], id, oz);
+    else if (geom.type === 'Point') noktaEkle(geom.coordinates, id, oz);
+    else if (geom.type === 'MultiPoint') for (const n of geom.coordinates) noktaEkle(n, id, oz);
   });
   const icinde = (x, y) => x >= 0 && y >= 0 && x < g.outW && y < g.outH;
-  const halkaIc = [], halkaDis = [], halkaIcId = [];
+  const halkaIc = [], halkaDis = [], halkaIcId = [], halkaIcOz = [];
   halkalar.forEach((h, k) => {
     let mx = 0, my = 0; const n = h.length >> 1;
     for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; }
-    if (icinde(mx / n, my / n)){ halkaIc.push(h); halkaIcId.push(halkaIdler[k]); } else halkaDis.push(h);
+    if (icinde(mx / n, my / n)){ halkaIc.push(h); halkaIcId.push(halkaIdler[k]); halkaIcOz.push(halkaOz[k]); } else halkaDis.push(h);
   });
-  const noktaIc = [], noktaIcId = [];
-  noktalar.forEach((n, k) => { if (icinde(n[0], n[1])){ noktaIc.push(n); noktaIcId.push(noktaIdler[k]); } });
-  return { halkalar: halkaIc, halkaIdler: halkaIcId, halkaDisarida: halkaDis.length, halkaToplam: halkalar.length,
-           noktalar: noktaIc, noktaIdler: noktaIcId, noktaDisarida: noktalar.length - noktaIc.length, noktaToplam: noktalar.length };
+  const noktaIc = [], noktaIcId = [], noktaIcOz = [];
+  noktalar.forEach((n, k) => { if (icinde(n[0], n[1])){ noktaIc.push(n); noktaIcId.push(noktaIdler[k]); noktaIcOz.push(noktaOz[k]); } });
+  return { halkalar: halkaIc, halkaIdler: halkaIcId, halkaOzellikler: halkaIcOz, halkaDisarida: halkaDis.length, halkaToplam: halkalar.length,
+           noktalar: noktaIc, noktaIdler: noktaIcId, noktaOzellikler: noktaIcOz, noktaDisarida: noktalar.length - noktaIc.length, noktaToplam: noktalar.length };
 }
 async function referansDosyaOku(dosya, tur){
   const hataEl = $('dogrulukHata');
@@ -6682,8 +6713,8 @@ function referansOzetiYaz(){
         'bire bir eşlenir; küme poligonuna düşen tespitler kümeyi "bulundu" sayar, kümedeki fazla ' +
         'tespitler yanlış alarm sayılmaz.</small>' : '');
   goster($('referansBilgi'), varMi);
-  $('btnDogrulukHesapla').disabled = !(varMi && D.sonuc);
-  $('btnAyarTara').disabled = !(D.sonuc && noktasalReferansVar());
+  $('btnDogrulukHesapla').disabled = !(varMi && (D.sonuc || D.disTespit));
+  $('btnAyarTara').disabled = !((D.sonuc || D.disTespit) && noktasalReferansVar());
   durumYaz('Dogruluk', varMi ? (D.sonuc ? 'değerlendirmeye hazır' : 'önce sınıflandırın') : 'bekliyor');
 }
 /* ---- DEĞERLENDİRME DIŞI (EĞİTİM) AĞAÇLAR ----
@@ -6917,6 +6948,329 @@ $('secEslesmeProtokol').addEventListener('change', () => {
   referansOzetiYaz();
   if (D.gorsel) ciz();
 });
+/* ---- DIŞ TESPİTLER (ör. Colab'da eğitilen YOLO): GeoJSON nokta/kutu → aynı referans, aynı protokol ---- */
+D.disTespit = null;
+const blokOlcek = () => D.sonuc ? { adim: D.sonuc.adim, yari: D.sonuc.yari } : { adim: 1, yari: 0 };
+$('btnDisTespit').addEventListener('click', () => $('disTespitGirdi').click());
+$('disTespitGirdi').addEventListener('change', async e => {
+  if (e.target.files.length) await disTespitYukle(e.target.files[0]);
+  e.target.value = '';
+});
+async function disTespitYukle(dosya){
+  const hataEl = $('dogrulukHata');
+  goster(hataEl, false);
+  try{
+    if (!D.gorsel) throw new Error('Önce görüntüyü yükleyin (koordinat dönüşümü için gerekli).');
+    const c = geojsonCoz(JSON.parse(await dosya.text()));
+    const guvenAl = oz => {
+      for (const k of ['guven', 'conf', 'confidence', 'score', 'skor', 'p', 'olasilik']){
+        const v = parseFloat(oz && oz[k]);
+        if (isFinite(v)) return Math.max(0, Math.min(1, v));
+      }
+      return 1;
+    };
+    const liste = [];
+    c.noktalar.forEach((n, i) => liste.push({ x: n[0], y: n[1], p: guvenAl(c.noktaOzellikler[i]) }));
+    /* kutu/poligon verildiyse merkezleri nokta sayılır */
+    c.halkalar.forEach((h, i) => {
+      let mx = 0, my = 0; const n = h.length >> 1;
+      for (let k = 0; k < h.length; k += 2){ mx += h[k]; my += h[k + 1]; }
+      liste.push({ x: mx / n, y: my / n, p: guvenAl(c.halkaOzellikler[i]) });
+    });
+    if (!liste.length)
+      throw new Error('Dosyada görüntü kapsamına düşen nokta/kutu yok (' + (c.noktaToplam + c.halkaToplam) +
+        ' öğe okundu). Dosyanın CRS\'si ortomozaikle aynı olmalı (ör. EPSG:32635).');
+    D.disTespit = { ad: dosya.name, liste, toplam: c.noktaToplam + c.halkaToplam, disarida: c.noktaDisarida + c.halkaDisarida };
+    D.dogrulukNokta = null; D.ayarTarama = null; D.dogruluk = null;
+    goster($('noktaOzet'), false); goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false);
+    goster($('sacilimKnv'), false); goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
+    disTespitUygula();
+    referansOzetiYaz();
+    $('adimDogruluk').open = true;
+  }catch(h){
+    hataEl.textContent = '⚠️ ' + (h && h.message ? h.message : h);
+    goster(hataEl, true);
+  }
+}
+/* güven eşiği (Adım 4 kaydırıcısı) ile süz, blok koordinatına çevir, tuvale çiz */
+function disTespitUygula(){
+  const d = D.disTespit;
+  if (!d || !D.gorsel) return;
+  const esik = parseInt($('esik').value, 10) / 100;
+  $('esikYazi').textContent = '%' + $('esik').value;
+  const { adim, yari } = blokOlcek();
+  D.agaclar = d.liste.filter(t => t.p >= esik).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, dis: true }));
+  D.enYogun = null;
+  const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
+  let tac = parseFloat(String($('tacCapi').value || '').replace(',', '.'));
+  if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
+  D.tacCalisPx = Math.max(4, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
+  isaretKnvOlustur();
+  const kutu = $('agacSonucKutu');
+  kutu.className = D.agaclar.length ? 'basari' : 'uyari';
+  kutu.innerHTML = '📥 <b>Dış tespit:</b> ' + kacHtml(d.ad) + ' — ' + sayiTR(d.liste.length) + ' nokta okundu, güven ≥ %' +
+    $('esik').value + ' olan <b>' + sayiTR(D.agaclar.length) + '</b> tanesi işaretlendi' +
+    (d.disarida ? ' (' + d.disarida + ' tanesi görüntü dışında)' : '') +
+    '.<br><small>Bu noktalar modelin değil, yüklenen dosyanın (ör. YOLO) tespitleridir; Doğruluk Analizi aynı referans ve ' +
+    'protokolle puanlar. Modelin işaretlerine dönmek için 📍 Ağaçları İşaretle.</small>';
+  goster(kutu, true); goster($('agacGosterSatir'), true); goster($('esikSatir'), true); goster($('agacSatir'), true);
+  $('btnAgacGeojson').disabled = !D.sonuc || !D.agaclar.length;
+  $('adim4').open = true;
+  ciz();
+}
+/* dış tespitler için ayar taraması: yalnız güven eşiği */
+async function disTespitTarama(){
+  const d = D.disTespit;
+  if (!d || !noktasalReferansVar()) return;
+  const yr = eslesmeYaricapPx();
+  const { adim, yari } = blokOlcek();
+  const sonuclar = [];
+  for (let e = 0.05; e <= 0.951; e += 0.05){
+    const ag = d.liste.filter(t => t.p >= e - 1e-9).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0 }));
+    const o = noktaDogrulukOlc(ag, yr.px);
+    sonuclar.push({ esik: +e.toFixed(2), tac: NaN, f1: o.f1, precision: o.precision, recall: o.recall, tp: o.tp, fp: o.fp, fn: o.fn, n: ag.length });
+  }
+  sonuclar.sort((a, b) => b.f1 - a.f1 || b.esik - a.esik);
+  const en = sonuclar[0];
+  $('esik').value = String(Math.round(en.esik * 100));
+  D.ayarTarama = { denenen: sonuclar.length, enIyi: en, ilkBes: sonuclar.slice(0, 5), tacGirdi: NaN,
+    yaricap: yr.deger, birim: yr.birim, harici: true, kaynak: d.ad, zaman: new Date().toLocaleString('tr-TR') };
+  disTespitUygula();
+  noktaDogrulukHesapla();
+  D.ayarTarama.bitti = true;
+  $('noktaOzet').innerHTML += '<div class="ipucu" style="margin-top:6px"><b>🔎 Güven eşiği taraması (dış tespit)</b> — ' +
+    sonuclar.length + ' eşik denendi; seçilen <b>%' + Math.round(en.esik * 100) + '</b>.' +
+    '<table class="istat" style="margin-top:4px"><tr><th>Eşik</th><th>TP</th><th>FP</th><th>FN</th><th>F1</th></tr>' +
+    sonuclar.slice(0, 5).map(r => '<tr><td>%' + Math.round(r.esik * 100) + '</td><td>' + r.tp + '</td><td>' + r.fp +
+      '</td><td>' + r.fn + '</td><td><b>' + yuzde(r.f1) + '</b></td></tr>').join('') + '</table>' +
+    '<small>Not: eşik bu referansa göre seçildi; bağımsız raporlama için doğrulama/test ayrımına dikkat edin.</small></div>';
+}
+
+/* ---- ZIP yazıcı (STORE, sıkıştırmasız; tek dosya, CDN yok) ---- */
+const CRC_TABLO = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(u8){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLO[(c ^ u8[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+async function zipOlustur(girdiler){
+  const enc = new TextEncoder();
+  const parcalar = [], merkez = [];
+  let ofs = 0;
+  for (const gi of girdiler){
+    const veri = gi.veri instanceof Blob ? new Uint8Array(await gi.veri.arrayBuffer())
+      : (typeof gi.veri === 'string' ? enc.encode(gi.veri) : gi.veri);
+    const ad = enc.encode(gi.ad);
+    const crc = crc32(veri);
+    const yerel = new DataView(new ArrayBuffer(30 + ad.length));
+    yerel.setUint32(0, 0x04034b50, true); yerel.setUint16(4, 20, true); yerel.setUint16(6, 0x0800, true);
+    yerel.setUint16(8, 0, true); yerel.setUint16(10, 0, true); yerel.setUint16(12, 0x21, true);
+    yerel.setUint32(14, crc, true); yerel.setUint32(18, veri.length, true); yerel.setUint32(22, veri.length, true);
+    yerel.setUint16(26, ad.length, true); yerel.setUint16(28, 0, true);
+    new Uint8Array(yerel.buffer).set(ad, 30);
+    parcalar.push(yerel.buffer, veri);
+    merkez.push({ ad, crc, boy: veri.length, ofs });
+    ofs += 30 + ad.length + veri.length;
+  }
+  const cd = []; let cdBoy = 0;
+  for (const m of merkez){
+    const d = new DataView(new ArrayBuffer(46 + m.ad.length));
+    d.setUint32(0, 0x02014b50, true); d.setUint16(4, 20, true); d.setUint16(6, 20, true); d.setUint16(8, 0x0800, true);
+    d.setUint16(10, 0, true); d.setUint16(12, 0, true); d.setUint16(14, 0x21, true);
+    d.setUint32(16, m.crc, true); d.setUint32(20, m.boy, true); d.setUint32(24, m.boy, true);
+    d.setUint16(28, m.ad.length, true); d.setUint16(30, 0, true); d.setUint16(32, 0, true);
+    d.setUint16(34, 0, true); d.setUint16(36, 0, true); d.setUint32(38, 0, true); d.setUint32(42, m.ofs, true);
+    new Uint8Array(d.buffer).set(m.ad, 46);
+    cd.push(d.buffer); cdBoy += 46 + m.ad.length;
+  }
+  const son = new DataView(new ArrayBuffer(22));
+  son.setUint32(0, 0x06054b50, true); son.setUint16(8, merkez.length, true); son.setUint16(10, merkez.length, true);
+  son.setUint32(12, cdBoy, true); son.setUint32(16, ofs, true);
+  return new Blob([...parcalar, ...cd, son.buffer], { type: 'application/zip' });
+}
+
+/* ---- YOLO VERİ SETİ: ortomozaik karoları + QGIS taçlarından kutular; test taçları maskelenir ---- */
+$('btnYoloAktar').addEventListener('click', yoloVeriSetiAktar);
+async function yoloVeriSetiAktar(){
+  if (D.mesgul || !D.gorsel) return;
+  const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
+  const hata = m => bilgi('YOLO veri seti üretilemedi: ' + m);
+  if (!tacPoligonuVar()) return hata('Önce Doğruluk Analizi\'nde 🌿 taç poligonlarını yükleyin; kutular bu taçlardan üretilir.');
+  if (!egitimDisiVar()) return hata('Önce 🎓 kutusuna eğitim çamlarının kimliklerini yazıp Uygula deyin. Yalnız o taçlar ' +
+    'eğitim kutusu olur; test çamları eğitim karolarında maskelenir.');
+  const dis = egitimDislamasi(eslesmeYaricapPx().px);
+  const egitimTac = [], testTac = [];
+  D.referans.halkalarPx.forEach((h, i) => (dis.tacDisi[i] ? egitimTac : testTac).push(h));
+  if (!egitimTac.length) return hata('Kimlik listesi hiçbir taçla eşleşmedi; tuvaldeki numaralara bakın.');
+  const kumeler = D.referansKume ? D.referansKume.halkalarPx : [];
+  const fotoDahil = $('chkYoloFoto').checked;
+  const T = 1024, ADIM = Math.round(T * 0.8);
+  const pxM = geoVar ? 1 / (g.geo.sx * g.olcek) : 1 / 0.025;
+  const maskePay = 1.0 * pxM;
+  const onay = await onayla('YOLO veri seti:\n• ' + egitimTac.length + ' eğitim tacı → kutu; ' + testTac.length +
+    ' test tacı ve ' + kumeler.length + ' küme eğitim karolarında maskelenir (1 m tampon)\n• Karo ' + T + ' px' +
+    (geoVar ? ' ≈ ' + (T / pxM).toFixed(0) + ' m' : '') + ', %20 bindirme; pozitif karolar %80 eğitim / %20 doğrulama\n' +
+    '• Tahmin için tüm ortomozaik karoları (maskesiz) + coğrafi bilgi' +
+    (fotoDahil ? '\n• Havuzdaki fotoğraf kopyaları ve Çam çokgenleri de eğitime eklenir' : '') + '\n\nDevam edilsin mi?');
+  if (!onay) return;
+  D.mesgul = true;
+  const durum = m => { $('durumBilgi').textContent = m; };
+  try{
+    const W = g.outW, H = g.outH;
+    const bbox = h => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let i = 0; i < h.length; i += 2){ x0 = Math.min(x0, h[i]); x1 = Math.max(x1, h[i]); y0 = Math.min(y0, h[i + 1]); y1 = Math.max(y1, h[i + 1]); }
+      return { x0, y0, x1, y1 };
+    };
+    const kesisim = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+    const egitimKutu = egitimTac.map(bbox);
+    const maskeHalka = testTac.concat(kumeler).map(h => halkaOlcekle(h, maskePay));
+    const maskeKutu = maskeHalka.map(bbox);
+    const eksen = (boy) => { const s = new Set(); for (let v = 0; v < boy; v += ADIM){ s.add(Math.min(v, Math.max(0, boy - T))); if (v + T >= boy) break; } return [...s]; };
+    const xler = eksen(W), yler = eksen(H);
+    const girdiler = [], karoBilgi = [], pozitif = [], arkaplan = [];
+    const knv = document.createElement('canvas'); knv.width = T; knv.height = T;
+    const ctx = knv.getContext('2d', { willReadFrequently: true });
+    const kucuk = document.createElement('canvas'); kucuk.width = 32; kucuk.height = 32;
+    const kctx = kucuk.getContext('2d', { willReadFrequently: true });
+    const toplam = xler.length * yler.length;
+    let say = 0;
+    for (const ty of yler) for (const tx of xler){
+      say++;
+      if (say % 3 === 0){ durum('YOLO karoları hazırlanıyor… ' + say + '/' + toplam); await beklet(); }
+      const tw = Math.min(T, W - tx), th = Math.min(T, H - ty);
+      let gecerliSay = 0, orneklem = 0;
+      for (let y = 0; y < th; y += 8) for (let x = 0; x < tw; x += 8){ orneklem++; if (g.gecerli[(ty + y) * W + tx + x]) gecerliSay++; }
+      const gecerliOran = orneklem ? gecerliSay / orneklem : 0;
+      if (gecerliOran < 0.02) continue;
+      const karo = { x0: tx, y0: ty, x1: tx + tw, y1: ty + th };
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, T, T);
+      ctx.drawImage(D.tabanKnv, tx, ty, tw, th, 0, 0, tw, th);
+      const ad = 'karo_' + String(ty).padStart(5, '0') + '_' + String(tx).padStart(5, '0');
+      const tahminBlob = await new Promise(r => knv.toBlob(r, 'image/jpeg', 0.92));
+      girdiler.push({ ad: 'tahmin/images/' + ad + '.jpg', veri: tahminBlob });
+      karoBilgi.push({ dosya: ad + '.jpg', x0: tx, y0: ty, w: tw, h: th });
+      if (gecerliOran < 0.3) continue;
+      const satirlar = [];
+      const maskeler = maskeHalka.filter((h, i) => kesisim(maskeKutu[i], karo) > 0);
+      egitimKutu.forEach((b, i) => {
+        const alan = (b.x1 - b.x0) * (b.y1 - b.y0);
+        if (alan <= 0) return;
+        const kes = kesisim(b, karo);
+        if (kes / alan >= 0.5){
+          const x0 = Math.max(b.x0, tx) - tx, x1 = Math.min(b.x1, tx + tw) - tx;
+          const y0 = Math.max(b.y0, ty) - ty, y1 = Math.min(b.y1, ty + th) - ty;
+          satirlar.push('0 ' + ((x0 + x1) / 2 / T).toFixed(6) + ' ' + ((y0 + y1) / 2 / T).toFixed(6) + ' ' +
+            ((x1 - x0) / T).toFixed(6) + ' ' + ((y1 - y0) / T).toFixed(6));
+        } else if (kes > 0){
+          maskeler.push(halkaOlcekle(egitimTac[i], maskePay));     // kenarda yarım kalan eğitim tacı etiketsiz kalmasın
+        }
+      });
+      if (maskeler.length){
+        kctx.drawImage(knv, 0, 0, 32, 32);
+        const d2 = kctx.getImageData(0, 0, 32, 32).data;
+        let r = 0, gg = 0, b = 0, n = 0;
+        for (let i = 0; i < d2.length; i += 4){ if (d2[i] + d2[i + 1] + d2[i + 2] < 15) continue; r += d2[i]; gg += d2[i + 1]; b += d2[i + 2]; n++; }
+        if (n){ r /= n; gg /= n; b /= n; } else { r = gg = b = 110; }
+        ctx.fillStyle = 'rgb(' + Math.round(r) + ',' + Math.round(gg) + ',' + Math.round(b) + ')';
+        for (const h of maskeler){
+          ctx.beginPath(); ctx.moveTo(h[0] - tx, h[1] - ty);
+          for (let i = 2; i < h.length; i += 2) ctx.lineTo(h[i] - tx, h[i + 1] - ty);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+      const egitimBlob = maskeler.length ? await new Promise(r => knv.toBlob(r, 'image/jpeg', 0.92)) : tahminBlob;
+      (satirlar.length ? pozitif : arkaplan).push({ ad, blob: egitimBlob, etiket: satirlar.join('\n') });
+    }
+    const rng = mulberry32(42);
+    const karistir = a => { for (let i = a.length - 1; i > 0; i--){ const j = (rng() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    karistir(pozitif); karistir(arkaplan);
+    if (!pozitif.length) throw new Error('Hiçbir karoya eğitim tacı düşmedi (taçlar görüntü kapsamında mı?).');
+    const valSayi = Math.max(1, Math.round(pozitif.length * 0.2));
+    const arkaSec = arkaplan.slice(0, Math.max(2, pozitif.length));
+    const valArka = Math.min(arkaSec.length, Math.max(1, Math.round(arkaSec.length * 0.2)));
+    const koy = (liste, bolum) => {
+      for (const k of liste){
+        girdiler.push({ ad: 'images/' + bolum + '/' + k.ad + '.jpg', veri: k.blob });
+        girdiler.push({ ad: 'labels/' + bolum + '/' + k.ad + '.txt', veri: k.etiket });
+      }
+    };
+    koy(pozitif.slice(valSayi), 'train'); koy(pozitif.slice(0, valSayi), 'val');
+    koy(arkaSec.slice(valArka), 'train'); koy(arkaSec.slice(0, valArka), 'val');
+    /* fotoğraflar (isteğe bağlı): havuz kopyaları + Çam çokgenleri */
+    let fotoSayi = 0, fotoKutu = 0, fotoAtlanan = 0;
+    if (fotoDahil){
+      const pozIdx = hedefTurIdx();
+      for (const h of D.havuz){
+        if (!h.vuruslar || !h.vuruslar.length || h.ad === g.dosyaAd) continue;
+        let kopya = null;
+        try{ kopya = await yedekOku(gorselKopyaAnahtari(h.ad, h.outW, h.outH)); }catch(_e){}
+        if (!kopya || !kopya.blob){ fotoAtlanan++; continue; }
+        const satirlar = [];
+        for (const v of h.vuruslar){
+          if (v.sinif !== pozIdx) continue;
+          const tip = v.tip || 'firca';
+          let b = null;
+          if (tip === 'cokgen') b = bbox(v.noktalar);
+          else if (tip === 'dikdortgen') b = { x0: Math.min(v.x0, v.x1), y0: Math.min(v.y0, v.y1), x1: Math.max(v.x0, v.x1), y1: Math.max(v.y0, v.y1) };
+          else if (tip === 'firca'){ b = bbox(v.noktalar); b.x0 -= v.boy; b.y0 -= v.boy; b.x1 += v.boy; b.y1 += v.boy; }
+          if (!b) continue;
+          const x0 = Math.max(0, b.x0), y0 = Math.max(0, b.y0), x1 = Math.min(h.outW, b.x1), y1 = Math.min(h.outH, b.y1);
+          if (x1 - x0 < 8 || y1 - y0 < 8) continue;
+          satirlar.push('0 ' + ((x0 + x1) / 2 / h.outW).toFixed(6) + ' ' + ((y0 + y1) / 2 / h.outH).toFixed(6) + ' ' +
+            ((x1 - x0) / h.outW).toFixed(6) + ' ' + ((y1 - y0) / h.outH).toFixed(6));
+        }
+        if (!satirlar.length) continue;
+        const uz = kopya.blob.type === 'image/png' ? '.png' : '.jpg';
+        const ad = 'foto_' + h.ad.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_-]/g, '_');
+        const bolum = fotoSayi % 5 === 4 ? 'val' : 'train';
+        girdiler.push({ ad: 'images/' + bolum + '/' + ad + uz, veri: kopya.blob });
+        girdiler.push({ ad: 'labels/' + bolum + '/' + ad + '.txt', veri: satirlar.join('\n') });
+        fotoSayi++; fotoKutu += satirlar.length;
+      }
+    }
+    const meta = {
+      kaynak: g.dosyaAd, epsg: geoVar ? g.geo.epsg : null,
+      ox: geoVar ? g.geo.ox : null, oy: geoVar ? g.geo.oy : null,
+      sx: geoVar ? g.geo.sx * g.olcek : null, sy: geoVar ? g.geo.sy * g.olcek : null,
+      calisma_w: W, calisma_h: H, olcek: g.olcek, karo: T, bindirme: 0.2,
+      egitim_tac: egitimTac.length, test_tac: testTac.length, kume: kumeler.length,
+      egitim_kimlikler: [...D.egitimDisi.idler], uretim: new Date().toISOString()
+    };
+    girdiler.push({ ad: 'tahmin/karolar.json', veri: JSON.stringify({ meta, karolar: karoBilgi }) });
+    girdiler.push({ ad: 'data.yaml', veri: 'path: .\ntrain: images/train\nval: images/val\nnames:\n  0: cam\n' });
+    girdiler.push({ ad: 'README_tr.txt', veri: [
+      'ÇAM-AI → YOLO veri seti (' + new Date().toLocaleString('tr-TR') + ')',
+      'Kaynak: ' + g.dosyaAd + (geoVar ? ' · EPSG:' + g.geo.epsg + ' · çalışma GSD ' + (g.geo.sx * g.olcek * 100).toFixed(2) + ' cm/px' : ''),
+      'Eğitim taçları: ' + egitimTac.length + ' (kimlikler: ' + [...D.egitimDisi.idler].join(', ') + ')',
+      'Test taçları: ' + testTac.length + ' + küme ' + kumeler.length + ' → eğitim karolarında 1 m tamponla maskelendi (model görmez)',
+      'Pozitif karo: ' + pozitif.length + ' (eğitim ' + (pozitif.length - valSayi) + ' / doğrulama ' + valSayi + ') · arka plan karosu: ' + arkaSec.length,
+      'Tahmin karoları: ' + karoBilgi.length + ' (maskesiz, tüm ortomozaik) — tahmin/karolar.json coğrafi dönüşümü içerir',
+      fotoDahil ? 'Fotoğraflar: ' + fotoSayi + ' görüntü, ' + fotoKutu + ' kutu' + (fotoAtlanan ? ' (' + fotoAtlanan + ' fotoğrafın kopyası yok, atlandı)' : '') : 'Fotoğraflar: eklenmedi',
+      '', 'Kullanım: ZIP\'i Colab defterine (cam_yolo_colab.ipynb) yükleyin; eğitim sonunda üretilen',
+      'yolo_tespitler.geojson dosyasını Çam-AI → Doğruluk Analizi → 📥 Dış tespitleri yükle ile açın.'
+    ].join('\n') });
+    durum('ZIP paketleniyor…'); await beklet();
+    const zip = await zipOlustur(girdiler);
+    const t = new Date(), iki = n => String(n).padStart(2, '0');
+    const damga = t.getFullYear() + '-' + iki(t.getMonth() + 1) + '-' + iki(t.getDate()) + '_' + iki(t.getHours()) + iki(t.getMinutes());
+    await indir('cam_yolo_veri_' + damga + '.zip', zip, 'application/zip');
+    await bilgi('✓ YOLO veri seti hazır (' + (zip.size / 1048576).toFixed(1) + ' MB): ' + pozitif.length + ' pozitif karo (' +
+      egitimTac.length + ' taç), ' + arkaSec.length + ' arka plan karosu, ' + karoBilgi.length + ' tahmin karosu' +
+      (fotoDahil ? ', ' + fotoSayi + ' fotoğraf (' + fotoKutu + ' kutu' + (fotoAtlanan ? ', ' + fotoAtlanan + ' kopyasız atlandı' : '') + ')' : '') +
+      '.\n\nZIP dosyasını Colab defterine yükleyin; adımlar YOLO_REHBER.md\'de.');
+  }catch(e){
+    console.error(e);
+    await bilgi('YOLO veri seti üretilemedi: ' + (e && e.message ? e.message : e));
+  }finally{
+    D.mesgul = false;
+    durum('');
+  }
+}
 function noktaHalkaIcinde(x, y, h){
   let ic = false;
   for (let i = 0, j = h.length - 2; i < h.length; j = i, i += 2){
@@ -6934,7 +7288,7 @@ function eslesmeYaricapPx(){
 /* Protokol: tespitler önce küme poligonlarına atanır (küme ≥1 tespit → bulundu);
    kalan tespitler referans noktalarla yarıçap içinde, artan mesafeyle bire bir eşlenir. */
 function noktaDogrulukOlc(agaclar, yaricapPx){
-  const s = D.sonuc;
+  const s = blokOlcek();                        // model sonucu yoksa (dış tespit) blok = çalışma pikseli
   const tespTum = agaclar.map((a, i) => ({ i, x: s.yari + a.x * s.adim, y: s.yari + a.y * s.adim, p: a.p, kume: a.kume || 0 }));
   const refTum = D.referansNokta ? D.referansNokta.noktalarPx : [];
   const kumeTum = D.referansKume ? D.referansKume.halkalarPx : [];
@@ -7015,7 +7369,7 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
     egitimDisi: dis.var, refDisiSayi: dis.refDisiSayi, kumeDisiSayi: dis.kumeDisiSayi, egitimIciTespit };
 }
 function noktaDogrulukHesapla(){
-  if (!D.sonuc || !D.agaclar || !noktasalReferansVar()) return;
+  if ((!D.sonuc && !D.disTespit) || !D.agaclar || !noktasalReferansVar()) return;
   const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
   const yr = eslesmeYaricapPx();
   const o = noktaDogrulukOlc(D.agaclar, yr.px);
@@ -7024,6 +7378,7 @@ function noktaDogrulukHesapla(){
   D.dogrulukNokta = { ...o, yaricap: yr.deger, birim, mBirim,
     ortHata: o.ortHataPx * mBirim, medHata: o.medHataPx * mBirim, enBuyukHata: o.enBuyukHataPx * mBirim,
     refAd: D.referansNokta ? D.referansNokta.ad : null, kumeAd: D.referansKume ? D.referansKume.ad : null,
+    kaynak: D.disTespit ? D.disTespit.ad : 'model', esikYuzde: parseInt($('esik').value, 10),
     zaman: new Date().toLocaleString('tr-TR') };
   const toplamRef = o.refSayi + o.kumeSayi;
   const f1y = o.f1 * 100, ry = o.recall * 100, py = o.precision * 100;
@@ -7034,7 +7389,8 @@ function noktaDogrulukHesapla(){
     '</b> (med ' + (geoVar ? fmt(D.dogrulukNokta.medHata) + ' m' : Math.round(D.dogrulukNokta.medHata) + ' px') + ')' : '';
   $('noktaOzet').innerHTML =
     '<div class="buyuk-deger ' + durum + '">%' + fmt(f1y) + '</div>' +
-    '<div class="ozet-metin"><b>' + sinifAd + ' — noktasal tespit başarısı (F1)</b><br>' +
+    '<div class="ozet-metin"><b>' + sinifAd + ' — noktasal tespit başarısı (F1)' +
+    (D.disTespit ? ' · dış tespit: ' + kacHtml(D.disTespit.ad) : '') + '</b><br>' +
     toplamRef + ' referans birimden <b>' + o.tp + '</b> tanesi bulundu' +
     (o.kumeSayi ? ' (tek ağaç ' + o.tpB + '/' + o.refSayi + ' · küme ' + o.tpK + '/' + o.kumeSayi + ')' : '') +
     ' · kaçırılan <b>' + o.fn + '</b> · yanlış alarm <b>' + o.fp + '</b></div>' +
@@ -7065,7 +7421,9 @@ function noktaDogrulukHesapla(){
 /* Güven eşiği × taç çapı ızgarasını tarar; nokta-F1'i en yüksek ayarı uygular.
    Sunucuya gitmez: yalnız mevcut olasılık ızgarası üzerinde yeniden işaretler. */
 async function enIyiAyariBul(){
-  if (D.mesgul || !D.sonuc || !noktasalReferansVar()) return;
+  if (D.mesgul || !noktasalReferansVar()) return;
+  if (D.disTespit) return disTespitTarama();            // dış tespit: yalnız güven eşiği taranır
+  if (!D.sonuc) return;
   if (!D.agaclar) agaclariHesapla(true);
   const s = D.sonuc, g = D.gorsel, K = D.siniflar.length, camIdx = hedefTurIdx();
   const probs = aktifProbs();

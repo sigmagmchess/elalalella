@@ -236,3 +236,17 @@ havuza eklenir). Yalnızca gönderdiğiniz veriyle eğitmek için gövdeye
 - Bu sunucu, tezdeki tarayıcı-içi modele (36 öznitelik uzayı aynı) **büyük model
   karşılaştırması** eklemenizi sağlar; sınıflandırma haritası üretimi için
   Çam-AI'nin blok özniteliklerini `/tahmin` ucuna göndermek yeterlidir.
+
+## YOLO köprüsü (ikinci yöntem: derin öğrenme ile nesne tespiti)
+
+Ayrıntılı adımlar `yolo/YOLO_REHBER.md`'de. Özet:
+
+| Parça | Nerede | Ne yapar |
+|---|---|---|
+| **📦 YOLO veri seti (ZIP)** | kopru.html → Adım 5 | Ortomozaiği 1024 px karolara böler (%20 bindirme). 🎓 kimlikli **eğitim taçları** YOLO kutusu olur (`labels/*.txt`, "0 cx cy w h"); **test taçları ve kümeler eğitim karolarında 1 m tamponla düz renge boyanır** (model görmez). Pozitif karolar %80/%20 train/val; sınırlı arka plan karosu eklenir. `tahmin/images` tüm ortomozaiğin maskesiz karolarıdır; `tahmin/karolar.json` EPSG/ox/oy/sx/sy ve karo köşelerini taşır. İsteğe bağlı: havuzdaki fotoğraf kopyaları + Çam çokgenleri de eğitim görüntüsü olur. ZIP tarayıcıda, CDN'siz yazılır (STORE). |
+| **`yolo/cam_yolo_colab.ipynb`** | Google Colab (T4) | Ultralytics YOLO11/YOLOv8 eğitimi (`imgsz=1024`, 150 epoch, `patience=30`, COCO ön eğitim, havadan görüntü artırmaları, tohum 42), doğrulama metrikleri (P/R/F1/mAP50, PR eğrisi, karışıklık matrisi), tahmin karolarında `conf=0.05` ile tahmin, birleştirme, sonuç ZIP'i. |
+| **`yolo/yolo_tespit_birlestir.py`** | defterin içine gömülü; CLI olarak da çalışır | Karo kutularını çalışma pikseline taşır (`x0 + bx`), **küresel NMS** ile bindirme kopyalarını tekilleştirir (IoU ≥ 0,45 · merkezi büyük kutunun içinde · farklı karolardan gelen, kenara değen parçalar için IoS ≥ 0,5 → birleşim), `E = ox + px·sx`, `N = oy − py·sy` ile `yolo_tespitler.geojson` (nokta + `guven`) ve `yolo_kutular.geojson` yazar. Yalnız standart kütüphane. |
+| **📥 Dış tespitleri yükle** | kopru.html → Doğruluk Analizi | Nokta ya da kutu GeoJSON'unu (özellik: `guven`/`conf`/`score`…) okur; Adım 4 güven kaydırıcısı bu güveni süzer; tuvalde işaretlenir. **Değerlendir / 🔎 Ayar tara (yalnız eşik, %5–95) / 📄 rapor** aynı referans, aynı 🎓 dışlama ve aynı protokolle çalışır; rapor "Tespit kaynağı: DIŞ TESPİT dosyası" satırını ve dış tespit eşik taramasını içerir. 📍 Ağaçları İşaretle modelin işaretlerine döner. |
+
+Tezde iki yöntem (36 öznitelik + MLP ↔ YOLO) **aynı eğitim ve test çamları** üzerinde,
+aynı protokolle karşılaştırılır; `data.yaml` içindeki göreli `path` defterde mutlak yola çevrilir.
