@@ -7260,7 +7260,7 @@ async function yoloVeriSetiAktar(){
     if (fotoDahil){
       const pozIdx = hedefTurIdx();
       for (const h of D.havuz){
-        if (!h.vuruslar || !h.vuruslar.length || h.ad === g.dosyaAd) continue;
+        if (!h.vuruslar || !h.vuruslar.length || h.ad === g.dosyaAd || h.pasif) continue;   // "eğitime dahil" kapalı fotoğraflar atlanır
         let kopya = null;
         try{ kopya = await yedekOku(gorselKopyaAnahtari(h.ad, h.outW, h.outH)); }catch(_e){}
         if (!kopya || !kopya.blob){ fotoAtlanan++; continue; }
