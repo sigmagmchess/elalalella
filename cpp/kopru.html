@@ -6552,6 +6552,8 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     if (n.protokol === 'poligon'){
       m.push('Protokol  : TAÇ POLİGONU — poligonun içine en az bir tespit düşen taç "bulundu" sayılır; poligon');
       m.push('            içindeki fazla tespitler FP sayılmaz; hiçbir taç/kümeye düşmeyen tespitler FP, tespitsiz taçlar FN.');
+      if (n.kutuIleTespit)
+        m.push('            Kutulu dış tespit: ' + n.kutuIleTespit + ' tespit, kutusu bir taç/küme merkezini kapsadığı için eşleşti.');
       m.push('            Konum hatası: taç merkezine en yakın tespitin uzaklığıdır. (Yarıçap protokolü daha katıdır; ikisini de raporlayın.)');
     } else {
       m.push('Protokol  : YARIÇAP — küme poligonuna düşen tespitler kümeyi "bulundu" sayar; kümedeki fazla tespit FP sayılmaz;');
@@ -6975,12 +6977,13 @@ async function disTespitYukle(dosya){
     c.halkalar.forEach((h, i) => {
       let mx = 0, my = 0; const n = h.length >> 1;
       for (let k = 0; k < h.length; k += 2){ mx += h[k]; my += h[k + 1]; }
-      liste.push({ x: mx / n, y: my / n, p: guvenAl(c.halkaOzellikler[i]) });
+      liste.push({ x: mx / n, y: my / n, p: guvenAl(c.halkaOzellikler[i]), kutu: h });   // kutu: çalışma pikselinde halka
     });
     if (!liste.length)
       throw new Error('Dosyada görüntü kapsamına düşen nokta/kutu yok (' + (c.noktaToplam + c.halkaToplam) +
         ' öğe okundu). Dosyanın CRS\'si ortomozaikle aynı olmalı (ör. EPSG:32635).');
-    D.disTespit = { ad: dosya.name, liste, toplam: c.noktaToplam + c.halkaToplam, disarida: c.noktaDisarida + c.halkaDisarida };
+    D.disTespit = { ad: dosya.name, liste, toplam: c.noktaToplam + c.halkaToplam, disarida: c.noktaDisarida + c.halkaDisarida,
+      kutulu: c.halkalar.length > 0 };
     D.dogrulukNokta = null; D.ayarTarama = null; D.dogruluk = null;
     goster($('noktaOzet'), false); goster($('dogrulukKartlar'), false); goster($('dogrulukOzet'), false);
     goster($('sacilimKnv'), false); goster($('sacilimNot'), false); goster($('btnDogrulukRapor'), false);
@@ -6999,7 +7002,7 @@ function disTespitUygula(){
   const esik = parseInt($('esik').value, 10) / 100;
   $('esikYazi').textContent = '%' + $('esik').value;
   const { adim, yari } = blokOlcek();
-  D.agaclar = d.liste.filter(t => t.p >= esik).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, dis: true }));
+  D.agaclar = d.liste.filter(t => t.p >= esik).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, dis: true, kutu: t.kutu || null }));
   D.enYogun = null;
   const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
   let tac = parseFloat(String($('tacCapi').value || '').replace(',', '.'));
@@ -7012,7 +7015,9 @@ function disTespitUygula(){
     $('esik').value + ' olan <b>' + sayiTR(D.agaclar.length) + '</b> tanesi işaretlendi' +
     (d.disarida ? ' (' + d.disarida + ' tanesi görüntü dışında)' : '') +
     '.<br><small>Bu noktalar modelin değil, yüklenen dosyanın (ör. YOLO) tespitleridir; Doğruluk Analizi aynı referans ve ' +
-    'protokolle puanlar. Modelin işaretlerine dönmek için 📍 Ağaçları İşaretle.</small>';
+    'protokolle puanlar.' + (d.kutulu ? ' Dosya <b>kutu</b> içerdiği için taç poligonu protokolünde, kutusu bir taç/küme merkezini kapsayan ' +
+    'tespit de o birimi bulmuş sayılır.' : ' Nokta dosyası yüklendi; kutu kapsaması için yolo_kutular.geojson\'u yükleyebilirsiniz.') +
+    ' Modelin işaretlerine dönmek için 📍 Ağaçları İşaretle.</small>';
   goster(kutu, true); goster($('agacGosterSatir'), true); goster($('esikSatir'), true); goster($('agacSatir'), true);
   $('btnAgacGeojson').disabled = !D.sonuc || !D.agaclar.length;
   $('adim4').open = true;
@@ -7026,7 +7031,7 @@ async function disTespitTarama(){
   const { adim, yari } = blokOlcek();
   const sonuclar = [];
   for (let e = 0.05; e <= 0.951; e += 0.05){
-    const ag = d.liste.filter(t => t.p >= e - 1e-9).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0 }));
+    const ag = d.liste.filter(t => t.p >= e - 1e-9).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, kutu: t.kutu || null }));
     const o = noktaDogrulukOlc(ag, yr.px);
     sonuclar.push({ esik: +e.toFixed(2), tac: NaN, f1: o.f1, precision: o.precision, recall: o.recall, tp: o.tp, fp: o.fp, fn: o.fn, n: ag.length });
   }
@@ -7240,11 +7245,28 @@ async function yoloVeriSetiAktar(){
         if ((egitimBilgi.length & 3) === 0){ durum('Eğitim karoları hazırlanıyor… ' + egitimBilgi.length); await beklet(); }
       }
     }
+    if (!egitimKaro.length) throw new Error('Hiçbir karoya eğitim tacı düşmedi (taçlar görüntü kapsamında mı?).');
+    /* 3) rastgele arka plan karoları: eğitim/doğrulama tacı içermeyen konumlar (test taçları yine maskeli) —
+          başka ağaç türleri, gölge, çim gibi olumsuz örnekler; yanlış alarmı azaltır. Hedef: eğitim karosu kadar. */
+    const hedefArka = Math.max(20, egitimKaro.length);
+    for (let deneme = 0; deneme < hedefArka * 10 && arkaplan.length < hedefArka; deneme++){
+      const tx = W <= T ? 0 : Math.round(rng() * (W - T)), ty = H <= T ? 0 : Math.round(rng() * (H - T));
+      const tw = Math.min(T, W - tx), th = Math.min(T, H - ty);
+      if (gecerliOrani(tx, ty, tw, th) < 0.5) continue;
+      const karo = { x0: tx, y0: ty, x1: tx + tw, y1: ty + th };
+      if (egitimKutu.some(b => { const alan = (b.x1 - b.x0) * (b.y1 - b.y0); return alan > 0 && kesisim(b, karo) / alan >= 0.5; })) continue;
+      const ad = 'arka_' + String(ty).padStart(5, '0') + '_' + String(tx).padStart(5, '0');
+      if (arkaplan.some(a => a.ad === ad)) continue;
+      const { satirlar } = etiketliKaro(tx, ty, 'egitim');
+      if (satirlar.length) continue;
+      arkaplan.push({ ad, blob: await blobAl(), etiket: '', x0: tx, y0: ty, w: tw, h: th });
+      if ((arkaplan.length & 3) === 0){ durum('Arka plan karoları hazırlanıyor… ' + arkaplan.length); await beklet(); }
+    }
     const karistir = a => { for (let i = a.length - 1; i > 0; i--){ const j = (rng() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
     karistir(arkaplan);
-    if (!egitimKaro.length) throw new Error('Hiçbir karoya eğitim tacı düşmedi (taçlar görüntü kapsamında mı?).');
     if (!dogrulamaKaro.length) dogrulamaKaro.push({ ...egitimKaro[0], ad: 'dogrulama_' + egitimKaro[0].ad });   // tek taç: doğrulama boş kalmasın
-    const arkaSec = arkaplan.slice(0, Math.max(2, Math.round(egitimKaro.length / 2)));
+    const arkaSec = arkaplan.slice(0, Math.max(2, egitimKaro.length));
+    arkaSec.forEach((a, i) => egitimBilgi.push({ dosya: a.ad + '.jpg', bolum: 'arka', x0: a.x0, y0: a.y0, w: a.w, h: a.h, tac: null }));
     const valArka = Math.min(arkaSec.length, Math.max(1, Math.round(arkaSec.length * 0.2)));
     const koy = (liste, bolum) => {
       for (const k of liste){
@@ -7349,7 +7371,7 @@ function eslesmeYaricapPx(){
    kalan tespitler referans noktalarla yarıçap içinde, artan mesafeyle bire bir eşlenir. */
 function noktaDogrulukOlc(agaclar, yaricapPx){
   const s = blokOlcek();                        // model sonucu yoksa (dış tespit) blok = çalışma pikseli
-  const tespTum = agaclar.map((a, i) => ({ i, x: s.yari + a.x * s.adim, y: s.yari + a.y * s.adim, p: a.p, kume: a.kume || 0 }));
+  const tespTum = agaclar.map((a, i) => ({ i, x: s.yari + a.x * s.adim, y: s.yari + a.y * s.adim, p: a.p, kume: a.kume || 0, kutu: a.kutu || null }));
   const refTum = D.referansNokta ? D.referansNokta.noktalarPx : [];
   const kumeTum = D.referansKume ? D.referansKume.halkalarPx : [];
   /* eğitim ağaçları: referanstan çıkar, çevrelerindeki tespitleri yok say (ne TP ne FP) */
@@ -7370,6 +7392,8 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
   const merkez = h => { let mx = 0, my = 0; const n = h.length >> 1;
     for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; } return [mx / n, my / n]; };
   const serbest = [];
+  let kutuIle = 0;
+  const kumeMerkez = kumeler.map(merkez), tacMerkez = taclar.map(merkez);
   for (const t of tesp){
     let k = -1;
     for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(t.x, t.y, kumeler[i])){ k = i; break; }
@@ -7378,6 +7402,16 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
       let tk = -1;
       for (let i = 0; i < taclar.length; i++) if (noktaHalkaIcinde(t.x, t.y, taclar[i])){ tk = i; break; }
       if (tk >= 0){ tacTespit[tk].push(t); continue; }
+      /* kutulu dış tespit (ör. YOLO kutu dosyası): tespit kutusu bir taç/küme MERKEZİNİ kapsıyorsa o birim bulundu sayılır;
+         büyük taçlarda kutu merkezi poligonun biraz dışına düşse de ağaç yakalanmış demektir */
+      if (t.kutu){
+        let tk2 = -1;
+        for (let i = 0; i < taclar.length; i++) if (noktaHalkaIcinde(tacMerkez[i][0], tacMerkez[i][1], t.kutu)){ tk2 = i; break; }
+        if (tk2 >= 0){ tacTespit[tk2].push(t); kutuIle++; continue; }
+        let k2 = -1;
+        for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(kumeMerkez[i][0], kumeMerkez[i][1], t.kutu)){ k2 = i; break; }
+        if (k2 >= 0){ kumeTespitK[k2]++; kutuIle++; continue; }
+      }
     }
     serbest.push(t);
   }
@@ -7425,7 +7459,7 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
     enBuyukHataPx: hatalar.length ? hatalar[hatalar.length - 1] : 0,
     eslesen, kumeTespit, refSayi: birimSayi, kumeSayi: kumeler.length,
     tespit: tesp.length, kumeIciTespit: kumeTespitK.reduce((a, b) => a + b, 0),
-    tacIciTespit: tacTespit.reduce((a, l) => a + l.length, 0), protokol: poligonModu ? 'poligon' : 'yaricap', yaricapPx,
+    tacIciTespit: tacTespit.reduce((a, l) => a + l.length, 0), kutuIleTespit: kutuIle, protokol: poligonModu ? 'poligon' : 'yaricap', yaricapPx,
     egitimDisi: dis.var, refDisiSayi: dis.refDisiSayi, kumeDisiSayi: dis.kumeDisiSayi, egitimIciTespit };
 }
 function noktaDogrulukHesapla(){
@@ -7460,7 +7494,8 @@ function noktaDogrulukHesapla(){
       : ' · eşleşme yarıçapı ' + String(yr.deger).replace('.', ',') + ' ' + birim + ' (bire bir, katı)') +
     ' · tespit ' + o.tespit +
     ((o.tacIciTespit || o.kumeIciTespit) ? ' (' + [o.tacIciTespit ? o.tacIciTespit + '’i taç içinde' : '',
-      o.kumeIciTespit ? o.kumeIciTespit + '’i küme içinde' : ''].filter(Boolean).join(', ') + ')' : '') + hataYazi +
+      o.kumeIciTespit ? o.kumeIciTespit + '’i küme içinde' : '',
+      o.kutuIleTespit ? o.kutuIleTespit + '’i kutu kapsamasıyla' : ''].filter(Boolean).join(', ') + ')' : '') + hataYazi +
     (o.egitimDisi ? '<br>🎓 Değerlendirme dışı: <b>' + o.refDisiSayi + '</b> eğitim ağacı' +
       (o.kumeDisiSayi ? ' + ' + o.kumeDisiSayi + ' küme' : '') + ' · çevrelerindeki <b>' + o.egitimIciTespit +
       '</b> tespit sayılmadı — sonuç yalnız bağımsız (test) ağaçlar üzerinden' : '') + '</div>';
