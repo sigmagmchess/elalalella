@@ -658,6 +658,13 @@ textarea.rapor{
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11.5px" title="Havuzdaki fotoğraf kopyaları ve Çam çokgenleri de eğitim görüntüsü olarak eklenir (test çamları fotoğraflarda ayırt edilemez; raporda belirtin)">
           <input type="checkbox" id="chkYoloFoto"> fotoğrafları da ekle
         </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px" title="Karo kenarı (çalışma pikseli). Colab'da imgsz=1024 ile eğitildiği için 512 px karo = 2 kat yakınlaştırma: taçlar daha büyük görünür, yan yana taçlar tek kutuya sığmaz (grup kutusunu azaltır); karo sayısı ve ZIP 4 kat büyür.">karo
+          <select id="secYoloKaro" style="font-size:11.5px">
+            <option value="1024" selected>1024 px</option>
+            <option value="768">768 px (1,3×)</option>
+            <option value="512">512 px (2× yakın)</option>
+          </select>
+        </label>
       </div>
       <div class="arac-grup">
         <button class="btn kucuk" id="btnModelAktar" disabled>🧠 C++ modelini indir (.bin)</button>
@@ -7113,7 +7120,7 @@ async function yoloVeriSetiAktar(){
   if (!egitimTac.length) return hata('Kimlik listesi hiçbir taçla eşleşmedi; tuvaldeki numaralara bakın.');
   const kumeler = D.referansKume ? D.referansKume.halkalarPx : [];
   const fotoDahil = $('chkYoloFoto').checked;
-  const T = 1024, ADIM = Math.round(T * 0.8);
+  const T = parseInt($('secYoloKaro').value, 10) || 1024, ADIM = Math.round(T * 0.8);   // karo kenarı (çalışma px); Colab imgsz=1024 → 512 = 2× yakın
   const pxM = geoVar ? 1 / (g.geo.sx * g.olcek) : 1 / 0.025;
   const maskePay = 1.0 * pxM;
   const onay = await onayla('YOLO veri seti:\n• ' + egitimTac.length + ' eğitim tacı → kutu; ' + testTac.length +
