@@ -6553,7 +6553,7 @@ $('btnDogrulukRapor').addEventListener('click', () => {
       m.push('Protokol  : TAÇ POLİGONU — poligonun içine en az bir tespit düşen taç "bulundu" sayılır; poligon');
       m.push('            içindeki fazla tespitler FP sayılmaz; hiçbir taç/kümeye düşmeyen tespitler FP, tespitsiz taçlar FN.');
       if (n.kutuIleTespit)
-        m.push('            Kutulu dış tespit: ' + n.kutuIleTespit + ' tespit, kutusu bir taç/küme merkezini kapsadığı için eşleşti.');
+        m.push('            Kutulu dış tespit: ' + n.kutuIleTespit + ' tespit, kutusu bir taç/küme sınır dikdörtgeninin en az yarısını kapsadığı için eşleşti.');
       m.push('            Konum hatası: taç merkezine en yakın tespitin uzaklığıdır. (Yarıçap protokolü daha katıdır; ikisini de raporlayın.)');
     } else {
       m.push('Protokol  : YARIÇAP — küme poligonuna düşen tespitler kümeyi "bulundu" sayar; kümedeki fazla tespit FP sayılmaz;');
@@ -7015,8 +7015,8 @@ function disTespitUygula(){
     $('esik').value + ' olan <b>' + sayiTR(D.agaclar.length) + '</b> tanesi işaretlendi' +
     (d.disarida ? ' (' + d.disarida + ' tanesi görüntü dışında)' : '') +
     '.<br><small>Bu noktalar modelin değil, yüklenen dosyanın (ör. YOLO) tespitleridir; Doğruluk Analizi aynı referans ve ' +
-    'protokolle puanlar.' + (d.kutulu ? ' Dosya <b>kutu</b> içerdiği için taç poligonu protokolünde, kutusu bir taç/küme merkezini kapsayan ' +
-    'tespit de o birimi bulmuş sayılır.' : ' Nokta dosyası yüklendi; kutu kapsaması için yolo_kutular.geojson\'u yükleyebilirsiniz.') +
+    'protokolle puanlar.' + (d.kutulu ? ' Dosya <b>kutu</b> içerdiği için taç poligonu protokolünde, kutusu bir tacın (sınır dikdörtgeninin) en az ' +
+    'yarısını kapsayan tespit de o tacı bulmuş sayılır; özet ve raporda ayrı gösterilir.' : ' Nokta dosyası yüklendi; kutu kapsaması için yolo_kutular.geojson\'u yükleyebilirsiniz.') +
     ' Modelin işaretlerine dönmek için 📍 Ağaçları İşaretle.</small>';
   goster(kutu, true); goster($('agacGosterSatir'), true); goster($('esikSatir'), true); goster($('agacSatir'), true);
   $('btnAgacGeojson').disabled = !D.sonuc || !D.agaclar.length;
@@ -7393,7 +7393,14 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
     for (let i = 0; i < h.length; i += 2){ mx += h[i]; my += h[i + 1]; } return [mx / n, my / n]; };
   const serbest = [];
   let kutuIle = 0;
-  const kumeMerkez = kumeler.map(merkez), tacMerkez = taclar.map(merkez);
+  const kutuSinir = h => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < h.length; i += 2){ x0 = Math.min(x0, h[i]); x1 = Math.max(x1, h[i]); y0 = Math.min(y0, h[i + 1]); y1 = Math.max(y1, h[i + 1]); }
+    return { x0, y0, x1, y1 }; };
+  const kapsamaOrani = (kutu, tac) => {           // tacın sınır dikdörtgeninin kutu içinde kalan oranı
+    const kx = Math.max(0, Math.min(kutu.x1, tac.x1) - Math.max(kutu.x0, tac.x0)), ky = Math.max(0, Math.min(kutu.y1, tac.y1) - Math.max(kutu.y0, tac.y0));
+    const alan = (tac.x1 - tac.x0) * (tac.y1 - tac.y0);
+    return alan > 0 ? kx * ky / alan : 0; };
+  const tacSinir = taclar.map(kutuSinir), kumeSinir = kumeler.map(kutuSinir);
   for (const t of tesp){
     let k = -1;
     for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(t.x, t.y, kumeler[i])){ k = i; break; }
@@ -7402,14 +7409,16 @@ function noktaDogrulukOlc(agaclar, yaricapPx){
       let tk = -1;
       for (let i = 0; i < taclar.length; i++) if (noktaHalkaIcinde(t.x, t.y, taclar[i])){ tk = i; break; }
       if (tk >= 0){ tacTespit[tk].push(t); continue; }
-      /* kutulu dış tespit (ör. YOLO kutu dosyası): tespit kutusu bir taç/küme MERKEZİNİ kapsıyorsa o birim bulundu sayılır;
-         büyük taçlarda kutu merkezi poligonun biraz dışına düşse de ağaç yakalanmış demektir */
+      /* kutulu dış tespit (ör. YOLO kutu dosyası): tespit kutusu bir tacın (ya da kümenin) sınır dikdörtgeninin
+         en az YARISINI kapsıyorsa o birim bulundu sayılır; kutu merkezi büyük/düzensiz poligonun dışına düşse de
+         taç kutunun içindedir. Yalnız merkezi kapsamak yetmez (dev kutular ödüllendirilmesin). */
       if (t.kutu){
-        let tk2 = -1;
-        for (let i = 0; i < taclar.length; i++) if (noktaHalkaIcinde(tacMerkez[i][0], tacMerkez[i][1], t.kutu)){ tk2 = i; break; }
+        const kb = kutuSinir(t.kutu);
+        let tk2 = -1, enIyi = 0;
+        for (let i = 0; i < taclar.length; i++){ const o = kapsamaOrani(kb, tacSinir[i]); if (o >= 0.5 && o > enIyi){ enIyi = o; tk2 = i; } }
         if (tk2 >= 0){ tacTespit[tk2].push(t); kutuIle++; continue; }
-        let k2 = -1;
-        for (let i = 0; i < kumeler.length; i++) if (noktaHalkaIcinde(kumeMerkez[i][0], kumeMerkez[i][1], t.kutu)){ k2 = i; break; }
+        let k2 = -1; enIyi = 0;
+        for (let i = 0; i < kumeler.length; i++){ const o = kapsamaOrani(kb, kumeSinir[i]); if (o >= 0.5 && o > enIyi){ enIyi = o; k2 = i; } }
         if (k2 >= 0){ kumeTespitK[k2]++; kutuIle++; continue; }
       }
     }
