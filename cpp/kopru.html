@@ -4973,7 +4973,7 @@ function sonucKatmaniGuncelle(){
   const s = D.sonuc, K = D.siniflar.length;
   const esik = parseInt($('esik').value, 10) / 100;
   $('esikYazi').textContent = '%' + $('esik').value;
-  const probs = aktifProbs();
+  const probs = yukseklikliProbs(aktifProbs());             // yükseklik maskesi: alçak bloklarda Çam olasılığı 0
   if (!D.sonucKnv){ D.sonucKnv = document.createElement('canvas'); }
   D.sonucKnv.width = s.gw; D.sonucKnv.height = s.gh;
   const ctx = D.sonucKnv.getContext('2d');
@@ -5201,7 +5201,7 @@ function agaclariHesapla(sessiz){
   const K = D.siniflar.length;
   const camIdx = hedefTurIdx();
   const esik = parseInt($('esik').value, 10) / 100;
-  const probs = aktifProbs();
+  const probs = yukseklikliProbs(aktifProbs());
   const geoVar = g.geo && !g.geo.cografi;
   let tac = parseFloat(String($('tacCapi').value || '').replace(',', '.'));
   if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
@@ -7119,8 +7119,10 @@ function yukseklikSuzgeciEtkin(){
 function yukseklikDegisti(){
   yukseklikDurumYaz();
   if (!D.gorsel) return;
-  if (D.disTespit) disTespitUygula();
-  else if (D.sonuc && D.agaclar) agaclariHesapla(true);
+  if (D.sonuc) sonucKatmaniGuncelle();                   // harita maskeyle yenilenir (dış tespit varsa içinde yeniden süzülür)
+  else if (D.disTespit) disTespitUygula();
+  if (D.sonuc && D.agaclar && !D.disTespit) agaclariHesapla(true);
+  if (D.gorsel) ciz();
 }
 function yukseklikDurumYaz(){
   const y = D.yukseklik, el = $('yukseklikDurum');
@@ -7224,6 +7226,33 @@ function noktaYuksekligi(xCalisma, yCalisma){
       if (!(enCok >= hh)) enCok = hh;
     }
   return enCok;
+}
+/* blok düzeyinde yükseklik maskesi: merkezi eşiğin altında kalan bloklar (çim, yol, çalı) → Çam olasılığı sıfırlanır.
+   Harita, işaretleme ve ayar taraması bu maskeli olasılıkları kullanır; sonuç ve ayarlara göre önbelleklenir. */
+function yukseklikBlokMaske(){
+  if (!D.sonuc || !yukseklikSuzgeciEtkin()) return null;
+  const s = D.sonuc, enAz = parseFloat(String($('yukseklikEnAz').value).replace(',', '.'));
+  if (!isFinite(enAz) || enAz <= 0) return null;
+  const y = D.yukseklik, zemin = y.dtm || y.zemin;
+  const anahtar = [s.gw, s.gh, s.adim, s.yari, enAz, y.dsm.ad, y.dsm.w, zemin ? zemin.w : 0, y.dtm ? 'dtm' : 'zemin'].join('|');
+  if (y.blokMaske && y.blokAnahtar === anahtar && y.blokSonuc === s) return y.blokMaske;
+  const g = D.gorsel, m = new Uint8Array(s.gw * s.gh);
+  let alcak = 0;
+  for (let by = 0; by < s.gh; by++) for (let bx = 0; bx < s.gw; bx++){
+    const xC = s.yari + bx * s.adim, yC = s.yari + by * s.adim;
+    const E = g.geo.ox + xC * g.olcek * g.geo.sx, N = g.geo.oy - yC * g.olcek * g.geo.sy;
+    const d = rasterDeger(y.dsm, E, N), z = rasterDeger(zemin, E, N);
+    if (isFinite(d) && isFinite(z) && d - z < enAz){ m[by * s.gw + bx] = 1; alcak++; }
+  }
+  y.blokMaske = m; y.blokAnahtar = anahtar; y.blokSonuc = s; y.alcakBlok = alcak;
+  return m;
+}
+function yukseklikliProbs(probs){
+  const m = yukseklikBlokMaske();
+  if (!m) return probs;
+  const K = D.siniflar.length, cam = hedefTurIdx(), p = Float32Array.from(probs);
+  for (let i = 0; i < m.length; i++) if (m[i]) p[i * K + cam] = 0;
+  return p;
 }
 /* ağaç listesini (blok koordinatında) yükseklikle süzer; D.yukseklik.elenen sayısını günceller */
 function yukseklikSuz(agaclar){
@@ -7726,7 +7755,7 @@ async function enIyiAyariBul(){
   if (!D.sonuc) return;
   if (!D.agaclar) agaclariHesapla(true);
   const s = D.sonuc, g = D.gorsel, K = D.siniflar.length, camIdx = hedefTurIdx();
-  const probs = aktifProbs();
+  const probs = yukseklikliProbs(aktifProbs());
   const geoVar = !!(g.geo && !g.geo.cografi);
   const tacGirdi = parseFloat(String($('tacCapi').value || '').replace(',', '.')) || (geoVar ? 3 : 60);
   const yr = eslesmeYaricapPx();
