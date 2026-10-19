@@ -4496,8 +4496,14 @@ function koordinatYaz(x, y){
     const E = geo.ox + (ozX + 0.5 * D.gorsel.olcek) * geo.sx;
     const N = geo.oy - (ozY + 0.5 * D.gorsel.olcek) * geo.sy;
     const hane = geo.cografi ? 6 : 2;
+    let yuk = '';
+    if (D.yukseklik && D.yukseklik.dsm && !geo.cografi){
+      const d = rasterDeger(D.yukseklik.dsm, E, N), z = rasterDeger(D.yukseklik.dtm || D.yukseklik.zemin, E, N);
+      yuk = ' · DSM ' + (isFinite(d) ? sayiTR(d, 1) : '—') + ' · zemin ' + (isFinite(z) ? sayiTR(z, 1) : '—') +
+        ' · h ' + (isFinite(d) && isFinite(z) ? sayiTR(d - z, 1) + ' m' : '—');
+    }
     $('durumGeo').textContent = (geo.epsg ? 'EPSG:' + geo.epsg + ' → ' : '') +
-      'E ' + sayiTR(E, hane) + ', N ' + sayiTR(N, hane);
+      'E ' + sayiTR(E, hane) + ', N ' + sayiTR(N, hane) + yuk;
   } else $('durumGeo').textContent = '';
 }
 
