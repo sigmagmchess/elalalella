@@ -3713,6 +3713,7 @@ function geriAl(){
 }
 function maskeyiYenidenKur(){
   D.etiketMaske.fill(0);
+  if (D.cevreMaske) D.cevreMaske.fill(0);
   if (D.referansMaske) D.referansMaske.fill(0);
   for (const v of D.vuruslar) vurusUygula(v, false);
   etiketKnvYenile();
@@ -3778,7 +3779,10 @@ function cevreDoldur(m, W, H, v, deger){
   for (const h of v.halkalar) cokgenDoldur(yakin, W, H, halkaOlcekle(h, v.yaricap), 1);
   for (const h of v.hepsi) cokgenDoldur(haric, W, H, halkaOlcekle(h, v.tampon), 1);
   const g = D.gorsel.gecerli;
-  for (let i = 0; i < N; i++) if (yakin[i] && !haric[i] && g[i]) m[i] = deger;
+  /* kuşak yalnız boş piksellere yazılır: elle boyanan vuruşlar (ör. geniş yapraklı "Çam değil", ek Çam) korunur.
+     Kuşak pikselleri ayrıca işaretlenir; örneklemede elle boyananlara öncelik verilir. */
+  if (!D.cevreMaske || D.cevreMaske.length !== N) D.cevreMaske = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (yakin[i] && !haric[i] && g[i] && !m[i]){ m[i] = deger; D.cevreMaske[i] = 1; }
 }
 
 /* fırça dışı araçlar: uygula + tuvali/istatistikleri tazele */
@@ -4551,23 +4555,28 @@ window.addEventListener('keyup', e => {
 function ornekleriTopla(yama, sinifBasina){
   const g = D.gorsel, m = D.etiketMaske, K = D.siniflar.length;
   const rng = mulberry32(42);
-  /* rezervuar örneklemesi ile sınıf başına en çok N piksel */
-  const secilen = Array.from({ length: K }, () => []);
-  const gorulen = new Array(K).fill(0);
+  /* rezervuar örneklemesi ile sınıf başına en çok N piksel — iki katmanlı:
+     elle boyanan pikseller (fırça/çokgen; ör. geniş yapraklı "Çam değil") ÖNCELİKLİ, otomatik çevre kuşağı
+     pikselleri (D.cevreMaske) yalnız kalan kotayı doldurur. Böylece 7 milyon px'lik kuşak, 200 bin px'lik
+     elle örnekleri bastıramaz; her sınıf için bütçe yine N. */
+  const kusak = D.cevreMaske && D.cevreMaske.length === m.length ? D.cevreMaske : null;
+  const oncelik = Array.from({ length: K }, () => []), kusakSec = Array.from({ length: K }, () => []);
+  const gorulenO = new Array(K).fill(0), gorulenK = new Array(K).fill(0);
   /* merkezleri seyrelt: komşu piksellerin ~%90 örtüşen yamaları CV katlarına
      sızıp F1'i yapay şişirmesin (örtüşme ≤ %50'ye iner) */
   const seyrek = Math.max(2, yama >> 1);
+  const rezervuar = (liste, gorulen, c, i) => {
+    gorulen[c]++;
+    if (liste[c].length < sinifBasina) liste[c].push(i);
+    else { const j = (rng() * gorulen[c]) | 0; if (j < sinifBasina) liste[c][j] = i; }
+  };
   for (let i = 0; i < m.length; i++){
     const c = m[i] - 1;
     if (c < 0) continue;
     if ((i % g.outW) % seyrek !== 0 || (((i / g.outW) | 0) % seyrek) !== 0) continue;
-    gorulen[c]++;
-    if (secilen[c].length < sinifBasina) secilen[c].push(i);
-    else {
-      const j = (rng() * gorulen[c]) | 0;
-      if (j < sinifBasina) secilen[c][j] = i;
-    }
+    if (kusak && kusak[i]) rezervuar(kusakSec, gorulenK, c, i); else rezervuar(oncelik, gorulenO, c, i);
   }
+  const secilen = oncelik.map((o, c) => o.length >= sinifBasina ? o.slice(0, sinifBasina) : o.concat(kusakSec[c].slice(0, sinifBasina - o.length)));
   const cikar = ozellikCikarici(g.rgba, g.gecerli, g.outW, g.outH, yama);
   const oz = new Float64Array(OZELLIK_SAYISI);
   const X = [], y = [];
