@@ -600,6 +600,18 @@ textarea.rapor{
           title="Başka bir yöntemin (ör. Colab'da eğitilen YOLO) tespitlerini GeoJSON nokta ya da kutu olarak yükleyin; aynı referans ve aynı protokolle puanlanır. Güven değeri 'guven'/'conf' özniteliğinden okunur, Adım 4'teki güven eşiği kaydırıcısıyla süzülür.">📥 Dış tespitleri yükle (YOLO GeoJSON)…</button>
         <input type="file" id="disTespitGirdi" accept=".geojson,.json,application/geo+json,application/json" class="gizli">
       </div>
+      <div class="satir" style="flex-wrap:wrap;gap:6px;align-items:center">
+        <button class="btn kucuk" id="btnDsmYukle"
+          title="Pix4D sayısal yüzey modeli (3_dsm_ortho/1_dsm/*_dsm.tif ya da tiles klasöründeki tüm karolar). DTM ile birlikte bitki örtüsü yüksekliği (CHM = DSM − DTM) hesaplanır; alçak tespitler (çim, çalı, fidan) elenir.">🏔️ DSM yükle…</button>
+        <input type="file" id="dsmGirdi" accept=".tif,.tiff,image/tiff" multiple class="gizli">
+        <button class="btn kucuk" id="btnDtmYukle" title="Pix4D arazi modeli (3_dsm_ortho/extras/dtm/*_dtm.tif). Yüklenmezse zemin DSM'den (yerel en küçük yükseklik) tahmin edilir.">⛰️ DTM yükle…</button>
+        <input type="file" id="dtmGirdi" accept=".tif,.tiff,image/tiff" multiple class="gizli">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px" title="Tespit noktasının 1,5 m çevresindeki en yüksek bitki örtüsü yüksekliği bu değerin altındaysa tespit elenir; modelin işaretlerine ve dış (YOLO) tespitlere aynı biçimde uygulanır.">
+          <input type="checkbox" id="chkYukseklik" checked> yükseklik süzgeci, en az
+          <input type="number" id="yukseklikEnAz" value="3" min="0" step="0.5" style="max-width:56px"> m
+        </label>
+        <span id="yukseklikDurum" style="font-size:11px;color:var(--ink2)"></span>
+      </div>
       <div class="satir">
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11.5px">
           <input type="checkbox" id="chkReferansGoster" checked>
@@ -1414,6 +1426,8 @@ async function tiffCoz(buf, secenek = {}){
   bildir(1, 'bitti');
   return {
     w, h, outW, outH, olcek: k, rgba, gecerli, geo,
+    bant0: secenek.hamBant ? bantlar[0] : undefined,  // sayısal raster (DSM/DTM) için ham ilk bant
+    kapsandi: secenek.hamBant ? kapsandi : undefined,
     meta: {
       sikAd, bit, fmt, bantSayi, karoMu, big,
       parcaBoy: karoMu ? (cW + '×' + cH) : ('şerit ' + cH + ' satır'),
@@ -5174,10 +5188,10 @@ function agaclariHesapla(sessiz){
   if (!isFinite(tac) || tac <= 0) tac = geoVar ? 3 : 60;
   const tacCalisPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
   const dBlok = Math.max(1, Math.round(tacCalisPx / s.adim));
-  const agaclar = agacTespitAdaptif({
+  const agaclar = yukseklikSuz(agacTespitAdaptif({
     probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik, tacBlok: tacCalisPx / s.adim,
     delik: tacDelikBlok()
-  });
+  }));
   const maske = new Uint8Array(s.gw * s.gh);
   for (let i = 0; i < s.gw * s.gh; i++){
     if (s.sinif[i] === 255) continue;
@@ -5199,7 +5213,7 @@ function agaclariHesapla(sessiz){
   let metin = '📍 <b>' + sayiTR(agaclar.length) + ' ' + kacHtml(D.siniflar[camIdx].ad) +
     ' ağacı</b> işaretlendi — ' + sayiTR(tekSayi) + ' tek ağaç' +
     (kumeSayi ? ' + ' + kumeSayi + ' kümede ' + sayiTR(agaclar.length - tekSayi) + ' gövde' : '') +
-    ' (taç çapı ~' + String(tac).replace('.', ',') + (geoVar ? ' m' : ' px') + ', eşik %' + $('esik').value + ').' +
+    ' (taç çapı ~' + String(tac).replace('.', ',') + (geoVar ? ' m' : ' px') + ', eşik %' + $('esik').value + ')' + yukseklikOzeti() + '.' +
     '<br><small>Her ağaç için tek nokta: taç bileşenlerinin merkezi; birleşik taçlar tepe sayısına göre bölünür.</small>';
   if (D.enYogun){
     const wx = s.yari + D.enYogun.gx * s.adim, wy = s.yari + D.enYogun.gy * s.adim;
@@ -6542,6 +6556,9 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     if (D.referansKume && D.referansKume.disarida)
       m.push('                  (' + D.referansKume.disarida + ' küme görüntü kapsamı dışında, alınmadı)');
     m.push('Tespit          : ' + n.tespit + ' nokta' + (n.kumeIciTespit ? ' (' + n.kumeIciTespit + ' tanesi küme içinde)' : ''));
+    if (n.yukseklik)
+      m.push('Yükseklik süzgeci: en az ' + n.yukseklik.enAz + ' m bitki örtüsü yüksekliği (' + n.yukseklik.zemin + '; DSM: ' + n.yukseklik.dsm +
+        '); ' + n.yukseklik.elenen + ' tespit elendi (tespit noktasının 1,5 m çevresindeki en yüksek CHM değeri)');
     if (n.egitimDisi){
       const e = D.egitimDisi;
       m.push('Değerlendirme dışı (eğitim ağaçları): ' + n.refDisiSayi + ' referans ağacı' +
@@ -7009,7 +7026,7 @@ function disTespitUygula(){
   const esik = parseInt($('esik').value, 10) / 100;
   $('esikYazi').textContent = '%' + $('esik').value;
   const { adim, yari } = blokOlcek();
-  D.agaclar = d.liste.filter(t => t.p >= esik).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, dis: true, kutu: t.kutu || null }));
+  D.agaclar = yukseklikSuz(d.liste.filter(t => t.p >= esik).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, dis: true, kutu: t.kutu || null })));
   D.enYogun = null;
   const g = D.gorsel, geoVar = !!(g.geo && !g.geo.cografi);
   let tac = parseFloat(String($('tacCapi').value || '').replace(',', '.'));
@@ -7020,7 +7037,7 @@ function disTespitUygula(){
   kutu.className = D.agaclar.length ? 'basari' : 'uyari';
   kutu.innerHTML = '📥 <b>Dış tespit:</b> ' + kacHtml(d.ad) + ' — ' + sayiTR(d.liste.length) + ' nokta okundu, güven ≥ %' +
     $('esik').value + ' olan <b>' + sayiTR(D.agaclar.length) + '</b> tanesi işaretlendi' +
-    (d.disarida ? ' (' + d.disarida + ' tanesi görüntü dışında)' : '') +
+    (d.disarida ? ' (' + d.disarida + ' tanesi görüntü dışında)' : '') + yukseklikOzeti() +
     '.<br><small>Bu noktalar modelin değil, yüklenen dosyanın (ör. YOLO) tespitleridir; Doğruluk Analizi aynı referans ve ' +
     'protokolle puanlar.' + (d.kutulu ? ' Dosya <b>kutu</b> içerdiği için taç poligonu protokolünde, kutusu bir tacın (sınır dikdörtgeninin) en az ' +
     'yarısını kapsayan tespit de o tacı bulmuş sayılır; özet ve raporda ayrı gösterilir.' : ' Nokta dosyası yüklendi; kutu kapsaması için yolo_kutular.geojson\'u yükleyebilirsiniz.') +
@@ -7038,7 +7055,7 @@ async function disTespitTarama(){
   const { adim, yari } = blokOlcek();
   const sonuclar = [];
   for (let e = 0.05; e <= 0.951; e += 0.05){
-    const ag = d.liste.filter(t => t.p >= e - 1e-9).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, kutu: t.kutu || null }));
+    const ag = yukseklikSuz(d.liste.filter(t => t.p >= e - 1e-9).map(t => ({ x: (t.x - yari) / adim, y: (t.y - yari) / adim, p: t.p, kume: 0, kutu: t.kutu || null })));
     const o = noktaDogrulukOlc(ag, yr.px);
     sonuclar.push({ esik: +e.toFixed(2), tac: NaN, f1: o.f1, precision: o.precision, recall: o.recall, tp: o.tp, fp: o.fp, fn: o.fn, n: ag.length });
   }
@@ -7057,6 +7074,149 @@ async function disTespitTarama(){
       '</td><td>' + r.fn + '</td><td><b>' + yuzde(r.f1) + '</b></td></tr>').join('') + '</table>' +
     '<small>Not: eşik bu referansa göre seçildi; bağımsız raporlama için doğrulama/test ayrımına dikkat edin.</small></div>';
 }
+
+/* ---- YÜKSEKLİK SÜZGECİ: Pix4D DSM (− DTM) → bitki örtüsü yüksekliği (CHM); alçak tespitler elenir.
+        Modelin işaretlerine ve dış (YOLO) tespitlere aynı süzgeç uygulanır → karşılaştırma adil kalır. ---- */
+D.yukseklik = { dsm: null, dtm: null, zemin: null, elenen: 0 };
+const YUK_PX = 0.25;                                    // yükseklik ızgarası hedef çözünürlüğü (m/px)
+const YUK_YARICAP = 1.5;                                // tespit çevresinde aranan yarıçap (m)
+$('btnDsmYukle').addEventListener('click', () => $('dsmGirdi').click());
+$('btnDtmYukle').addEventListener('click', () => $('dtmGirdi').click());
+$('dsmGirdi').addEventListener('change', async e => { if (e.target.files.length) await yukseklikYukle([...e.target.files], 'dsm'); e.target.value = ''; });
+$('dtmGirdi').addEventListener('change', async e => { if (e.target.files.length) await yukseklikYukle([...e.target.files], 'dtm'); e.target.value = ''; });
+$('chkYukseklik').addEventListener('change', yukseklikDegisti);
+$('yukseklikEnAz').addEventListener('change', yukseklikDegisti);
+function yukseklikSuzgeciEtkin(){
+  const g = D.gorsel;
+  return !!(D.yukseklik.dsm && $('chkYukseklik').checked && g && g.geo && !g.geo.cografi);
+}
+function yukseklikDegisti(){
+  yukseklikDurumYaz();
+  if (!D.gorsel) return;
+  if (D.disTespit) disTespitUygula();
+  else if (D.sonuc && D.agaclar) agaclariHesapla(true);
+}
+function yukseklikDurumYaz(){
+  const y = D.yukseklik, el = $('yukseklikDurum');
+  if (!y.dsm){ el.textContent = ''; return; }
+  el.textContent = 'DSM ✓ ' + y.dsm.w + '×' + y.dsm.h + ' @ ' + String(y.dsm.px).replace('.', ',') + ' m · ' +
+    (y.dtm ? 'DTM ✓' : 'DTM yok → zemin DSM\'den tahmin') + ' · süzgeç ' + ($('chkYukseklik').checked ? 'açık' : 'kapalı') +
+    (y.elenen ? ' · elenen ' + y.elenen : '');
+}
+async function yukseklikYukle(dosyalar, tip){
+  const durum = $('yukseklikDurum'), ad = tip === 'dsm' ? 'DSM' : 'DTM';
+  try{
+    if (D.mesgul) throw new Error('Başka bir işlem sürüyor.');
+    durum.textContent = ad + ' başlıkları okunuyor…';
+    const basliklar = [];
+    for (const f of dosyalar){
+      const b = await tiffCoz(await f.arrayBuffer(), { yalnizBaslik: true });
+      if (!b.geo || b.geo.cografi || !b.geo.sx) throw new Error(f.name + ': UTM coğrafi dönüşüm bulunamadı (GeoTIFF değil?).');
+      basliklar.push({ f, w: b.w, h: b.h, geo: b.geo });
+    }
+    let E0 = Infinity, N1 = -Infinity, E1 = -Infinity, N0 = Infinity;
+    for (const b of basliklar){
+      E0 = Math.min(E0, b.geo.ox); N1 = Math.max(N1, b.geo.oy);
+      E1 = Math.max(E1, b.geo.ox + b.w * b.geo.sx); N0 = Math.min(N0, b.geo.oy - b.h * b.geo.sy);
+    }
+    const px = Math.max(YUK_PX, basliklar[0].geo.sx);
+    const W = Math.ceil((E1 - E0) / px), H = Math.ceil((N1 - N0) / px);
+    if (W * H > 8e7) throw new Error('Yükseklik ızgarası çok büyük (' + W + '×' + H + '); dosyayı QGIS\'te 4 kat alt örnekleyin.');
+    const veri = new Float32Array(W * H).fill(NaN);
+    let i = 0;
+    for (const b of basliklar){
+      durum.textContent = ad + ' çözülüyor… ' + (++i) + '/' + basliklar.length;
+      await beklet();
+      const k = Math.max(1, Math.round(px / b.geo.sx));
+      const t = await tiffCoz(await b.f.arrayBuffer(), { kZorla: k, hamBant: true });
+      const nd = t.meta.nodata;
+      for (let ty = 0; ty < t.outH; ty++){
+        const gy = Math.floor((N1 - (b.geo.oy - ty * k * b.geo.sy)) / px);
+        if (gy < 0 || gy >= H) continue;
+        for (let tx = 0; tx < t.outW; tx++){
+          const idx = ty * t.outW + tx;
+          if (!t.kapsandi[idx]) continue;
+          const v = t.bant0[idx];
+          if (!isFinite(v) || (nd !== null && (v === nd || (isNaN(nd) && isNaN(v)))) || v < -1000) continue;
+          const gx = Math.floor((b.geo.ox + tx * k * b.geo.sx - E0) / px);
+          if (gx >= 0 && gx < W) veri[gy * W + gx] = v;
+        }
+      }
+    }
+    D.yukseklik[tip] = { veri, w: W, h: H, ox: E0, oy: N1, px, ad: dosyalar.map(f => f.name).join(', ') };
+    if (tip === 'dsm'){ durum.textContent = 'zemin tahmini…'; await beklet(); D.yukseklik.zemin = zeminTahmini(D.yukseklik.dsm); }
+    yukseklikDegisti();
+    if (D.gorsel){ const g = D.gorsel; if (g.geo && g.geo.epsg && basliklar[0].geo.epsg && g.geo.epsg !== basliklar[0].geo.epsg)
+      durum.textContent += ' ⚠️ EPSG farklı (' + basliklar[0].geo.epsg + ' ≠ ' + g.geo.epsg + ')'; }
+  }catch(h){
+    durum.textContent = '⚠️ ' + ad + ': ' + (h && h.message ? h.message : h);
+  }
+}
+/* DTM yoksa: 2 m hücrelerde DSM en küçüğü, sonra 12 m yarıçaplı pencerede en küçük → kaba zemin */
+function zeminTahmini(dsm){
+  const hpx = 2, oran = Math.max(1, Math.round(hpx / dsm.px));
+  const w = Math.ceil(dsm.w / oran), h = Math.ceil(dsm.h / oran);
+  const kaba = new Float32Array(w * h).fill(NaN);
+  for (let y = 0; y < dsm.h; y++){
+    const cy = (y / oran) | 0;
+    for (let x = 0; x < dsm.w; x++){
+      const v = dsm.veri[y * dsm.w + x];
+      if (!isFinite(v)) continue;
+      const i = cy * w + ((x / oran) | 0);
+      if (!(kaba[i] <= v)) kaba[i] = v;
+    }
+  }
+  const r = Math.round(12 / hpx), zemin = new Float32Array(w * h).fill(NaN);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    let m = Infinity;
+    for (let dy = -r; dy <= r; dy++){ const yy = y + dy; if (yy < 0 || yy >= h) continue;
+      for (let dx = -r; dx <= r; dx++){ const xx = x + dx; if (xx < 0 || xx >= w) continue;
+        const v = kaba[yy * w + xx]; if (v < m) m = v; } }
+    if (isFinite(m)) zemin[y * w + x] = m;
+  }
+  return { veri: zemin, w, h, ox: dsm.ox, oy: dsm.oy, px: dsm.px * oran };
+}
+function rasterDeger(r, E, N){
+  if (!r) return NaN;
+  const gx = Math.floor((E - r.ox) / r.px), gy = Math.floor((r.oy - N) / r.px);
+  if (gx < 0 || gy < 0 || gx >= r.w || gy >= r.h) return NaN;
+  return r.veri[gy * r.w + gx];
+}
+/* çalışma pikselindeki noktanın çevresindeki (YUK_YARICAP m) en yüksek bitki örtüsü yüksekliği; veri yoksa NaN */
+function noktaYuksekligi(xCalisma, yCalisma){
+  const g = D.gorsel, y = D.yukseklik;
+  const E = g.geo.ox + xCalisma * g.olcek * g.geo.sx, N = g.geo.oy - yCalisma * g.olcek * g.geo.sy;
+  const zemin = y.dtm || y.zemin;
+  let enCok = NaN;
+  const adim = y.dsm.px;
+  for (let dN = -YUK_YARICAP; dN <= YUK_YARICAP + 1e-9; dN += adim)
+    for (let dE = -YUK_YARICAP; dE <= YUK_YARICAP + 1e-9; dE += adim){
+      if (dE * dE + dN * dN > YUK_YARICAP * YUK_YARICAP) continue;
+      const d = rasterDeger(y.dsm, E + dE, N + dN), z = rasterDeger(zemin, E + dE, N + dN);
+      if (!isFinite(d) || !isFinite(z)) continue;
+      const hh = d - z;
+      if (!(enCok >= hh)) enCok = hh;
+    }
+  return enCok;
+}
+/* ağaç listesini (blok koordinatında) yükseklikle süzer; D.yukseklik.elenen sayısını günceller */
+function yukseklikSuz(agaclar){
+  D.yukseklik.elenen = 0;
+  if (!yukseklikSuzgeciEtkin() || !agaclar || !agaclar.length) return agaclar;
+  const enAz = parseFloat(String($('yukseklikEnAz').value).replace(',', '.'));
+  if (!isFinite(enAz) || enAz <= 0) return agaclar;
+  const s = blokOlcek();
+  const kalan = agaclar.filter(a => {
+    const h = noktaYuksekligi(s.yari + a.x * s.adim, s.yari + a.y * s.adim);
+    return !(h < enAz);                                  // veri yoksa (NaN) tut
+  });
+  D.yukseklik.elenen = agaclar.length - kalan.length;
+  yukseklikDurumYaz();
+  return kalan;
+}
+const yukseklikOzeti = () => yukseklikSuzgeciEtkin()
+  ? ' · yükseklik süzgeci ≥ ' + String($('yukseklikEnAz').value).replace('.', ',') + ' m (' + (D.yukseklik.dtm ? 'DSM−DTM' : 'DSM−tahmini zemin') + '): <b>' + D.yukseklik.elenen + '</b> tespit elendi'
+  : '';
 
 /* ---- ZIP yazıcı (STORE, sıkıştırmasız; tek dosya, CDN yok) ---- */
 const CRC_TABLO = (() => {
@@ -7489,6 +7649,8 @@ function noktaDogrulukHesapla(){
     ortHata: o.ortHataPx * mBirim, medHata: o.medHataPx * mBirim, enBuyukHata: o.enBuyukHataPx * mBirim,
     refAd: D.referansNokta ? D.referansNokta.ad : null, kumeAd: D.referansKume ? D.referansKume.ad : null,
     kaynak: D.disTespit ? D.disTespit.ad : 'model', esikYuzde: parseInt($('esik').value, 10),
+    yukseklik: yukseklikSuzgeciEtkin() ? { enAz: String($('yukseklikEnAz').value), elenen: D.yukseklik.elenen,
+      zemin: D.yukseklik.dtm ? 'DTM' : 'DSM\'den tahmini zemin', dsm: D.yukseklik.dsm.ad } : null,
     zaman: new Date().toLocaleString('tr-TR') };
   const toplamRef = o.refSayi + o.kumeSayi;
   const f1y = o.f1 * 100, ry = o.recall * 100, py = o.precision * 100;
@@ -7512,6 +7674,7 @@ function noktaDogrulukHesapla(){
     ((o.tacIciTespit || o.kumeIciTespit) ? ' (' + [o.tacIciTespit ? o.tacIciTespit + '’i taç içinde' : '',
       o.kumeIciTespit ? o.kumeIciTespit + '’i küme içinde' : '',
       o.kutuIleTespit ? o.kutuIleTespit + '’i kutu kapsamasıyla' : ''].filter(Boolean).join(', ') + ')' : '') + hataYazi +
+    yukseklikOzeti() +
     (o.egitimDisi ? '<br>🎓 Değerlendirme dışı: <b>' + o.refDisiSayi + '</b> eğitim ağacı' +
       (o.kumeDisiSayi ? ' + ' + o.kumeDisiSayi + ' küme' : '') + ' · çevrelerindeki <b>' + o.egitimIciTespit +
       '</b> tespit sayılmadı — sonuç yalnız bağımsız (test) ağaçlar üzerinden' : '') + '</div>';
@@ -7552,7 +7715,7 @@ async function enIyiAyariBul(){
     for (const e of esikler) for (const c of carpanlar){
       const tac = tacGirdi * c;
       const tacPx = Math.max(2, geoVar ? tac / (g.geo.sx * g.olcek) : tac / g.olcek);
-      const ag = agacTespitAdaptif({ probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik: e, tacBlok: tacPx / s.adim, delik: tacDelikBlok() });
+      const ag = yukseklikSuz(agacTespitAdaptif({ probs, sinif: s.sinif, gw: s.gw, gh: s.gh, K, camIdx, esik: e, tacBlok: tacPx / s.adim, delik: tacDelikBlok() }));
       const o = noktaDogrulukOlc(ag, yr.px);
       sonuclar.push({ esik: e, tac, f1: o.f1, precision: o.precision, recall: o.recall, tp: o.tp, fp: o.fp, fn: o.fn, n: ag.length });
       btn.textContent = '🔎 taranıyor… ' + (++i) + '/' + (esikler.length * carpanlar.length);
