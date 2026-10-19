@@ -1192,7 +1192,7 @@ async function tiffCoz(buf, secenek = {}){
     throw new Error('Desteklenmeyen bit derinliği: ' + bit + ' bit (8/16/32 desteklenir).');
   if (bit === 32 && fmt !== 3)
     throw new Error('32-bit tamsayı TIFF desteklenmiyor (yalnız 32-bit float).');
-  if (ongoru === 3) throw new Error('Öngörücü=3 (kayan nokta farkı) desteklenmiyor.');
+  if (ongoru === 3 && bit !== 32) throw new Error('Öngörücü=3 yalnız 32-bit float için desteklenir.');
   if (foto === 6 && sik !== 7) throw new Error('JPEG dışı YCbCr TIFF desteklenmiyor.');
 
   const jpegMi = sik === 7;
@@ -1255,10 +1255,23 @@ async function tiffCoz(buf, secenek = {}){
       if (j.w < px1 - px0) continue;
     } else {
       let bayt;
-      if (sik === 1) bayt = (ongoru === 2 ? ham.slice() : ham);  // öngörücü kaynağı bozmasın
+      if (sik === 1) bayt = (ongoru >= 2 ? ham.slice() : ham);  // öngörücü kaynağı bozmasın
       else if (sik === 5) bayt = lzwAc(ham, beklenen);
       else if (sik === 32773) bayt = packbitsAc(ham, beklenen);
       else bayt = await deflateAc(ham, beklenen);
+      if (ongoru === 3){
+        /* kayan nokta öngörücüsü (libtiff fpAcc): satır içinde bayt bazlı fark toplama, sonra bayt düzlemlerini
+           (en anlamlı bayt önce) örnek sırasına geri dizme — Pix4D/GDAL float DSM-DTM'lerinde yaygın */
+        const bps = bit >> 3, satirBayt = parcaW * bantSayi * bps, wc = parcaW * bantSayi, adimB = bantSayi;
+        const tmp = new Uint8Array(satirBayt);
+        for (let r = 0; r + satirBayt <= bayt.length; r += satirBayt){
+          const satir = bayt.subarray(r, r + satirBayt);
+          for (let i = adimB; i < satirBayt; i++) satir[i] = (satir[i] + satir[i - adimB]) & 255;
+          tmp.set(satir);
+          for (let c = 0; c < wc; c++) for (let b = 0; b < bps; b++)
+            satir[c * bps + b] = az ? tmp[(bps - 1 - b) * wc + c] : tmp[b * wc + c];
+        }
+      }
       if (bayt.length < beklenen && sik === 1 && !karoMu){
         // bazı yazıcılar son şeridi kırpar — kalan kısmı sıfırla doldur
         const tam = new Uint8Array(beklenen); tam.set(bayt.subarray(0, Math.min(bayt.length, beklenen)));
