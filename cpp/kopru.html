@@ -606,7 +606,7 @@ textarea.rapor{
         <input type="file" id="dsmGirdi" accept=".tif,.tiff,image/tiff" multiple class="gizli">
         <button class="btn kucuk" id="btnDtmYukle" title="Pix4D arazi modeli (3_dsm_ortho/extras/dtm/*_dtm.tif). Yüklenmezse zemin DSM'den (yerel en küçük yükseklik) tahmin edilir.">⛰️ DTM yükle…</button>
         <input type="file" id="dtmGirdi" accept=".tif,.tiff,image/tiff" multiple class="gizli">
-        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px" title="Tespit noktasının 1,5 m çevresindeki en yüksek bitki örtüsü yüksekliği bu değerin altındaysa tespit elenir; modelin işaretlerine ve dış (YOLO) tespitlere aynı biçimde uygulanır.">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px" title="Tespit noktasının 1,5 m çevresindeki (kutulu dış tespitlerde kutunun tamamındaki) en yüksek bitki örtüsü yüksekliği bu değerin altındaysa tespit elenir; modelin işaretlerine ve dış (YOLO) tespitlere aynı biçimde uygulanır.">
           <input type="checkbox" id="chkYukseklik" checked> yükseklik süzgeci, en az
           <input type="number" id="yukseklikEnAz" value="3" min="0" step="0.5" style="max-width:56px"> m
         </label>
@@ -6586,7 +6586,7 @@ $('btnDogrulukRapor').addEventListener('click', () => {
     m.push('Tespit          : ' + n.tespit + ' nokta' + (n.kumeIciTespit ? ' (' + n.kumeIciTespit + ' tanesi küme içinde)' : ''));
     if (n.yukseklik)
       m.push('Yükseklik süzgeci: en az ' + n.yukseklik.enAz + ' m bitki örtüsü yüksekliği (' + n.yukseklik.zemin + '; DSM: ' + n.yukseklik.dsm +
-        '); ' + n.yukseklik.elenen + ' tespit elendi (tespit noktasının 1,5 m çevresindeki en yüksek CHM değeri)');
+        '); ' + n.yukseklik.elenen + ' tespit elendi (tespit noktasının 1,5 m çevresindeki, kutulu dış tespitlerde kutunun tamamındaki en yüksek CHM değeri)');
     if (n.egitimDisi){
       const e = D.egitimDisi;
       m.push('Değerlendirme dışı (eğitim ağaçları): ' + n.refDisiSayi + ' referans ağacı' +
@@ -7236,6 +7236,26 @@ function noktaYuksekligi(xCalisma, yCalisma){
     }
   return enCok;
 }
+/* kutulu tespit (ör. YOLO): kutunun (çalışma pikselinde düz halka [x,y,x,y…]) tamamındaki en yüksek bitki örtüsü yüksekliği.
+   Grup kutularının merkezi iki taç arasına, zemine düşebildiği için merkez yerine kutu taranır. */
+function kutuYuksekligi(kutu){
+  const g = D.gorsel, y = D.yukseklik, zemin = y.dtm || y.zemin;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < kutu.length; i += 2){ x0 = Math.min(x0, kutu[i]); x1 = Math.max(x1, kutu[i]); y0 = Math.min(y0, kutu[i + 1]); y1 = Math.max(y1, kutu[i + 1]); }
+  if (!isFinite(x0)) return NaN;
+  const E0 = g.geo.ox + x0 * g.olcek * g.geo.sx, E1 = g.geo.ox + x1 * g.olcek * g.geo.sx;
+  const N1 = g.geo.oy - y0 * g.olcek * g.geo.sy, N0 = g.geo.oy - y1 * g.olcek * g.geo.sy;
+  const adim = Math.max(y.dsm.px, (E1 - E0) / 80, (N1 - N0) / 80);   // en çok ~80×80 örnek
+  let enCok = NaN;
+  for (let N = N0; N <= N1 + 1e-9; N += adim)
+    for (let E = E0; E <= E1 + 1e-9; E += adim){
+      const d = rasterDeger(y.dsm, E, N), z = rasterDeger(zemin, E, N);
+      if (!isFinite(d) || !isFinite(z)) continue;
+      const hh = d - z;
+      if (!(enCok >= hh)) enCok = hh;
+    }
+  return enCok;
+}
 /* blok düzeyinde yükseklik maskesi: merkezi eşiğin altında kalan bloklar (çim, yol, çalı) → Çam olasılığı sıfırlanır.
    Harita, işaretleme ve ayar taraması bu maskeli olasılıkları kullanır; sonuç ve ayarlara göre önbelleklenir. */
 function yukseklikBlokMaske(){
@@ -7271,7 +7291,8 @@ function yukseklikSuz(agaclar){
   if (!isFinite(enAz) || enAz <= 0) return agaclar;
   const s = blokOlcek();
   const kalan = agaclar.filter(a => {
-    const h = noktaYuksekligi(s.yari + a.x * s.adim, s.yari + a.y * s.adim);
+    const h = a.kutu && a.kutu.length >= 6 ? kutuYuksekligi(a.kutu)           // kutulu tespit: kutunun tamamı
+                                            : noktaYuksekligi(s.yari + a.x * s.adim, s.yari + a.y * s.adim);
     return !(h < enAz);                                  // veri yoksa (NaN) tut
   });
   D.yukseklik.elenen = agaclar.length - kalan.length;
@@ -7279,7 +7300,8 @@ function yukseklikSuz(agaclar){
   return kalan;
 }
 const yukseklikOzeti = () => yukseklikSuzgeciEtkin()
-  ? ' · yükseklik süzgeci ≥ ' + String($('yukseklikEnAz').value).replace('.', ',') + ' m (' + (D.yukseklik.dtm ? 'DSM−DTM' : 'DSM−tahmini zemin') + '): <b>' + D.yukseklik.elenen + '</b> tespit elendi'
+  ? ' · yükseklik süzgeci ≥ ' + String($('yukseklikEnAz').value).replace('.', ',') + ' m (' + (D.yukseklik.dtm ? 'DSM−DTM' : 'DSM−tahmini zemin') +
+    (D.disTespit && D.disTespit.kutulu ? '; kutunun tamamındaki en yüksek değer' : '') + '): <b>' + D.yukseklik.elenen + '</b> tespit elendi'
   : '';
 
 /* ---- ZIP yazıcı (STORE, sıkıştırmasız; tek dosya, CDN yok) ---- */
